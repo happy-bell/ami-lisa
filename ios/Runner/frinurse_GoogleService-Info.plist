@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>871225930361-5d6s6k70jj8314i3d5p7nudq0u0d5he4.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.871225930361-5d6s6k70jj8314i3d5p7nudq0u0d5he4</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>871225930361-b4au5v3tkjqmgrencu5p2e2lkeutsfhr.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCXGE0Z1cKJa3hJ8CyKAadd28dcFcVCWOI</string>
+	<key>GCM_SENDER_ID</key>
+	<string>871225930361</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.frinurse.amiapp</string>
+	<key>PROJECT_ID</key>
+	<string>frinurse</string>
+	<key>STORAGE_BUCKET</key>
+	<string>frinurse.appspot.com</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:871225930361:ios:78aa3c5ac668d331931aa8</string>
+	<key>DATABASE_URL</key>
+	<string>https://frinurse.firebaseio.com</string>
+</dict>
+</plist>
