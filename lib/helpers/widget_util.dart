@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -305,6 +306,35 @@ class WidgetUtil {
         );
       },
     );
+  }
+
+  static Future<void> showAutoDisposeDialog(BuildContext context, String message) async {
+    const displayTime = Duration(seconds: 2);
+
+    try {
+      await showDialog(
+          context: context,
+          barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('確認'),
+            content: Text(message),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('OK'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      )
+          .timeout(displayTime);
+
+    } on TimeoutException {
+      Navigator.of(context).pop();
+    }
   }
 
   static Future<bool> showSimpleConfirmDialog(BuildContext context, String message, {String title = '確認'}) async {

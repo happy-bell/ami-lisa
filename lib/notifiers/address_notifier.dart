@@ -68,17 +68,34 @@ class AddressStore with ChangeNotifier {
   }
 
   Address? find(udid) {
-    final index = addressList.indexWhere((item) => item.id == udid);
+    var index = _findAddress(udid);
+    if (index >= 0) {
+      return addressList[index];
+    }
+
+    return null;
+  }
+
+  Address? findManager(udid) {
+    final index = _findManagerAddress(udid);
     if (index < 0) {
       return null;
     }
     return addressList[index];
-    // final found = addressList.firstWhere((item) => item.id == udid, orElse: () => null);
-    // return found;
   }
 
   _findAddress(udid) {
     final index = addressList.indexWhere((item) => item.id == udid);
+    return index;
+  }
+
+  _findStaffAddress(udid) {
+    final index = addressList.indexWhere((item) => item.id == udid && item.userType == 'S');
+    return index;
+  }
+
+  _findManagerAddress(udid) {
+    final index = addressList.indexWhere((item) => item.id == udid && item.type == 'manager');
     return index;
   }
 
@@ -99,13 +116,29 @@ class AddressStore with ChangeNotifier {
 
   setAddressStatus(udid, status) {
     final index = _findAddress(udid);
+    print('setAddressStatus   ' + index.toString());
     if (index < 0) {
       return;
     }
 
-    // print('status change $udid => $status');
+    setAddressStatusManager(udid, status);
+    print('status change $udid => $status');
     addressList[index].status = int.parse(status);
     notifyListeners();
+  }
+
+  setAddressStatusManager(udid, status) {
+    final address = find(udid)!;
+    if (address.userType == 'S') {
+      return;
+    }
+    final index = _findAddress('manager_${address.code}');
+    if (index < 0) {
+      return;
+    }
+
+    print('manager status change $udid => $status');
+    addressList[index].status = int.parse(status);
   }
 
   setCall(udid, value) {
@@ -114,21 +147,22 @@ class AddressStore with ChangeNotifier {
       return;
     }
 
+    setCallManager(udid, value);
     print('set call $udid => $value');
     addressList[index].call = value;
-    setCallManager(addressList[index].code);
     notifyListeners();
   }
 
-  setCallManager(code) {
-    final isCall = addressList.indexWhere((item) => item.code == code && item.call == 1);
-    var value = isCall < 0 ? 0 : 1;
-    final index = addressList.indexWhere((item) => item.code == code && item.type == 'manager' && item.userType != 'S');
+  setCallManager(udid, value) {
+    final address = find(udid)!;
+    if (address.userType == 'S') {
+      return;
+    }
+    final index = _findAddress('manager_${address.code}');
     if (index < 0) {
       return;
     }
     addressList[index].call = value;
-
   }
 
   setCalled(udid, value) {
@@ -137,9 +171,23 @@ class AddressStore with ChangeNotifier {
       return;
     }
 
+    setCalledManager(udid, value);
     print('set called $udid => $value');
     addressList[index].called = value;
     notifyListeners();
+  }
+
+  setCalledManager(udid, value) {
+    final address = find(udid)!;
+    if (address.userType == 'S') {
+      return;
+    }
+    final index = _findAddress('manager_${address.code}');
+    if (index < 0) {
+      return;
+    }
+    addressList[index].called = value;
+
   }
 
   setSupported(udid, value) {

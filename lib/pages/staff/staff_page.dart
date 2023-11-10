@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:amiapp/helpers/staff_util.dart';
 import 'package:amiapp/pages/staff/staff_web_page.dart';
 import 'package:amiapp/widgets/biosilver_popup_widget.dart';
 import 'package:flutter/material.dart';
@@ -217,8 +218,12 @@ class _StaffPageState extends State<StaffPage>
       imageName = 'assets/images/status/addr_called.png';
     } else if (address.supported == 1) {
       imageName = 'assets/images/status/addr_supported.png';
-    } else if (address.status == 0 || address.status == 1) {
+    }
+    else if (address.status == 0 || address.status == 1) {
       imageName = 'assets/images/status/addr.png';
+      if (address.userType == 'S') {
+        imageName = 'assets/images/status/addr_staff.png';
+      }
       if (address.sensors.isNotEmpty) {
         print("biosliv image");
         var sensorImage = SensorService.biosilverImageName(address.sensors);
@@ -237,20 +242,21 @@ class _StaffPageState extends State<StaffPage>
           photo = photo.substring(base64Pos + 'base64,'.length);
           bytes = base64Decode(photo);
         }
-      } else if (address.userType == '5') {
-        imageName = 'assets/images/status/addr_staff.png';
       }
-    } else if (address.status == 2 ||
+    }
+    else if (address.status == 2 ||
         address.status == 3 ||
         address.status == 4 ||
         address.status == 5) {
       imageName = 'assets/images/status/addr_talk.png';
-    } else if (address.status == 9) {
+    }
+    else if (address.status == 9) {
       liveText = 'LIVE';
       if (address.liveimage.isNotEmpty) {
         bytes = base64Decode(address.liveimage);
       }
-    } else if (address.status == -1) {
+    }
+    else if (address.status == -1) {
       if (address.sensors.isNotEmpty) {
         print("biosliv image");
         var sensorImage = SensorService.biosilverImageName(address.sensors);
@@ -464,6 +470,39 @@ class _StaffPageState extends State<StaffPage>
         ],
       ),
     );
+  }
+
+  Widget _managerAddressCell(Address address) {
+    final Size size = MediaQuery.of(context).size;
+    if (_islist) {
+      return StaffUtil.managerAddressListCell(size, address, _selectManagerAddress, _talkHistoryButton, _graphButton);
+    }
+
+    return StaffUtil.managerAddressCell(address, _selectManagerAddress);
+  }
+
+  Future<void> _selectManagerAddress(Address address) async {
+    print('===============================================================${address.id}');
+    if (address.userType == 'S') {
+      AppManager.selectUser = address;
+      await Navigator.of(context, rootNavigator: true)
+          .push(
+          PageRouteBuilder(
+            pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
+              return StaffTalkViewPage();
+            },
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+            fullscreenDialog: true,
+          )
+      );
+      return;
+    }
+
+    AppManager.selectCode = address.code;
+    setState(() {
+
+    });
   }
 
   Widget _callStatusPopupListItem(int index) {
@@ -701,6 +740,11 @@ class _StaffPageState extends State<StaffPage>
       appBar: AppManager.selectCode.isNotEmpty ? WidgetUtil.appBar(AppManager.selectCode,
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        leading: IconButton(onPressed: () {
+          setState(() {
+            AppManager.selectCode = '';
+          });
+        }, icon: Icon(Icons.close))
       ) : null,
       body: SafeArea(
         child: LayoutBuilder(
@@ -708,10 +752,12 @@ class _StaffPageState extends State<StaffPage>
               var spanaSize = Size(51, 36);
               const gridPadding = 4.0;
               var gridSpacing = 10.0;
-              var cols = 3;
+              var cols = int.parse(AppManager.appsettings['DISPLAYNUM']);
+              if (cols != 2 && cols != 3 && cols != 5) {
+                cols = 3;
+              }
               var maxWidth = constraints.maxWidth;
               if (maxWidth > 500) {
-                cols = 5;
                 spanaSize = Size(60, 45);
               }
               var colWidth =
@@ -730,6 +776,7 @@ class _StaffPageState extends State<StaffPage>
               }
 
               var gridRatio = colWidth / colHeight;
+              var isManagerList = AppManager.isManager && AppManager.selectCode.isEmpty;
 
               return Stack(
                 fit: StackFit.expand,
@@ -746,7 +793,11 @@ class _StaffPageState extends State<StaffPage>
                         mainAxisSpacing: gridSpacing,
                         crossAxisSpacing: gridSpacing,
                         childAspectRatio: gridRatio,
-                        children: addressStore.staffList()
+                        children: isManagerList ?
+                        addressStore.managerList()
+                            .map((data) => _managerAddressCell(data))
+                            .toList() :
+                        addressStore.staffList()
                             .map((data) => _addressCell(data))
                             .toList(),
                       );
@@ -932,7 +983,7 @@ class _StaffPageState extends State<StaffPage>
       useType = '1';
     }
 
-    if (AppManager.settings["MCSTYPE"] == 'S') {
+    if (AppManager.isManager) {
       useType = 'S';
     }
 
@@ -1042,6 +1093,13 @@ class _StaffPageState extends State<StaffPage>
       if (index < 0) {
         return;
       }
+      var address = context.read<AddressStore>().find(udid)!;
+      if (!AppManager.isAuthReceive(address)) {
+        socketservice.io.emit("call_not_auth", [address.id]);
+        AppManager.toast("${address.name}から着信がありました", bgColor: Colors.blue, sec: 5);
+        return;
+      }
+
       addressStore.setCall(udid, 1);
       if (AppManager.status == AppStatus.Call ||
           AppManager.status == AppStatus.Talk ||
@@ -1050,7 +1108,6 @@ class _StaffPageState extends State<StaffPage>
       } else {
         if (AppManager.appsettings["AUTO_RECEIVE"] == '1') {
           if (AppManager.selectUser == null) {
-            var address = context.read<AddressStore>().find(data["info"]["udid"]);
             if (address != null) {
               AppManager.autoReceiveId = address.id;
               _selectAddress(address);

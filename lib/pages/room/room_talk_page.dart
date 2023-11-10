@@ -357,6 +357,14 @@ class RoomTalkPageState extends State<RoomTalkPage>
     _close();
   }
 
+  Future<void> _callNotAuth() async {
+    audio.stopCall();
+    _statusImage = '';
+    setAppStatus(AppStatus.None);
+    await WidgetUtil.showAutoDisposeDialog(context, '通話許可がありません　通知しました');
+    _close();
+  }
+
   void _receiveHangup(String from) {
     AppStatus newStatus = AppStatus.None;
 
@@ -1115,6 +1123,12 @@ class RoomTalkPageState extends State<RoomTalkPage>
         return;
       }
       _callRejected();
+    }
+    else if (message == 'call_not_auth') {
+      if (data["udid"] == null) {
+        return;
+      }
+      _callNotAuth();
     }
     else if (message == 'talk_end') {
       if (data["udid"] == null) {

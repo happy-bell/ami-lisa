@@ -28,9 +28,10 @@ enum AppStatus {
 
 class AppManager {
   static var settings = {};
-  static bool isManger = false;
-  static dynamic appsettings = {"AUTO_RECEIVE": "0", "SLEEP_MODE": "0", "SLEEP_CLOCK": "0", "SLEEPMODEBRIGHTNESS": "0", "SENSOR0": "0", "SENSOR1": "0", "SENSOR2": "0", "SENSOR3": "0", "SENSOR4": "0", "SENSOR5": "0", "SENSOR8": "0", "SENSOR9": "0", "RINGTONE": "0", "CALLSCREENIMAGE": "0", "CALLSCREENIMAGEL": "0", "VOLUME_CALL": "0", "CLOCKDISP": "0", "DISPLAYNUM": "1", "CALLSTATUSDISP": "0"};
+  static bool isManager = false;
+  static dynamic appsettings = {"AUTO_RECEIVE": "0", "SLEEP_MODE": "0", "SLEEP_CLOCK": "0", "SLEEPMODEBRIGHTNESS": "0", "SENSOR0": "0", "SENSOR1": "0", "SENSOR2": "0", "SENSOR3": "0", "SENSOR4": "0", "SENSOR5": "0", "SENSOR8": "0", "SENSOR9": "0", "RINGTONE": "0", "CALLSCREENIMAGE": "0", "CALLSCREENIMAGEL": "0", "VOLUME_CALL": "0", "CLOCKDISP": "0", "DISPLAYNUM": "3", "CALLSTATUSDISP": "0"};
   static var autoreceives = {};
+  static var authReceives = {};
   static List<List<String>> ringtones = [];
   static List<List<String>> weatherAreas = [];
   static List<List<String>> callScreenImages = [];
@@ -101,7 +102,7 @@ class AppManager {
   }
 
   static dynamic initialAppSettings() {
-    return {"AUTO_RECEIVE": "0", "SLEEP_MODE": "0", "SLEEP_CLOCK": "0", "SLEEPMODEBRIGHTNESS": "0", "SENSOR0": "0", "SENSOR1": "0", "SENSOR2": "0", "SENSOR3": "0", "SENSOR4": "0", "SENSOR5": "0", "SENSOR8": "0", "SENSOR9": "0", "RINGTONE": "0", "CALLSCREENIMAGE": "0", "CALLSCREENIMAGEL": "0", "VOLUME_CALL": "0", "CLOCKDISP": "0", "DISPLAYNUM": "1", "CALLSTATUSDISP": "0"};
+    return {"AUTO_RECEIVE": "0", "SLEEP_MODE": "0", "SLEEP_CLOCK": "0", "SLEEPMODEBRIGHTNESS": "0", "SENSOR0": "0", "SENSOR1": "0", "SENSOR2": "0", "SENSOR3": "0", "SENSOR4": "0", "SENSOR5": "0", "SENSOR8": "0", "SENSOR9": "0", "RINGTONE": "0", "CALLSCREENIMAGE": "0", "CALLSCREENIMAGEL": "0", "VOLUME_CALL": "0", "CLOCKDISP": "0", "DISPLAYNUM": "3", "CALLSTATUSDISP": "0"};
   }
 
   static Future<bool> loadSetting() async {
@@ -112,7 +113,7 @@ class AppManager {
       return false;
     }
     AppManager.settings = json.decode(settingsString);
-    print(AppManager.settings);
+    // print(AppManager.settings);
 
     String? appString = sharedPreferences.getString('appsettings');
     if (appString == null) {
@@ -137,7 +138,12 @@ class AppManager {
     socketservice.url = settings['server'];
 
     bool isManager = sharedPreferences.getBool("manager") ?? false;
-    AppManager.isManger = isManager;
+    AppManager.isManager = isManager;
+
+    String? authReceivesString = sharedPreferences.getString('authreceives');
+    if (authReceivesString != null) {
+      AppManager.authReceives = json.decode(authReceivesString);
+    }
     return true;
   }
 
@@ -178,6 +184,29 @@ class AppManager {
     }
   }
 
+  static saveAuthReceives(String val) async {
+    final sharedPreferences = await SharedPreferences.getInstance();
+    AppManager.authReceives[AppManager.selectCode] = val;
+    await sharedPreferences.setString('authreceives', json.encode(AppManager.authReceives));
+  }
+
+  static bool isAuthReceive(Address address) {
+    if (!AppManager.isManager) {
+      return true;
+    }
+    if (address.userType == 'S') {
+      return true;
+    }
+    final code = address.code;
+
+    if (AppManager.authReceives.keys.contains(code)) {
+      if (AppManager.authReceives[code] == '1') {
+        return true;
+      }
+    }
+    return false;
+  }
+
   static String dispType(String type) {
     if (type == '0') {
       return '標準';
@@ -192,13 +221,10 @@ class AppManager {
   }
 
   static String displyNumber(String type) {
-    if (type == '0') {
-      return '15';
+    if (type == '2' || type == '3' || type == '5') {
+      return type;
     }
-    else if (type == '1') {
-      return '100';
-    }
-    return '';
+    return '3';
   }
 
   static String sleepModeBrightness() {
@@ -256,12 +282,12 @@ class AppManager {
     return completer.future;
   }
 
-  static void toast(String message, {Color bgColor = Colors.red, Color color = Colors.white, ToastGravity gravity = ToastGravity.BOTTOM}) async {
+  static void toast(String message, {Color bgColor = Colors.red, Color color = Colors.white, ToastGravity gravity = ToastGravity.BOTTOM, int sec = 3}) async {
     await Fluttertoast.showToast(
         msg: message,
         toastLength: Toast.LENGTH_LONG,
         gravity: gravity,
-        timeInSecForIosWeb: 3,
+        timeInSecForIosWeb: sec,
         backgroundColor: bgColor,
         textColor: color,
         fontSize: 16.0);

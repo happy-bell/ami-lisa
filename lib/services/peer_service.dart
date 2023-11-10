@@ -96,6 +96,7 @@ class Peer {
 
     _peerConnections.forEach((key, pc) {
       pc.close();
+      pc.dispose();
     });
 
     _peerConnections.clear();
@@ -110,6 +111,7 @@ class Peer {
     print('peer closeOne $id');
     if (_peerConnections[id] != null) {
       _peerConnections[id]!.close();
+      _peerConnections[id]!.dispose();
       _peerConnections.remove(id);
     }
   }

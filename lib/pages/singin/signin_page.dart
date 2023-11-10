@@ -21,6 +21,7 @@ class _SignInPageState extends State<SignInPage> {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
   var _loginMode = 'user';
+  var _loading = false;
 
   @override
   void initState() {
@@ -52,11 +53,19 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   Future<void> _login() async {
-    var url = _loginURL();
+    if (primaryFocus != null) {
+      primaryFocus?.unfocus();
+    }
+    setState(() {
+      _loading = true;
+    });
 
-    var code = _codeController.text;
-    var id = _idController.text;
-    var password = _passController.text;
+    final url = _loginURL();
+    print(url);
+
+    final code = _codeController.text;
+    final id = _idController.text;
+    final password = _passController.text;
 
     if (code.isEmpty || id.isEmpty || password.isEmpty) {
       await showDialog(
@@ -80,7 +89,7 @@ class _SignInPageState extends State<SignInPage> {
     }
 
     final dio = Dio();
-    var data = await dio.post(
+    final data = await dio.post(
       url,
       data: FormData.fromMap({'delegatorCode': code, 'userID': id, 'password': password, 'code': code, 'user_id': id})
     ).then((response) {
@@ -93,6 +102,11 @@ class _SignInPageState extends State<SignInPage> {
     }).catchError((err) {
       print(err);
       return null;
+    });
+
+
+    setState(() {
+      _loading = false;
     });
 
     if (data == null) {
@@ -126,7 +140,6 @@ class _SignInPageState extends State<SignInPage> {
 
     await prefs.setString('settings', json.encode(settings));
     AppManager.saveAppSetting("ANMINMODEFLG", isAnminMode ? "1" : "0");
-
     // if (settings['MASPROSENSOR'] == "1") {
     //   isMaspro = true;
     //   Navigator.of(context).pushReplacementNamed("/sensorweb");
@@ -170,6 +183,9 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   Future<void> _staffLogin() async {
+    setState(() {
+      _loading = true;
+    });
     var url = '${AppDefine.baseURL}app/staff_login';
 
     var code = _codeController.text;
@@ -213,12 +229,14 @@ class _SignInPageState extends State<SignInPage> {
       return null;
     });
 
+    setState(() {
+      _loading = false;
+    });
+
     if (data == null) {
       WidgetUtil.showSimpleDialog(context, 'ログイン情報を確認してください。');
       return;
     }
-
-    print(data);
 
     var prefs = await SharedPreferences.getInstance();
     await prefs.setBool('login', true);
@@ -237,11 +255,15 @@ class _SignInPageState extends State<SignInPage> {
 
     await prefs.setString('settings', json.encode(settings));
 
+    setState(() {
+      _loading = false;
+    });
+
     if (!mounted) return;
     Navigator.of(context)
         .pushAndRemoveUntil(PageRouteBuilder(
       pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-        return ManagerPage();
+        return StaffPage();
       },
       transitionDuration: Duration.zero,
       reverseTransitionDuration: Duration.zero,
@@ -267,128 +289,144 @@ class _SignInPageState extends State<SignInPage> {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 238, 239, 243),
       resizeToAvoidBottomInset: false,
-      body: Container(
-        padding: EdgeInsets.symmetric(vertical: verticalPadding, horizontal: paddingX),
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 247, 247, 247),
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          padding: EdgeInsets.symmetric(vertical: verticalPadding2, horizontal: 22.0),
-          child: SingleChildScrollView(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(vertical: verticalPadding, horizontal: paddingX),
             child: Container(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('コード'),
-                  const SizedBox(height: 4,),
-                  TextField(
-                    controller: _codeController,
-                    decoration: const InputDecoration(
-                      fillColor: Colors.white,
-                      filled: false,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      border: UnderlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Color.fromARGB(255, 220, 220, 220),
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 247, 247, 247),
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              padding: EdgeInsets.symmetric(vertical: verticalPadding2, horizontal: 22.0),
+              child: SingleChildScrollView(
+                child: Container(
+                  padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('コード'),
+                      const SizedBox(height: 4,),
+                      TextField(
+                        controller: _codeController,
+                        decoration: const InputDecoration(
+                          fillColor: Colors.white,
+                          filled: false,
+                          contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          border: UnderlineInputBorder(
+                            borderSide: BorderSide(
+                              color: Color.fromARGB(255, 220, 220, 220),
+                            ),
+                          ),
+                          hintText: '',
+                          isDense: true,
+                          // errorText: _passErr.isEmpty ? null : _passErr,
                         ),
+                        // obscureText: true,
                       ),
-                      hintText: '',
-                      isDense: true,
-                      // errorText: _passErr.isEmpty ? null : _passErr,
-                    ),
-                    // obscureText: true,
-                  ),
-                  const SizedBox(height: 12.0,),
-                  const Text("ユーザーID"),
-                  const SizedBox(height: 4,),
-                  TextField(
-                    controller: _idController,
-                    decoration: const InputDecoration(
-                      fillColor: Colors.white,
-                      filled: false,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      border: UnderlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Color.fromARGB(255, 220, 220, 220),
+                      const SizedBox(height: 12.0,),
+                      const Text("ユーザーID"),
+                      const SizedBox(height: 4,),
+                      TextField(
+                        controller: _idController,
+                        decoration: const InputDecoration(
+                          fillColor: Colors.white,
+                          filled: false,
+                          contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          border: UnderlineInputBorder(
+                            borderSide: BorderSide(
+                              color: Color.fromARGB(255, 220, 220, 220),
+                            ),
+                          ),
+                          hintText: '',
+                          isDense: true,
+                          // errorText: _passErr.isEmpty ? null : _passErr,
                         ),
+                        // obscureText: true,
                       ),
-                      hintText: '',
-                      isDense: true,
-                      // errorText: _passErr.isEmpty ? null : _passErr,
-                    ),
-                    // obscureText: true,
-                  ),
-                  const SizedBox(height: 12.0,),
-                  const Text("パスワード"),
-                  const SizedBox(height: 4,),
-                  TextField(
-                    controller: _passController,
-                    decoration: const InputDecoration(
-                      fillColor: Colors.white,
-                      filled: false,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      border: UnderlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Color.fromARGB(255, 220, 220, 220),
+                      const SizedBox(height: 12.0,),
+                      const Text("パスワード"),
+                      const SizedBox(height: 4,),
+                      TextField(
+                        controller: _passController,
+                        decoration: const InputDecoration(
+                          fillColor: Colors.white,
+                          filled: false,
+                          contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          border: UnderlineInputBorder(
+                            borderSide: BorderSide(
+                              color: Color.fromARGB(255, 220, 220, 220),
+                            ),
+                          ),
+                          hintText: '',
+                          isDense: true,
+                          // errorText: _passErr.isEmpty ? null : _passErr,
                         ),
+                        obscureText: true,
                       ),
-                      hintText: '',
-                      isDense: true,
-                      // errorText: _passErr.isEmpty ? null : _passErr,
-                    ),
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 50,),
-                  Center(
-                    child: SizedBox(
-                      width: size.width - 60 > 200 ? 200 : size.width - 60,
-                      height: 40,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: _loginMode == 'user' ? Color.fromARGB(255, 115, 176, 236) :  Color.fromARGB(255, 115, 206, 146),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                      const SizedBox(height: 50,),
+                      Center(
+                        child: SizedBox(
+                          width: size.width - 60 > 200 ? 200 : size.width - 60,
+                          height: 40,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              backgroundColor: _loginMode == 'user' ? Color.fromARGB(255, 115, 176, 236) :  Color.fromARGB(255, 115, 206, 146),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed: () async {
+                              if (_loginMode == 'staff') {
+                                _staffLogin();
+                                return;
+                              }
+                              _login();
+                            },
+                            child: const Text("ログイン"),
                           ),
                         ),
-                        onPressed: () async {
-                          if (_loginMode == 'staff') {
-                            _staffLogin();
-                            return;
-                          }
-                          _login();
-                        },
-                        child: const Text("ログイン"),
                       ),
-                    ),
-                  ),
-                  if (1 == 1)
-                    ... [
-                      const SizedBox(height: 20),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          style: TextButton.styleFrom(
-                            textStyle: const TextStyle(fontSize: 14),
+                      if (1 == 1)
+                        ... [
+                          const SizedBox(height: 20),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                textStyle: const TextStyle(fontSize: 14),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _loginMode = _loginMode == 'user' ? 'staff' : 'user';
+                                });
+                              },
+                              child: Text(_loginMode == 'user' ? 'スタッフはこちら' : 'ユーザーはこちら'),
+                            ),
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _loginMode = _loginMode == 'user' ? 'staff' : 'user';
-                            });
-                          },
-                          child: Text(_loginMode == 'user' ? 'スタッフはこちら' : 'ユーザーはこちら'),
-                        ),
-                      ),
+                        ],
                     ],
-                ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+          if (_loading)
+            Align(
+              alignment: FractionalOffset.center,
+              child: Container(
+                color: Colors.grey.withOpacity(0.3),
+                child: const Padding(
+                  padding: EdgeInsets.all(5.0),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -49,8 +49,9 @@ class SettingSelectPageState extends State<SettingSelectPage> {
     } else if (_key == 'DISPLAYNUM') {
       title = '表示数';
       data = [
-        ['0', '15'],
-        ['1', '100']
+        ['2', '2'],
+        ['3', '3'],
+        ['5', '5']
       ];
     } else if (_key == 'SLEEP_CLOCK') {
       title = '時計';
@@ -191,7 +192,7 @@ class SettingSelectPageState extends State<SettingSelectPage> {
       onWillPop: () async {
         if (_key == 'DISPTYPE') {
           AppManager.saveSetting(_key, _value);
-        } else if (_key == 'SLEEP_CLOCK') {
+        } else if (_key == 'SLEEP_CLOCK' || _key == 'DISPLAYNUM') {
           AppManager.saveAppSetting(_key, _value);
         } else if (_key == 'SLEEPMODEBRIGHTNESS') {
           AppManager.saveAppSetting(_key, _value);

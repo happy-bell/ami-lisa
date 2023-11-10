@@ -36,11 +36,15 @@ void main() async {
     provisional: false,
     sound: true,
   );
-  final token = await messaging.getToken();
-  if (token != null) {
-    AppManager.fcmtoken = token;
+  try {
+    final token = await messaging.getToken();
+    if (token != null) {
+      AppManager.fcmtoken = token;
+    }
+    print('FCM TOKEN: $token');
+  } catch (e) {
+    print(e);
   }
-  print('FCM TOKEN: $token');
   runApp(
       MultiProvider(
         providers: [

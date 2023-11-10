@@ -389,6 +389,14 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     AppManager.toast("切断されました", bgColor: Colors.blue);
   }
 
+  void _callNotAuth() {
+    audio.stopCall();
+    _stopRusuTimer();
+    _statusImage = '';
+    setAppStatus(AppStatus.None);
+    WidgetUtil.showAutoDisposeDialog(context, '通話許可がありません　通知しました');
+  }
+
   void _receiveHangup(String from) {
     print("****************     receiveHangup: $from   talkId1 = ${AppManager.talkId1}   ********************************");
     AppStatus newStatus = AppStatus.None;
@@ -1448,6 +1456,14 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       }
       if (AppManager.selectUser!.id == data["udid"]) {
         _callRejected();
+      }
+    }
+    else if (message == 'call_not_auth') {
+      if (data["udid"] == null) {
+        return;
+      }
+      if (AppManager.selectUser!.id == data["udid"]) {
+        _callNotAuth();
       }
     }
     else if (message == 'talk_end') {

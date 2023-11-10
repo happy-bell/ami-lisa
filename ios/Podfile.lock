@@ -42,9 +42,9 @@ PODS:
   - Flutter (1.0.0)
   - flutter_native_splash (0.0.1):
     - Flutter
-  - flutter_webrtc (0.9.25):
+  - flutter_webrtc (0.9.31):
     - Flutter
-    - WebRTC-SDK (= 104.5112.16)
+    - WebRTC-SDK (= 104.5112.17)
   - fluttertoast (0.0.2):
     - Flutter
     - Toast
@@ -106,7 +106,7 @@ PODS:
     - Flutter
   - wakelock (0.0.1):
     - Flutter
-  - WebRTC-SDK (104.5112.16)
+  - WebRTC-SDK (104.5112.17)
   - webview_flutter_wkwebview (0.0.1):
     - Flutter
 
@@ -213,8 +213,8 @@ SPEC CHECKSUMS:
   FirebaseMessaging: ac9062bcc35ed56e15a0241d8fd317022499baf8
   Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
   flutter_native_splash: 52501b97d1c0a5f898d687f1646226c1f93c56ef
-  flutter_webrtc: ae7ab6f74d3c4f186594a74863f11433e7ab148a
-  fluttertoast: eb263d302cc92e04176c053d2385237e9f43fad0
+  flutter_webrtc: 02c023207f972145a3bc8c7aada86754f264d563
+  fluttertoast: 48c57db1b71b0ce9e6bba9f31c940ff4b001293c
   GoogleDataTransport: 54dee9d48d14580407f8f5fbf2f496e92437a2f2
   GoogleUtilities: 13e2c67ede716b8741c7989e26893d151b2b2084
   image_cropper: a3291c624a953049bc6a02e1f8c8ceb162a24b25
@@ -234,9 +234,9 @@ SPEC CHECKSUMS:
   url_launcher_ios: 08a3dfac5fb39e8759aeb0abbd5d9480f30fc8b4
   video_player_avfoundation: 81e49bb3d9fb63dccf9fa0f6d877dc3ddbeac126
   wakelock: d0fc7c864128eac40eba1617cb5264d9c940b46f
-  WebRTC-SDK: 566e58d2916cb79d770350169a449ea523f5db7c
+  WebRTC-SDK: 082ae4893212534a779ca233f19a9df8efd5f3bd
   webview_flutter_wkwebview: b7e70ef1ddded7e69c796c7390ee74180182971f
 
 PODFILE CHECKSUM: 8b351ae878b6822c5b61d5964c015105cbbb828f
 
-COCOAPODS: 1.12.1
+COCOAPODS: 1.13.0

@@ -183,7 +183,7 @@ class AppState extends State<AppPage> {
       // if (AppManager.settings['MASPROSENSOR'] == "1") {
       //   status = 10;
       }
-      if (AppManager.isManger) {
+      if (AppManager.isManager) {
         status = 9;
       }
     }
@@ -219,7 +219,7 @@ class AppState extends State<AppPage> {
         } else if (launchType == 4) {
           return LivePage();
         } else if (launchType == 9) {
-          return ManagerPage();
+          return StaffPage();
         }
 
         return StaffPage();

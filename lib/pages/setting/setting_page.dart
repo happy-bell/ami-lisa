@@ -83,6 +83,7 @@ class _SettingPageState extends State<SettingPage> {
         var prefs = await SharedPreferences.getInstance();
         await prefs.setBool('login', false);
         await prefs.setBool('manager', false);
+        await prefs.remove('codes');
 
         if (mounted) {
           Navigator.of(context, rootNavigator: true)
@@ -113,6 +114,9 @@ class _SettingPageState extends State<SettingPage> {
 
   String _getAddressURL() {
     if (AppDefine.amiApp) {
+      if (AppManager.isManager) {
+        return "${AppDefine.baseURL}app/staff_address_list?code=${AppManager.settings['DELEGATORCODE']}&token=${AppManager.settings['api_token']}";
+      }
       var mstId = AppManager.settings['MYID'].replaceAll(AppManager.settings['DELEGATORCODE'] + "_", "");
       return "${AppDefine.baseURL}app/address_list?code=${AppManager.settings['DELEGATORCODE']}&mst_id=$mstId&token=${AppManager.settings['api_token']}";
     }
@@ -228,6 +232,14 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   List<Widget> _listContainers() {
+    var mode = 'user';
+    if (AppManager.isManager) {
+      if (AppManager.selectCode.isEmpty) {
+        mode = 'staff1';
+      } else {
+        mode = 'staff2';
+      }
+    }
     var _separator = separator();
 
     var label = "医療機関";
@@ -310,6 +322,10 @@ class _SettingPageState extends State<SettingPage> {
       switchListContainer('自動応答', 'AUTO_RECEIVE'),
     ]);
 
+    if (mode == 'staff2') {
+      listContainers.add(switchListContainer('通話権限', 'AUTH_RECEIVE'));
+    }
+
     if (dispType == '1' && anminModeFlg == '1') {
       listContainers.add(
         switchListContainer('安眠モード', 'SLEEP_MODE'),
@@ -366,13 +382,17 @@ class _SettingPageState extends State<SettingPage> {
       ]);
     }
 
-    listContainers.addAll([
-      _separator,
-      nextListContainer('着信音', '', () {
-        _getRingtone();
-      }),
-      _separator,
-    ]);
+    if (mode != 'staff1') {
+      listContainers.addAll([
+        _separator,
+        nextListContainer('着信音', '', () {
+          _getRingtone();
+        }),
+        _separator,
+      ]);
+    } else {
+      listContainers.add(_separator);
+    }
     if (dispType == '1') {
       listContainers.add(
         switchListContainer('ホーム画面の時計', 'CLOCKDISP'),
@@ -380,15 +400,17 @@ class _SettingPageState extends State<SettingPage> {
     }
 
     if (AppDefine.amiApp) {
-      listContainers.addAll([
-        switchListContainer('表示設定', 'CALLSTATUSDISP'),
-        nextListContainer('お知らせ動画', '', _toInfoVideoPage),
-        nextListContainer('スライドショー', '', _toInfoPhotoPage),
-        nextListContainer('メッセージ配信', '', () async {
-          await Navigator.of(context)
-              .push(MaterialPageRoute(builder: (context) => SettingInfoMessagePage()));
-        }),
-      ]);
+      listContainers.add(switchListContainer('表示設定', 'CALLSTATUSDISP'));
+      if (mode == 'user') {
+        listContainers.addAll([
+          nextListContainer('お知らせ動画', '', _toInfoVideoPage),
+          nextListContainer('スライドショー', '', _toInfoPhotoPage),
+          nextListContainer('メッセージ配信', '', () async {
+            await Navigator.of(context)
+                .push(MaterialPageRoute(builder: (context) => SettingInfoMessagePage()));
+          }),
+        ]);
+      }
     }
 
     listContainers.addAll([_separator, abountListContainer()]);
@@ -446,7 +468,7 @@ class _SettingPageState extends State<SettingPage> {
             ),
                 (route) => false,
           );
-        } else if (AppManager.settings['MCSTYPE'] == 'S') {
+        } else if (AppManager.settings['MCSTYPE'] == 'SSSS') {
           Navigator.pushAndRemoveUntil(
             context,
             PageRouteBuilder(
@@ -620,6 +642,12 @@ class _SettingPageState extends State<SettingPage> {
       if (AppManager.appsettings[key] == '1') {
         isSwtich = true;
       }
+    } else if (key == 'AUTH_RECEIVE') {
+      if (AppManager.authReceives.keys.contains(AppManager.selectCode)) {
+        if (AppManager.authReceives[AppManager.selectCode] == '1') {
+          isSwtich = true;
+        }
+      }
     }
     return Container(
       decoration: const BoxDecoration(
@@ -647,8 +675,12 @@ class _SettingPageState extends State<SettingPage> {
               }
               if (key == 'AUTO_RECEIVE' || key == 'VOLUME_CALL' || key == 'CLOCKDISP') {
                 AppManager.saveAppSetting(key, val);
-              } else if (key == 'SLEEP_MODE' || key == 'CALLSTATUSDISP') {
+              }
+              else if (key == 'SLEEP_MODE' || key == 'CALLSTATUSDISP') {
                 AppManager.saveAppSetting(key, val);
+              }
+              else if (key == 'AUTH_RECEIVE') {
+                AppManager.saveAuthReceives(val);
               }
 
               setState(() {

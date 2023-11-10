@@ -97,6 +97,11 @@ class SocketIOService {
       if (delegate == null) {
         print('socket no delegate');
       }
+      if (delegate == null) {
+        print('**********************************************');
+        print('        delegate is null');
+        print('**********************************************');
+      }
       delegate?.onAppMessage(data);
       delegate2?.onAppMessage(data);
     });
@@ -226,7 +231,7 @@ class SocketIOService {
     final sharedPreferences = await SharedPreferences.getInstance();
     var codes = [];
     String? codesString = sharedPreferences.getString('codes');
-    if (codesString != null) {
+    if (AppManager.isManager && codesString != null) {
       codes = json.decode(codesString);
     }
 
