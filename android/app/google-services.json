@@ -1,121 +1,48 @@
 {
   "project_info": {
-    "project_number": "871225930361",
-    "firebase_url": "https://frinurse.firebaseio.com",
-    "project_id": "frinurse",
-    "storage_bucket": "frinurse.appspot.com"
+    "project_number": "764771508054",
+    "project_id": "ami-style",
+    "storage_bucket": "ami-style.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:871225930361:android:9b389be51eb68acf931aa8",
+        "mobilesdk_app_id": "1:764771508054:android:dfc77dcf9f36e643b4c0f7",
         "android_client_info": {
-          "package_name": "com.frinurse.amiapp"
+          "package_name": "com.ami.style"
         }
       },
       "oauth_client": [
         {
-          "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCS0SggiaEB61WiKbI20nbI7k5ZsnV0_XM"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "871225930361-132vvkuijiop11popln21di60hkqlmfm.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "jp.co.dellainc.push1"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:871225930361:android:a2652d432a44639b931aa8",
-        "android_client_info": {
-          "package_name": "com.frinurse.androidapp"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCS0SggiaEB61WiKbI20nbI7k5ZsnV0_XM"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "871225930361-132vvkuijiop11popln21di60hkqlmfm.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "jp.co.dellainc.push1"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:871225930361:android:e51ac8a14abe0e00931aa8",
-        "android_client_info": {
-          "package_name": "com.frinurse.app"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "871225930361-rh7eon4d26qcndc91laiqud8ar818fet.apps.googleusercontent.com",
+          "client_id": "764771508054-66k1jkb73opgdempo8jm5lj0ft17uc26.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.frinurse.app",
+            "package_name": "com.ami.style",
             "certificate_hash": "12781ac62c25a6d0f53976b63f1c99aa57280fc6"
           }
         },
         {
-          "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
+          "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCS0SggiaEB61WiKbI20nbI7k5ZsnV0_XM"
+          "current_key": "AIzaSyC4taodpKyludcxLWfA76ejVvWe7gTp3hY"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
+              "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "871225930361-132vvkuijiop11popln21di60hkqlmfm.apps.googleusercontent.com",
+              "client_id": "764771508054-1oim11eegovmoato4v3au9at59jhk2qh.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "jp.co.dellainc.push1"
+                "bundle_id": "jp.amiapp"
               }
             }
           ]
@@ -124,34 +51,34 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:871225930361:android:2488d0f5bb19e016931aa8",
+        "mobilesdk_app_id": "1:764771508054:android:4a305d85e7d9d89cb4c0f7",
         "android_client_info": {
-          "package_name": "com.frinurse.igirisu"
+          "package_name": "com.amiappstyle.elan"
         }
       },
       "oauth_client": [
         {
-          "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
+          "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCS0SggiaEB61WiKbI20nbI7k5ZsnV0_XM"
+          "current_key": "AIzaSyC4taodpKyludcxLWfA76ejVvWe7gTp3hY"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
+              "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "871225930361-132vvkuijiop11popln21di60hkqlmfm.apps.googleusercontent.com",
+              "client_id": "764771508054-1oim11eegovmoato4v3au9at59jhk2qh.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "jp.co.dellainc.push1"
+                "bundle_id": "jp.amiapp"
               }
             }
           ]
@@ -160,42 +87,34 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:871225930361:android:f9d72a1574c135d6931aa8",
+        "mobilesdk_app_id": "1:764771508054:android:57d6d3e6d3dba6e1b4c0f7",
         "android_client_info": {
-          "package_name": "com.igirisu_net.app"
+          "package_name": "jp.amiplus"
         }
       },
       "oauth_client": [
         {
-          "client_id": "871225930361-h2vcampang21ienvqg35er6mvvrq3pkb.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.igirisu_net.app",
-            "certificate_hash": "12781ac62c25a6d0f53976b63f1c99aa57280fc6"
-          }
-        },
-        {
-          "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
+          "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCS0SggiaEB61WiKbI20nbI7k5ZsnV0_XM"
+          "current_key": "AIzaSyC4taodpKyludcxLWfA76ejVvWe7gTp3hY"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
+              "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "871225930361-132vvkuijiop11popln21di60hkqlmfm.apps.googleusercontent.com",
+              "client_id": "764771508054-1oim11eegovmoato4v3au9at59jhk2qh.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "jp.co.dellainc.push1"
+                "bundle_id": "jp.amiapp"
               }
             }
           ]
@@ -204,78 +123,34 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:871225930361:android:7ba27dd27b1a4147931aa8",
+        "mobilesdk_app_id": "1:764771508054:android:6f8fc1fb6b08ca72b4c0f7",
         "android_client_info": {
-          "package_name": "com.telnurse.android"
+          "package_name": "jp.amiplus.mulch"
         }
       },
       "oauth_client": [
         {
-          "client_id": "871225930361-b4au5v3tkjqmgrencu5p2e2lkeutsfhr.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.telnurse.android",
-            "certificate_hash": "12781ac62c25a6d0f53976b63f1c99aa57280fc6"
-          }
-        },
-        {
-          "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
+          "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCS0SggiaEB61WiKbI20nbI7k5ZsnV0_XM"
+          "current_key": "AIzaSyC4taodpKyludcxLWfA76ejVvWe7gTp3hY"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
+              "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "871225930361-132vvkuijiop11popln21di60hkqlmfm.apps.googleusercontent.com",
+              "client_id": "764771508054-1oim11eegovmoato4v3au9at59jhk2qh.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "jp.co.dellainc.push1"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:871225930361:android:5b0b47e0f484932e",
-        "android_client_info": {
-          "package_name": "org.appspot.apprtc"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCS0SggiaEB61WiKbI20nbI7k5ZsnV0_XM"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "871225930361-sr779sas5334ctvdsjl04orlddhf91vf.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "871225930361-132vvkuijiop11popln21di60hkqlmfm.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "jp.co.dellainc.push1"
+                "bundle_id": "jp.amiapp"
               }
             }
           ]
