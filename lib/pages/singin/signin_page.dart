@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:amiapp/helpers/widget_util.dart';
+import 'package:amiapp/pages/family/family.dart';
 import 'package:amiapp/pages/room/room_page.dart';
 import 'package:amiapp/pages/staff/manager_page.dart';
 import 'package:amiapp/pages/staff/staff_page.dart';
@@ -121,6 +122,7 @@ class _SignInPageState extends State<SignInPage> {
     await prefs.setString('login_code', code);
     await prefs.setString('address', json.encode(data['address']));
     await prefs.setString('autoreceive', json.encode(data['autoreceive']));
+    await prefs.setString('login_at', WidgetUtil.dateFormat(DateTime.now(), 'yyyyMMddHHmmss'));
 
     Map<String, dynamic> settings = data['settings'];
 
@@ -160,7 +162,7 @@ class _SignInPageState extends State<SignInPage> {
       Navigator.of(context)
           .pushAndRemoveUntil(PageRouteBuilder(
         pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-          return StaffPage();
+          return FamilyPage();
         },
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
