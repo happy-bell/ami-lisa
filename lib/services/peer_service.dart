@@ -92,6 +92,7 @@ class Peer {
 
     if (peerConnection != null) {
       peerConnection!.close();
+      peerConnection!.dispose();
     }
 
     _peerConnections.forEach((key, pc) {
@@ -196,7 +197,13 @@ class Peer {
 
 
     print('***************      Turn on speaker phone(${stream.getAudioTracks()[0].muted})       ******************************');
-    stream.getAudioTracks()[0].enableSpeakerphone(true);
+    // final session = await AudioSession.instance;
+    // await session.configure(AudioSessionConfiguration.music());
+    try {
+      stream.getAudioTracks()[0].enableSpeakerphone(true);
+    } catch (e) {
+      print(e.toString());
+    }
     return stream;
   }
 
