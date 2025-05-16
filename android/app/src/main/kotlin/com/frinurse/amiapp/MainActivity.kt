@@ -1,4 +1,4 @@
-package com.frinurse.amiapp
+package jp.amiplus.mulch
 
 import io.flutter.embedding.android.FlutterActivity
 
