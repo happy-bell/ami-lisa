@@ -4,9 +4,10 @@ import 'dart:math';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:amiapp/pages/staff/staff_album_web_page.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:amiapp/pages/staff/staff_album_page.dart';
 import 'package:amiapp/pages/staff/staff_web_page.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:path_provider/path_provider.dart';
@@ -102,6 +103,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
           statusImage = 'assets/images/status/addr_call.png';
         } else if (address.called == 1) {
           statusImage = 'assets/images/status/addr_called.png';
+          socketservice.io.emit("called_check", [AppManager.selectUser!.id]);
         } else if (address.supported == 1) {
           statusImage = 'assets/images/status/addr_supported.png';
         }
@@ -195,7 +197,11 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
         AppManager.status == AppStatus.MultiToTalk) {
       return;
     }
-    if (AppManager.safetyCheckId == AppManager.selectUser!.id) {
+    var selectUserId = '';
+    if (AppManager.selectUser != null) {
+      selectUserId = AppManager.selectUser!.id;
+    }
+    if (AppManager.safetyCheckId == selectUserId) {
       return;
     }
     audio.stopButtonCall();
@@ -206,8 +212,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       // recsocket.close();
     }
 
-    context.read<AddressStore>().setSensor(AppManager.selectUser!.id, '');
-    context.read<AddressStore>().setCalled(AppManager.selectUser!.id, 0);
+    context.read<AddressStore>().setSensor(selectUserId, '');
+    context.read<AddressStore>().setCalled(selectUserId, 0);
 
     AppManager.selectUser = null;
     Navigator.of(context).pop();
@@ -339,6 +345,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
 
     if (AppManager.status == AppStatus.Multi) {
       if (socketioservice != null) {
+        socketioservice!.roomDelegate = null;
         socketioservice!.disconnect();
       }
       // if (roomsocket != null) {
@@ -697,7 +704,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
         print("_threewayToCall myId = from");
         AppManager.talkId1 = to;
         setAppStatus(AppStatus.MultiToTalk);
-        await Future.delayed(Duration(seconds: 1));
+        await Future.delayed(const Duration(milliseconds: 500));
         peer.invite(to, 'video', true);
       } else if (AppManager.myId == to) {
         print("_threewayToCall myId = to");
@@ -955,6 +962,33 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     File imageFile = File(filepath);
     imageFile.writeAsBytesSync(pngBytes!.buffer.asInt8List());
     // AppManager.toast("保存しました", Colors.blue, Colors.white);
+    _uploadPhotoImage(filepath);
+  }
+
+  String _uploadURL() {
+    if (AppDefine.amiApp) {
+      return AppDefine.baseURL + 'app/upload_photos';
+    }
+    return AppDefine.baseURL + "app/upphototest.php";
+  }
+
+  void _uploadPhotoImage(filepath) async {
+    String fileName = filepath.split('/').last;
+    FormData formData = FormData.fromMap({
+      "mcs": AppManager.settings["MCSURL"],
+      "gcd": AppManager.settings["MCSGROUPCODE"],
+      "ccd": AppManager.settings["MCSCLINICCODE"],
+      "mid": AppManager.selectUser!.id,
+      "code": AppManager.selectUser!.code,
+      "mst_id": AppManager.selectUser!.id.replaceAll(AppManager.selectUser!.code + "_", ""),
+      "files0": await MultipartFile.fromFile(filepath, filename: fileName),
+    });
+    var url = _uploadURL();
+    var dio = Dio();
+    try {
+      var response = await dio.post(url, data: formData);
+    } catch (e) {
+    }
   }
 
   Future<void> _endShareButton() async {
@@ -993,8 +1027,19 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   }
 
   Future<void> albumButton() async {
-    var result = await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (context) => StaffAlbumPage()));
+    await Navigator.of(context).push(
+        PageRouteBuilder(
+          pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
+            return StaffAlbumWebPage(
+              title: 'アルバム',
+              targetId: AppManager.selectUser!.id,
+              targetName: AppManager.selectUser!.name,
+            );
+          },
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+        )
+    );
   }
 
   /// *******************************************************************************************
@@ -1849,7 +1894,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       if (size.width < 500) {
         return "assets/images/talk/call_bg_s_landscape.png";
       }
-      return "assets/images/talk/call_bg_landscape.png";
+      return "assets/images/talk/call_bg_s_landscape.png";
     }
     if (size.width < 500) {
       return "assets/images/talk/call_bg_s.png";
@@ -1902,7 +1947,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       _onRecordEnd(data);
     }
     else if (messageId == 'iceCandidate') {
-      print(data);
+      // print(data);
       if (data["name"] == null || data["candidate"] == null) {
         return;
       }
@@ -1932,7 +1977,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
 
     var data = message['data'];
 
-    data.forEach((name) {
+    data.forEach((name) async {
+      await Future.delayed(const Duration(milliseconds: 500));
       _onParticipant(name.toString());
     });
   }
