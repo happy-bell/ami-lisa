@@ -10,7 +10,7 @@ class TutorialPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Size size = MediaQuery.of(context).size;
-    final double fontSize = 14;
+    final double fontSize = 20;//14
 
     return Scaffold(
       body: LayoutBuilder(
@@ -66,7 +66,7 @@ class TutorialPage extends StatelessWidget {
                 ),
               ),
               Positioned(
-                top: constraints.maxHeight > 800 ? 300 : 200,
+                top: constraints.maxHeight > 800 ? 310 : 200,
                 left: 40,
                 width: constraints.maxWidth - 80,
                 child: Center(
@@ -104,6 +104,11 @@ class TutorialPage extends StatelessWidget {
                           ),
                           recognizer: TapGestureRecognizer()..onTap = () {
                             print('"個人情報保護方針" がタップされました');
+
+                            Navigator.of(context, rootNavigator: true)
+                                .push(MaterialPageRoute(
+                                builder: (context) => WebviewPage(title: '個人情報保護方針', url: AppDefine.policyURL),
+                                fullscreenDialog: true));
                           },
                         ),
                         const TextSpan(
@@ -119,7 +124,11 @@ class TutorialPage extends StatelessWidget {
                 left: 40,
                 width: constraints.maxWidth - 80,
                 child: const Center(
-                  child: Text('サービス事業者より申し込みを行ってください。'),
+                  child: Text(
+                      'サービス事業者より申し込みを行ってください。',
+                    style: TextStyle(fontSize: 20),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
             ],
