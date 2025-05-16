@@ -84,6 +84,15 @@ class AddressStore with ChangeNotifier {
     return addressList[index];
   }
 
+  String managerName(code) {
+    final index = addressList.indexWhere((item) => item.code == code && item.type == 'manager');
+    if (index >= 0) {
+      final address = addressList[index];
+      return address.name;
+    }
+    return '';
+  }
+
   _findAddress(udid) {
     final index = addressList.indexWhere((item) => item.id == udid);
     return index;
