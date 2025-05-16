@@ -144,6 +144,24 @@ class _RoomPageState extends State<RoomPage>
     super.dispose();
   }
 
+  void _initPeer() {
+    peer = Peer();
+    peer.onLocalStream = _onLocalStream;
+    peer.onOffer = _onOffer;
+    peer.onAnswer = _onAnswer;
+    peer.onAddRemoteStream = _onAddRemoteStream;
+    peer.onIceCandidate = _onIceCandidate;
+  }
+
+  void _disposePeer() {
+    peer.close();
+    peer.onLocalStream = null;
+    peer.onOffer = null;
+    peer.onAnswer = null;
+    peer.onAddRemoteStream = null;
+    peer.onIceCandidate = null;
+  }
+
   Future<void> _logout() async {
     var prefs = await SharedPreferences.getInstance();
     await prefs.setBool('login', false);
@@ -431,7 +449,8 @@ class _RoomPageState extends State<RoomPage>
       socketservice.io.emit("safety_check_stop", []);
     }
     _safetyCheckIds.clear();
-    peer.close();
+    _disposePeer();
+    _initPeer();
   }
 
   Future<void> _onCallButton() async {
@@ -616,10 +635,10 @@ class _RoomPageState extends State<RoomPage>
   void onAppMessage(data) {
     String message = data['message'];
     if (message == 'from_server') {
-      // if (data['productName'] == '%logined') {
+      if (data['productName'] == '%logined') {
       //   AppManager.toast("ログイン済のアカウントです。");
-      //   return;
-      // }
+        return;
+      }
       setState(() {
         _isconnect = true;
       });
