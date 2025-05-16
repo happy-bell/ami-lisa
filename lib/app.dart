@@ -1,13 +1,17 @@
 import 'dart:io';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/pages/elan/elan_tutorial_page.dart';
+import 'package:amiapp/pages/family/family.dart';
+import 'package:amiapp/pages/family/familytalk.dart';
 import 'package:amiapp/pages/room/room_page.dart';
 import 'package:amiapp/pages/staff/manager_page.dart';
+import 'package:amiapp/services/audio_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock/wakelock.dart';
 import 'package:amiapp/pages/elan/elan_tab_page.dart';
@@ -17,6 +21,7 @@ import 'package:amiapp/pages/live/live_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
 import 'package:amiapp/pages/staff/staff_page.dart';
 import 'package:amiapp/pages/tutorial/tutorial_page.dart';
+import 'notifiers/address_notifier.dart';
 
 class App extends StatelessWidget {
 
@@ -46,6 +51,7 @@ class App extends StatelessWidget {
         '/staff': (BuildContext context) => StaffPage(),
         '/room': (BuildContext context) => RoomPage(),
         '/live': (BuildContext context) => LivePage(),
+        '/familytalk': (BuildContext context) => FamilyTalkPage(),
       },
       home: GestureDetector(
         onTap: () => primaryFocus?.unfocus(),
@@ -62,6 +68,8 @@ class AppPage extends StatefulWidget {
 
 class AppState extends State<AppPage> {
 
+  AudioService audio = AudioService();
+
   @override
   void initState() {
     super.initState();
@@ -70,7 +78,8 @@ class AppState extends State<AppPage> {
 
     // Run code required to handle interacted messages in an async function
     // as initState() must not be async
-    setupInteractedMessage();
+    setNotificationListener();
+    // setupInteractedMessage();
   }
 
   @override
@@ -93,6 +102,99 @@ class AppState extends State<AppPage> {
     // Also handle any interaction when the app is in the background via a
     // Stream listener
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessage);
+  }
+
+  String _targetIdFromRemoteMessage(RemoteMessage message) {
+    print('Message data: ${message.data}');
+    var data = message?.data;
+    RemoteNotification? notification = message.notification;
+    AndroidNotification? android = notification?.android;
+    AppleNotification? ios = notification?.apple;
+    print('Message notification: ${message.notification}');
+    print('Message android: ${android}');
+    print('Message ios: ${ios}');
+    if (notification != null) {
+      final title = notification.title ?? '';
+      final body = notification.body ?? '';
+      print('Message title: $title');
+      print('Message body: $body');
+
+      if (title.length > 5) {
+        var messageId = title.substring(1, 5);
+        if (messageId == 'M001') {
+          return _targetIdFromMessage(body);
+        }
+      }
+    }
+
+    if (ios != null) {
+      // iOS用の処理はこちらで行います。AppleNotificationクラスにはbadgeなどが含まれます。
+    }
+    if (android != null) {
+      // Android用の処理はこちらで行います。
+    }
+    // 共通のデータペイロードです。パラメータ処理はここから行います。
+    if (data != null) {
+      // 辞書型でデータを取り出せます。
+      var value = data["key"];
+    }
+    return '';
+  }
+
+  void _onMessage(RemoteMessage message) {
+    final targetId = _targetIdFromRemoteMessage(message);
+    if (targetId.isEmpty) {
+      return;
+    }
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('bcId', targetId);
+    });
+  }
+
+  void _onMessageOpendApp(RemoteMessage message) {
+    final targetId = _targetIdFromRemoteMessage(message);
+    print('_onMessageOpendApp: $targetId');
+    if (targetId.isEmpty) {
+      return;
+    }
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('fmId', targetId);
+    });
+  }
+
+  void setNotificationListener() {
+    // 1.フォアグラウンドで受信した場合
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      _onMessage(message);
+    });
+    // 2.アプリがオンメモリの状態で通知から起動した場合
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print('onMessageOpenedApp Message data: ${message}');
+      _onMessageOpendApp(message);
+    });
+
+    // 3.アプリが完全に終了している状態で通知から起動した場合
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      print('getInitialMessage Message data: ${message}');
+      if (message != null) {
+        _onMessageOpendApp(message);
+      }
+    });
+  }
+
+  String _targetIdFromMessage(String message) {
+    var pos1 = message.indexOf('[');
+    var pos2 = message.indexOf(']');
+    if (pos1 >= 0 && pos2 > pos1) {
+    } else {
+      pos1 = message.indexOf('【');
+      pos2 = message.indexOf('】');
+    }
+    if (pos1 >= 0 && pos2 > pos1) {
+      var targetId = message.substring(pos1 + 1, pos2);
+      return targetId;
+    }
+    return '';
   }
 
   void _handleMessage(RemoteMessage message) {
@@ -218,6 +320,8 @@ class AppState extends State<AppPage> {
           return RoomPage();
         } else if (launchType == 4) {
           return LivePage();
+        } else if (launchType == 5) {
+          return FamilyPage();
         } else if (launchType == 9) {
           return StaffPage();
         }
