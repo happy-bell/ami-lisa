@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:amiapp/helpers/staff_util.dart';
 import 'package:amiapp/pages/staff/staff_web_page.dart';
 import 'package:amiapp/widgets/biosilver_popup_widget.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -43,6 +45,8 @@ class _StaffPageState extends State<StaffPage>
   bool _islist = false;
   bool _isActive = false;
   Widget? biosilverPopup;
+  Timer? _buttonCallTimer;
+  Timer? _checkAccountTimer;
 
   @override
   void initState() {
@@ -74,6 +78,8 @@ class _StaffPageState extends State<StaffPage>
       _requestPermission();
       _loadAddress();
       socketservice.startConnectTimer();
+      _startButtonCallTimer();
+      // _startCheckAccountTimer();
 
       if (socketservice.connected) {
         _isconnect = true;
@@ -108,7 +114,9 @@ class _StaffPageState extends State<StaffPage>
 
       socketservice.reconnect = true;
       socketservice.startConnectTimer();
+      _startButtonCallTimer();
     } else if (state == AppLifecycleState.paused) {
+      _stopButtonCallTimer();
       sensorService.stopWatch();
 
       socketservice.reconnect = false;
@@ -129,7 +137,82 @@ class _StaffPageState extends State<StaffPage>
     super.dispose();
   }
 
+  void _stopCheckAccountTimer() {
+    print('stop check account timer');
+    if (_checkAccountTimer != null) {
+      print('stop check account timer');
+      _checkAccountTimer!.cancel();
+    }
+  }
+
+  void _startCheckAccountTimer() {
+    _stopCheckAccountTimer();
+
+    _checkAccountTimer = Timer.periodic(const Duration(seconds: 10), (Timer timer) {
+      _checkAccount();
+    });
+  }
+
+  Future<void> _checkAccount() async {
+    var prefs = await SharedPreferences.getInstance();
+    String? loginAt = prefs.getString('login_at');
+
+    if (!mounted) {
+      return;
+    }
+
+    if (loginAt == null) {
+      return;
+    }
+
+    if (loginAt != null) {
+
+      final url = '${AppDefine.baseURL}app/check_account';
+
+      final dio = Dio();
+      final data = await dio.post(
+          url,
+          data: FormData.fromMap({'code': AppManager.delegatorCode, 'user_id': AppManager.myId, 'type': AppManager.settings['MCSTYPE'], 'loginAt': loginAt, 'manager': AppManager.isManager ? '1' : '0'})
+      ).then((response) {
+
+        if (response.data['status'] == '1') {
+          return response.data;
+        }
+        return null;
+      }).catchError((err) {
+        print(err);
+        return null;
+      });
+
+      if (data == null) {
+        _stopCheckAccountTimer();
+
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('確認'),
+              content: Text('ログイン情報が更新されました。再度ログインをお願いします。'),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('OK'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+        _logout();
+      }
+    }
+  }
+
   Future<void> _logout() async {
+    _disconnect();
+    context.read<AddressStore>().clear();
     var prefs = await SharedPreferences.getInstance();
     await prefs.setBool('login', false);
     Navigator.of(context, rootNavigator: true)
@@ -199,6 +282,62 @@ class _StaffPageState extends State<StaffPage>
         // });
       }
     });
+  }
+
+  void _stopButtonCallTimer() {
+    print('stop button call timer');
+    if (_buttonCallTimer != null) {
+      print('stop button call timer');
+      _buttonCallTimer!.cancel();
+    }
+  }
+
+  void _startButtonCallTimer() {
+    _stopButtonCallTimer();
+
+    _buttonCallTimer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
+      _checkButtonCall();
+    });
+  }
+
+  Future<void> _checkButtonCall() async {
+    var prefs = await SharedPreferences.getInstance();
+    String? targetId = prefs.getString('bcId');
+
+    if (!mounted) {
+      return;
+    }
+
+    if (targetId != null) {
+      prefs.remove('bcId');
+
+      print('check button call: $targetId');
+      var addressStore = context.read<AddressStore>();
+      final index = addressStore.findAddress(targetId);
+      if (index < 0) {
+        print('check button call: $targetId not exist');
+        return;
+      }
+      var address = addressStore.find(targetId)!;
+      if (!AppManager.isAuthReceive(address)) {
+        print('check button call: $targetId not auth');
+        return;
+      }
+      if (address.call == 1) {
+        print('check button call: $targetId is calling');
+        return;
+      }
+      if (AppManager.status == AppStatus.Call ||
+          AppManager.status == AppStatus.Talk ||
+          AppManager.status == AppStatus.Multi ||
+          AppManager.status == AppStatus.MultiToTalk) {
+      } else {
+        audio.stopRingtone();
+        audio.buttonCall();
+      }
+
+      addressStore.setCalled(targetId, 1);
+    }
   }
 
   Widget _addressCell(Address address) {
@@ -289,13 +428,13 @@ class _StaffPageState extends State<StaffPage>
       children: [
         Container(
           color: const Color.fromARGB(255, 80, 80, 80),
-          height: 21,
+          height: 29,//21 ユーザーリストの高さ 20250510
           child: Text(
             address.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 19,//16 ユーザーリスト名の大きさ20250510
               color: Colors.white,
             ),
           ),
@@ -540,7 +679,8 @@ class _StaffPageState extends State<StaffPage>
                   mainAxisAlignment: MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    WidgetUtil.basicText(address.name),
+                    WidgetUtil.basicText(item['managerName'], fontSize: 18),
+                    WidgetUtil.basicText(address.name, fontSize: 18),
                   ],
                 ),
               ),
@@ -560,13 +700,19 @@ class _StaffPageState extends State<StaffPage>
     }
   }
 
+  String _getTalkHistoryURL() {
+    if (AppDefine.amiApp) {
+      return "${AppDefine.baseURL}talk_history";
+    }
+    return "${AppDefine.baseURL}talk_history.php";
+  }
+
   void _talkHistoryButton(Address address) {
     var cd = AppManager.delegatorCode;
     var id1 = AppManager.myId;
     var id2 = address.id;
     var name = address.name;
-    var url = AppDefine.baseURL +
-        "talk_history.php?cd=$cd&id1=$id1&id2=$id2&na=$name";
+    var url = _getTalkHistoryURL() + "?cd=$cd&id1=$id1&id2=$id2&na=$name";
     print(url);
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -587,6 +733,9 @@ class _StaffPageState extends State<StaffPage>
     for (var i = 0; i < addressStore.addressList.length; i++) {
       var address = addressStore.addressList[i];
       // print(address);
+      if (address.type == 'manager') {
+        continue;
+      }
       if (address.sensors.isNotEmpty) {
         var sensorImage = SensorService.biosilverImageName(address.sensors);
         if (sensorImage == 'sensor_alert_spo2.png') {
@@ -595,7 +744,8 @@ class _StaffPageState extends State<StaffPage>
         }
       }
       if (address.call == 1) {
-        _callStatuses.add({'address': address, 'status': 'call'});
+        final managerName = addressStore.managerName(address.code);
+        _callStatuses.add({'address': address, 'status': 'call', 'managerName': managerName});
       }
     }
     // print(_callStatuses);
@@ -636,6 +786,7 @@ class _StaffPageState extends State<StaffPage>
   Future<void> _selectAddress(Address address) async {
     AppManager.selectUser = address;
     audio.stopButtonCall();
+    _stopCheckAccountTimer();
 
     if (address.sensors.isNotEmpty) {
       setState(() {
@@ -664,6 +815,8 @@ class _StaffPageState extends State<StaffPage>
         )
     );
 
+    _startCheckAccountTimer();
+
     // TODO: implement sensorService
     sensorService.clearAlert(address.id);
     if (mounted) {
@@ -686,6 +839,7 @@ class _StaffPageState extends State<StaffPage>
   Future<void> _toSetting() async {
     _disconnect();
     context.read<AddressStore>().clear();
+    _stopCheckAccountTimer();
     await Navigator.of(context, rootNavigator: true)
         .push(
         PageRouteBuilder(
@@ -696,6 +850,7 @@ class _StaffPageState extends State<StaffPage>
           reverseTransitionDuration: Duration.zero,
         )
     );
+    _startCheckAccountTimer();
   }
 
   Future<void> _toMeet() async {
@@ -719,6 +874,23 @@ class _StaffPageState extends State<StaffPage>
     if (targetId != null) {
       prefs.remove('fmId');
       socketservice.io.emit("call?", [targetId]);
+    }
+  }
+
+  Future<void> _calledCheck(targetId) async {
+    if (mounted) {
+      var addressStore = context.read<AddressStore>();
+      final index = addressStore.findAddress(targetId);
+      if (index < 0) {
+        return;
+      }
+      var address = addressStore.find(targetId)!;
+      if (address.called == 1) {
+        context.read<AddressStore>().setCalled(targetId, 0);
+        context.read<AddressStore>().setSupported(targetId, 1);
+        await audio.stopButtonCall();
+        return;
+      }
     }
   }
 
@@ -1012,6 +1184,7 @@ class _StaffPageState extends State<StaffPage>
       if (data['productName'] == '%logined') {
         // AppManager.toast("ログイン済のアカウントです。");
         // return;
+        return;
       }
       setState(() {
         _isconnect = true;
@@ -1129,6 +1302,12 @@ class _StaffPageState extends State<StaffPage>
       }
       audio.stopRingtone();
       _openCallStatusPopup();
+    }
+    else if (message == 'called_check') {
+      if (data["TO"] == null) {
+        return;
+      }
+      _calledCheck(data["TO"].toString());
     }
   }
 
