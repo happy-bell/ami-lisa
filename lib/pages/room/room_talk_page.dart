@@ -86,21 +86,23 @@ class RoomTalkPageState extends State<RoomTalkPage>
   }
 
   @override
-  void didChangeDependencies() {
+  void didChangeDependencies() async {
     super.didChangeDependencies();
 
-    print('roomtalk didChangeDependencies');
+    print('roomtalk didChangeDependencies ${_init}');
 
     if (_init) {
       _init = false;
       AppManager.setStatusBarHidden(false);
 
       if (AppManager.selectUser!.call == 1) {
+        await audio.ringtone();
         print('[DEBUG PRINT]着信中 ${AppManager.selectUser!.id}');
         _statusImage = ImageName.addrCall;
         if (AppManager.appsettings["AUTO_RECEIVE"] == '1') {
           print(DateTime.now());
           print('[DEBUG PRINT]room talk 着信中 auto receive');
+          sleep(Duration(milliseconds: 500));
           _response();
           return;
         } else {
@@ -109,7 +111,6 @@ class RoomTalkPageState extends State<RoomTalkPage>
             return;
           }
         }
-        audio.ringtone();
       } else if (AppManager.status == AppStatus.Call) {
         print('発信中 ${AppManager.selectUser!.id}');
         _callendIsEnabled = false;
@@ -128,7 +129,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
 
     } else if (state == AppLifecycleState.paused) {
       if (AppManager.status == AppStatus.Call) {
-        _cancelcall();
+        _cancelCall();
       } else {
         _close();
       }
@@ -204,7 +205,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
       return;
     }
     if (AppManager.status == AppStatus.Call) {
-      _cancelcall();
+      _cancelCall();
     } else if (AppManager.selectUser!.call == 1) {
       _rejectCall();
     } else {
@@ -229,12 +230,12 @@ class RoomTalkPageState extends State<RoomTalkPage>
     await audio.call();
     socketservice.io.emit("call", [AppManager.selectUser!.id]);
 
-    _rusuTimer = Timer.periodic(Duration(milliseconds: AppDefine.absenceSec1), (Timer timer) {
+    _rusuTimer = Timer.periodic(const Duration(milliseconds: AppDefine.absenceSec1), (Timer timer) {
       if (!_active || AppManager.status == AppStatus.Talk) {
         print('[DEBUG PRINT]  rusu timer in talk');
         return;
       }
-      _cancelcall();
+      _cancelCall(isClose: false);
       setState(() {
         _statusImage = ImageName.rusu;
       });
@@ -245,8 +246,9 @@ class RoomTalkPageState extends State<RoomTalkPage>
     });
   }
 
-  void _response() {
-    audio.stopRingtone();
+  Future<void> _response() async {
+    await audio.stopRingtone();
+    // sleep(Duration(milliseconds: 300));
     AppManager.talkId1 = AppManager.selectUser!.id;
     peer.invite(AppManager.selectUser!.id, 'video', true);
   }
@@ -268,14 +270,16 @@ class RoomTalkPageState extends State<RoomTalkPage>
     audio.stopCall();
   }
 
-  void _cancelcall() {
+  void _cancelCall({bool isClose = true}) {
     if (socketservice.isConnect()) {
       socketservice.io.emit("call_cancel", [AppManager.selectUser!.id]);
     }
     audio.stopCall();
     _statusImage = '';
     setAppStatus(AppStatus.None);
-    _close();
+    if (isClose) {
+      _close();
+    }
   }
 
   void _rejectCall() {
@@ -358,6 +362,12 @@ class RoomTalkPageState extends State<RoomTalkPage>
   }
 
   Future<void> _callNotAuth() async {
+    if (AppManager.selectUser != null) {
+      if (AppManager.selectUser!.id.startsWith('@')) {
+        print('call not auth is not show no call to @');
+        return;
+      }
+    }
     audio.stopCall();
     _statusImage = '';
     setAppStatus(AppStatus.None);
@@ -857,7 +867,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
     }
     _tapping = true;
     if (AppManager.status == AppStatus.Call) {
-      _cancelcall();
+      _cancelCall();
     } else if (AppManager.selectUser?.call == 1) {
       _response();
     } else {
