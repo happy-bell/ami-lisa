@@ -232,7 +232,10 @@ class SocketIOService {
     var codes = [];
     String? codesString = sharedPreferences.getString('codes');
     if (AppManager.isManager && codesString != null) {
-      codes = json.decode(codesString);
+      var allCodes = json.decode(codesString);
+      for (var i = 0; i < allCodes.length; i++) {
+        codes.add(allCodes[i] + '_STAFF');
+      }
     }
 
     _socket!.emit("login", [
