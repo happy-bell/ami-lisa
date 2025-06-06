@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 
 class OriginalImageIconWidget extends ImageIcon {
   const OriginalImageIconWidget(
-      ImageProvider image, {
-        Key? key,
-        double? size,
-        Color? color,
-        String? semanticLabel,
-      }) : super(image,
-      key: key, size: size, color: color, semanticLabel: semanticLabel);
+      ImageProvider super.image, {
+        super.key,
+        super.size,
+        super.color,
+        super.semanticLabel,
+      });
 
   @override
   Widget build(BuildContext context) {

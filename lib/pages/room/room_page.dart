@@ -27,6 +27,8 @@ import '../../services/peer_service.dart';
 import '../../widgets/clock_widget.dart';
 
 class RoomPage extends StatefulWidget {
+  const RoomPage({super.key});
+
   @override
   _RoomPageState createState() => _RoomPageState();
 }
@@ -43,17 +45,17 @@ class _RoomPageState extends State<RoomPage>
   AudioService audio = AudioService();
   bool _isconnect = false;
   List<Address> addressList = [];
-  bool _talking = false;
+  final bool _talking = false;
   bool _isSleep = false;
   bool _isChangeBrightness = false;
   double _currentBrightness = 1.0;
   double _sleepBrightness = 0.5;
-  String _statusImage = '';
+  final String _statusImage = '';
   Peer peer = Peer();
   late VideoPlayerController _videoController;
   bool _isVideoPlay = false;
 
-  var _safetyCheckIds = [];
+  final _safetyCheckIds = [];
 
   @override
   void initState() {
@@ -112,7 +114,7 @@ class _RoomPageState extends State<RoomPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    print("room life cycle state -> ${state}");
+    print("room life cycle state -> $state");
     // setState(() {
     //   _notification = state;
     // });
@@ -179,7 +181,7 @@ class _RoomPageState extends State<RoomPage>
     int minVol = (await RealVolume.getMinVol(streamType)) ?? 0;
     int maxVol = (await RealVolume.getMaxVol(streamType)) ?? 10;
     double currentVol = (await RealVolume.getCurrentVol(streamType)) ?? 0;
-    print(minVol.toString() + " " + maxVol.toString() + " " + currentVol.toString());
+    print("$minVol $maxVol $currentVol");
     if (currentVol >= 1.0) {
       await RealVolume.setVolume(currentVol - 0.05);
     }
@@ -342,7 +344,7 @@ class _RoomPageState extends State<RoomPage>
   }
 
   Future<void> _setBrightness(double brightness) async {
-    print('set brightness ${brightness}');
+    print('set brightness $brightness');
     if (!_isChangeBrightness) {
       return;
     }
@@ -356,7 +358,7 @@ class _RoomPageState extends State<RoomPage>
 
   Future<void> _receive(String udid) async {
     print(DateTime.now());
-    print('[DEBUG PRINT] room receive ' + udid);
+    print('[DEBUG PRINT] room receive $udid');
     if (_isSleep) {
       _setBrightness(0.8);
     }
@@ -424,12 +426,7 @@ class _RoomPageState extends State<RoomPage>
 
   Future<dynamic> _requestAutoReceives() async {
     var token = AppDefine.getRMSToken();
-    var url = AppDefine.baseURL +
-        'app/v4/auto_receives.php?delegatorCode=' +
-        AppManager.delegatorCode +
-        '&userID=' +
-        AppManager.myId +
-        '&token=' +
+    var url = '${AppDefine.baseURL}app/v4/auto_receives.php?delegatorCode=${AppManager.delegatorCode}&userID=${AppManager.myId}&token=' +
         token;
     print(url);
     var response = await http.get(Uri.parse(url));

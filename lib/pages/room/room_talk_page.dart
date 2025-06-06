@@ -24,6 +24,8 @@ import '../../helpers/widget_util.dart';
 import '../../services/socket_service.dart';
 
 class RoomTalkPage extends StatefulWidget {
+  const RoomTalkPage({super.key});
+
   @override
   RoomTalkPageState createState() => RoomTalkPageState();
 }
@@ -39,7 +41,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
   final _remote2Renderer = RTCVideoRenderer();
   bool _hasRemoteVideo = false;
   bool _hasRemote2Video = false;
-  double _remoteMargin = 0;
+  final double _remoteMargin = 0;
   SocketIOService socketservice = SocketIOService();
   SocketService? socketioservice;
   AudioService audio = AudioService();
@@ -49,12 +51,12 @@ class RoomTalkPageState extends State<RoomTalkPage>
   bool _isrecording = false;
 
   bool _talked = false;
-  bool _showSubmenu = false;
+  final bool _showSubmenu = false;
   bool _callendIsEnabled = true;
 
   /// 通話中着信対応
-  String _callingId = '';
-  String _callingName = '';
+  final String _callingId = '';
+  final String _callingName = '';
   AnimationController? _blinkAnimationController;
   /// 画像共有
   ui.Image? _shareImage;
@@ -89,7 +91,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
   void didChangeDependencies() async {
     super.didChangeDependencies();
 
-    print('roomtalk didChangeDependencies ${_init}');
+    print('roomtalk didChangeDependencies $_init');
 
     if (_init) {
       _init = false;
@@ -121,7 +123,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    print("room talk life cycle state -> ${state}");
+    print("room talk life cycle state -> $state");
     // setState(() {
     //   _notification = state;
     // });
@@ -439,7 +441,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
     if (AppManager.status != AppStatus.Talk) {
       isEnableThreeway = false;
     }
-    if (AppManager.holdId.length == 0) {
+    if (AppManager.holdId.isEmpty) {
       isEnableThreeway = false;
     }
 
@@ -828,7 +830,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
     }
     print('start record');
     //self.recordConnectId = "REC_" + Date().toString("yyyyMMddHHmmss") + "_" + appManager.delegatorCode + "_" + appManager.myId
-    AppManager.recordConnectId = 'REC_' + AppManager.dateFormat(DateTime.now(), "yyyyMMddHHmmss") + '_' + AppManager.delegatorCode + '_' + AppManager.myId;
+    AppManager.recordConnectId = 'REC_${AppManager.dateFormat(DateTime.now(), "yyyyMMddHHmmss")}_${AppManager.delegatorCode}_${AppManager.myId}';
     setState(() {
       _isrecording = true;
     });
@@ -933,7 +935,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
                       ? constraints.maxHeight / 2
                       : constraints.maxHeight,
                   width: constraints.maxWidth,
-                  child: RTCVideoView(_remoteRenderer!, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,),
+                  child: RTCVideoView(_remoteRenderer, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,),
                 ),
               if (_talking && AppManager.safetyCheckId.isEmpty)
                 Positioned(
@@ -1415,7 +1417,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
     //   _localRenderer = RTCVideoRenderer();
     //   await _localRenderer!.initialize();
     // }
-    _localRenderer!.srcObject = stream;
+    _localRenderer.srcObject = stream;
   }
 
   void _onAddRemoteStream(id, stream) {

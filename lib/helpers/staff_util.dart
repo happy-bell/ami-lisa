@@ -194,7 +194,7 @@ class StaffUtil {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Container(
+          SizedBox(
             width: textWidth,
             child: Text(
               address.name,

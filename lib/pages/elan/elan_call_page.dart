@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:amiapp/pages/staff/staff_album_page.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +11,6 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:persistent_bottom_nav_bar_v2/persistent-tab-view.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/models/address_model.dart';
 import 'package:amiapp/notifiers/address_notifier.dart';
@@ -28,14 +26,18 @@ import '../../services/peer_service.dart';
 
 class ElanCallPage extends StatefulWidget {
   final ElanTabPageState tabPageState;
-  ElanCallPage({required this.tabPageState});
+  const ElanCallPage({super.key, required this.tabPageState});
 
   @override
   ElanCallPageState createState() => ElanCallPageState();
 }
 
 class ElanCallPageState extends State<ElanCallPage>
-    with WidgetsBindingObserver, SocketIOServiceDelegate, SocketServiceDelegate, PaintControllerDelegate {
+    with
+        WidgetsBindingObserver,
+        SocketIOServiceDelegate,
+        SocketServiceDelegate,
+        PaintControllerDelegate {
   bool _init = true;
   String _statusImage = '';
   late Address _address;
@@ -48,7 +50,7 @@ class ElanCallPageState extends State<ElanCallPage>
   // RTCVideoRenderer? _remote2Renderer;
   bool _hasRemoteVideo = false;
   bool _hasRemote2Video = false;
-  double _remoteMargin = 0;
+  final double _remoteMargin = 0;
   MediaStream? _localStream;
   SocketIOService socketservice = SocketIOService();
   SocketService? socketioservice;
@@ -58,10 +60,12 @@ class ElanCallPageState extends State<ElanCallPage>
   FileImage? _dlImage;
   FileImage? _dlImagel;
   GlobalKey<ElanCallMenuWidgetState> menuWidgetGlobalKey = GlobalKey();
+
   /// 通話中着信対応
   String _callingId = '';
   String _callingName = '';
   AnimationController? _blinkAnimationController;
+
   /// 画像共有
   ui.Image? _shareImage;
   bool _drawing = false;
@@ -111,9 +115,7 @@ class ElanCallPageState extends State<ElanCallPage>
           File file = File(imagePath);
           _dlImage = FileImage(file);
           print('set dl image');
-          setState(() {
-
-          });
+          setState(() {});
         });
       }
       if (AppManager.appsettings['CALLSCREENIMAGEL'] != '0') {
@@ -125,13 +127,12 @@ class ElanCallPageState extends State<ElanCallPage>
           File file = File(imagePath);
           _dlImagel = FileImage(file);
           print('set dl imagel');
-          setState(() {
-
-          });
+          setState(() {});
         });
       }
 
-      var address = context.read<AddressStore>().find(AppManager.selectUser!.id);
+      var address =
+          context.read<AddressStore>().find(AppManager.selectUser!.id);
       if (address != null) {
         _address = address;
         if (address.id == AppManager.autoReceiveId) {
@@ -144,9 +145,7 @@ class ElanCallPageState extends State<ElanCallPage>
         } else if (address.called == 1) {
           _statusImage = 'assets/images/status/addr_called.png';
         }
-        setState(() {
-
-        });
+        setState(() {});
       } else {
         _close();
       }
@@ -164,10 +163,7 @@ class ElanCallPageState extends State<ElanCallPage>
     print(state);
     if (state == AppLifecycleState.resumed) {
       print('resumed');
-
-    } else if (state == AppLifecycleState.paused) {
-
-    }
+    } else if (state == AppLifecycleState.paused) {}
   }
 
   @override
@@ -275,13 +271,15 @@ class ElanCallPageState extends State<ElanCallPage>
 
     print("call to ${AppManager.selectUser!.id}");
 
-    _absenceTimer = Timer.periodic(const Duration(milliseconds: AppDefine.absenceSec1), (Timer timer) {
+    _absenceTimer = Timer.periodic(
+        const Duration(milliseconds: AppDefine.absenceSec1), (Timer timer) {
       _cancelcall();
       setState(() {
         _statusImage = ImageName.rusu;
       });
 
-      _absenceTimer = Timer.periodic(const Duration(milliseconds: AppDefine.absenceSec2), (Timer timer) {
+      _absenceTimer = Timer.periodic(
+          const Duration(milliseconds: AppDefine.absenceSec2), (Timer timer) {
         _close();
       });
     });
@@ -503,7 +501,8 @@ class ElanCallPageState extends State<ElanCallPage>
   /// photo and draw
   /// *******************************************************************************************
   void _requestPhoto() async {
-    var confirm = await WidgetUtil.showSimpleConfirmDialog(context, '画像を取得しますか？');
+    var confirm =
+        await WidgetUtil.showSimpleConfirmDialog(context, '画像を取得しますか？');
     if (confirm) {
       _doRequestPhoto("2");
     }
@@ -646,7 +645,8 @@ class ElanCallPageState extends State<ElanCallPage>
   }
 
   void _savePhoto() async {
-    var confirm = await WidgetUtil.showSimpleConfirmDialog(context, '画像を保存しますか？');
+    var confirm =
+        await WidgetUtil.showSimpleConfirmDialog(context, '画像を保存しますか？');
     if (confirm) {
       Directory docDir = await getApplicationDocumentsDirectory();
       String directory = "${docDir.path}/album/${AppManager.talkId1}";
@@ -667,14 +667,16 @@ class ElanCallPageState extends State<ElanCallPage>
         _shareImage!, Size(_localCanvasWidth, _localCanvasHeight));
     var pngBytes = await image.toByteData(format: ui.ImageByteFormat.png);
 
-    var filepath = '$directory/${AppManager.dateFormat(DateTime.now(), 'yyyyMMddHHmmss')}.png';
+    var filepath =
+        '$directory/${AppManager.dateFormat(DateTime.now(), 'yyyyMMddHHmmss')}.png';
     File imagefile = File(filepath);
     imagefile.writeAsBytesSync(pngBytes!.buffer.asInt8List());
     // AppManager.toast("保存しました", Colors.blue, Colors.white);
   }
 
   void _endShareButton() async {
-    var confirm = await WidgetUtil.showSimpleConfirmDialog(context, '画像共有を終了しますか？');
+    var confirm =
+        await WidgetUtil.showSimpleConfirmDialog(context, '画像共有を終了しますか？');
     if (confirm) {
       setState(() {
         _drawing = false;
@@ -698,7 +700,7 @@ class ElanCallPageState extends State<ElanCallPage>
     if (AppManager.status != AppStatus.Talk) {
       isEnableThreeway = false;
     }
-    if (AppManager.holdId.length == 0) {
+    if (AppManager.holdId.isEmpty) {
       isEnableThreeway = false;
     }
 
@@ -754,7 +756,8 @@ class ElanCallPageState extends State<ElanCallPage>
   void _threewayToCall(String from, String to) async {
     print("_threewayToCall from:$from to:$to, status:${AppManager.status}");
 
-    if (AppManager.status == AppStatus.Multi && (AppManager.myId == from || AppManager.myId == to)) {
+    if (AppManager.status == AppStatus.Multi &&
+        (AppManager.myId == from || AppManager.myId == to)) {
       if (socketioservice != null) {
         socketioservice?.disconnect();
       }
@@ -878,215 +881,234 @@ class ElanCallPageState extends State<ElanCallPage>
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: LayoutBuilder(
-          builder: (context, constraints) {
-            final viewInsets = MediaQuery.of(context).viewInsets;
-            final viewPadding = MediaQuery.of(context).padding;
-            final topOffset = viewInsets.top + viewPadding.top;
-            final leftOffset = viewInsets.left + viewPadding.left + 12;
-            final bottomOffset = viewInsets.bottom + viewPadding.bottom;
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                if (!_talking && !_hasRemoteVideo && AppManager.status != AppStatus.Response)
-                  InkWell(
-                    onTap: () {
-                      _close();
-                    },
-                    child: Container(
-                      decoration: bgDecoration,
-                    ),
-                  ),
-                if (_hasRemote2Video)
-                  Positioned(
-                    top: constraints.maxHeight / 2,
-                    left: 0,
-                    height: constraints.maxHeight / 2,
-                    width: constraints.maxWidth,
-                    child: RTCVideoView(
-                      _remote2Renderer,
-                      mirror: true,
-                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                    ),
-                  ),
-                if (_hasRemoteVideo)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    height: AppManager.status == AppStatus.Multi
-                        ? size.height / 2
-                        : size.height,
-                    width: size.width - _remoteMargin,
-                    child: RTCVideoView(_remoteRenderer!, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,),
-                  ),
-                if (_talking && AppManager.safetyCheckId.isEmpty)
-                  Positioned(
-                    bottom: 20,
-                    right: 0,
-                    height: size.height / 4,
-                    width: size.height / 4 / 3 * 2,
-                    child: RTCVideoView(
-                      _localRenderer!,
-                      mirror: true,
-                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                    ),
-                  ),
-                if (_talking)
-                  Positioned(
-                    top: topOffset,
-                    left: leftOffset,
-                    width: constraints.maxWidth - (leftOffset * 2),
-                    height: 60,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: LayoutBuilder(builder: (context, constraints) {
+        final viewInsets = MediaQuery.of(context).viewInsets;
+        final viewPadding = MediaQuery.of(context).padding;
+        final topOffset = viewInsets.top + viewPadding.top;
+        final leftOffset = viewInsets.left + viewPadding.left + 12;
+        final bottomOffset = viewInsets.bottom + viewPadding.bottom;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (!_talking &&
+                !_hasRemoteVideo &&
+                AppManager.status != AppStatus.Response)
+              InkWell(
+                onTap: () {
+                  _close();
+                },
+                child: Container(
+                  decoration: bgDecoration,
+                ),
+              ),
+            if (_hasRemote2Video)
+              Positioned(
+                top: constraints.maxHeight / 2,
+                left: 0,
+                height: constraints.maxHeight / 2,
+                width: constraints.maxWidth,
+                child: RTCVideoView(
+                  _remote2Renderer,
+                  mirror: true,
+                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                ),
+              ),
+            if (_hasRemoteVideo)
+              Positioned(
+                top: 0,
+                left: 0,
+                height: AppManager.status == AppStatus.Multi
+                    ? size.height / 2
+                    : size.height,
+                width: size.width - _remoteMargin,
+                child: RTCVideoView(
+                  _remoteRenderer,
+                  mirror: false,
+                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                ),
+              ),
+            if (_talking && AppManager.safetyCheckId.isEmpty)
+              Positioned(
+                bottom: 20,
+                right: 0,
+                height: size.height / 4,
+                width: size.height / 4 / 3 * 2,
+                child: RTCVideoView(
+                  _localRenderer,
+                  mirror: true,
+                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                ),
+              ),
+            if (_talking)
+              Positioned(
+                top: topOffset,
+                left: leftOffset,
+                width: constraints.maxWidth - (leftOffset * 2),
+                height: 60,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          _changeCamera();
+                        },
+                        child: SizedBox(
+                          width: smallButtonSize,
+                          height: smallButtonSize,
+                          child: Image.asset(
+                              "assets/images/talk/btn-change_my_camera.png"),
+                        ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           GestureDetector(
                             onTap: () {
-                              _changeCamera();
+                              _requestPhoto();
                             },
                             child: SizedBox(
                               width: smallButtonSize,
                               height: smallButtonSize,
-                              child: Image.asset("assets/images/talk/btn-change_my_camera.png"),
+                              child: Image.asset(
+                                  "assets/images/talk/btn-photo_request.png"),
                             ),
                           ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              GestureDetector(
-                                onTap: () {
-                                  _requestPhoto();
-                                },
-                                child: SizedBox(
-                                  width: smallButtonSize,
-                                  height: smallButtonSize,
-                                  child: Image.asset("assets/images/talk/btn-photo_request.png"),
-                                ),
-                              ),
-                              const SizedBox(width: 20,),
-                              GestureDetector(
-                                onTap: () {
-                                  _requestChangeCamera();
-                                },
-                                child: SizedBox(
-                                  width: smallButtonSize,
-                                  height: smallButtonSize,
-                                  child: Image.asset("assets/images/talk/btn-change_camera.png"),
-                                ),
-                              ),
-                            ],
+                          const SizedBox(
+                            width: 20,
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              _requestChangeCamera();
+                            },
+                            child: SizedBox(
+                              width: smallButtonSize,
+                              height: smallButtonSize,
+                              child: Image.asset(
+                                  "assets/images/talk/btn-change_camera.png"),
+                            ),
                           ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                ElanCallMenuWidget(key: menuWidgetGlobalKey),
-                if (_statusImage.isNotEmpty)
-                  Positioned(
-                    top: size.height / 2 - (statusImageSize / 2),
-                    left: size.width / 2 - (statusImageSize / 2),
-                    height: statusImageSize,
-                    width: statusImageSize,
-                    child: Column(
-                      children: [
-                        if (_statusImage == 'assets/images/status/addr_call.png')
-                          Container(
-                            color: Colors.black,
-                            width: statusImageSize,
-                            height: 30,
-                            child: Text(
-                              _address.name,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        Image.asset(_statusImage),
-                      ],
-                    ),
-                  ),
-                if (_drawing)
-                  ... [
-                    Container(
-                      color: Colors.black,
-                    ),
-                    Positioned(
-                      top: (constraints.maxHeight - _localCanvasHeight) / 2,
-                      left: (constraints.maxWidth - _localCanvasWidth) / 2,
-                      width: _localCanvasWidth,
-                      height: _localCanvasHeight,
-                      child: Container(
+                ),
+              ),
+            ElanCallMenuWidget(key: menuWidgetGlobalKey),
+            if (_statusImage.isNotEmpty)
+              Positioned(
+                top: size.height / 2 - (statusImageSize / 2),
+                left: size.width / 2 - (statusImageSize / 2),
+                height: statusImageSize,
+                width: statusImageSize,
+                child: Column(
+                  children: [
+                    if (_statusImage == 'assets/images/status/addr_call.png')
+                      Container(
                         color: Colors.black,
-                        child: Painter(
-                          paintController: _controller,
-                          image: _shareImage!,
-                          width: _localCanvasWidth,
-                          height: _localCanvasHeight,
+                        width: statusImageSize,
+                        height: 30,
+                        child: Text(
+                          _address.name,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    Image.asset(_statusImage),
+                  ],
+                ),
+              ),
+            if (_drawing) ...[
+              Container(
+                color: Colors.black,
+              ),
+              Positioned(
+                top: (constraints.maxHeight - _localCanvasHeight) / 2,
+                left: (constraints.maxWidth - _localCanvasWidth) / 2,
+                width: _localCanvasWidth,
+                height: _localCanvasHeight,
+                child: Container(
+                  color: Colors.black,
+                  child: Painter(
+                    paintController: _controller,
+                    image: _shareImage!,
+                    width: _localCanvasWidth,
+                    height: _localCanvasHeight,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: topOffset,
+                left: leftOffset,
+                height: 40.0,
+                width: constraints.maxWidth - 32.0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    WidgetUtil.normalButton(
+                      '保存',
+                      _savePhoto,
+                      primaryColor: const Color.fromARGB(255, 179, 182, 186),
+                      foregroundColor: Colors.white,
+                    ),
+                    WidgetUtil.normalButton(
+                      '共有終了',
+                      _endShareButton,
+                      primaryColor: const Color.fromARGB(255, 238, 85, 104),
+                      foregroundColor: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                bottom: bottomOffset,
+                left: leftOffset,
+                height: 40.0,
+                width: constraints.maxWidth - 32.0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12.0),
+                      child: SizedBox(
+                        width: smallButtonSize,
+                        height: smallButtonSize,
+                        child: GestureDetector(
+                          onTap: () {
+                            _undoDraw();
+                          },
+                          child:
+                              Image.asset("assets/images/talk/icon_undo.png"),
                         ),
                       ),
                     ),
-                    Positioned(
-                      top: topOffset,
-                      left: leftOffset,
-                      height: 40.0,
-                      width: constraints.maxWidth - 32.0,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          WidgetUtil.normalButton('保存', _savePhoto, primaryColor: const Color.fromARGB(255, 179, 182, 186), foregroundColor: Colors.white,),
-                          WidgetUtil.normalButton('共有終了', _endShareButton, primaryColor: const Color.fromARGB(255, 238, 85, 104), foregroundColor: Colors.white,),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      bottom: bottomOffset,
-                      left: leftOffset,
-                      height: 40.0,
-                      width: constraints.maxWidth - 32.0,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(right: 12.0),
-                            child: SizedBox(
-                              width: smallButtonSize,
-                              height: smallButtonSize,
-                              child: GestureDetector(
-                                onTap: () {
-                                  _undoDraw();
-                                },
-                                child: Image.asset("assets/images/talk/icon_undo.png"),
-                              ),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              _toggleDrawClearMode();
-                            },
-                            child: _drawClearMode
-                                ? Image.asset(
+                    GestureDetector(
+                      onTap: () {
+                        _toggleDrawClearMode();
+                      },
+                      child: _drawClearMode
+                          ? Image.asset(
                               "assets/images/talk/icon_eraser_on.png",
                               width: smallButtonSize,
                               height: smallButtonSize,
                             )
-                                : Image.asset(
+                          : Image.asset(
                               "assets/images/talk/icon_eraser_off.png",
                               width: smallButtonSize,
                               height: smallButtonSize,
                             ),
-                          ),
-                        ],
-                      ),
                     ),
                   ],
-              ],
-            );
-          }
-      ),
+                ),
+              ),
+            ],
+          ],
+        );
+      }),
     );
   }
 
@@ -1108,7 +1130,8 @@ class ElanCallPageState extends State<ElanCallPage>
         } else {
           // 応答する
           if (AppManager.selectUser!.id != data["info"]["udid"]) {
-            var address = context.read<AddressStore>().find(data["info"]["udid"])!;
+            var address =
+                context.read<AddressStore>().find(data["info"]["udid"])!;
             AppManager.selectUser = address;
             _address = address;
           }
@@ -1129,8 +1152,7 @@ class ElanCallPageState extends State<ElanCallPage>
           });
         }
       }
-    }
-    else if (message == 'call_cancel') {
+    } else if (message == 'call_cancel') {
       if (data["udid"] == null) {
         return;
       }
@@ -1144,41 +1166,35 @@ class ElanCallPageState extends State<ElanCallPage>
           _callingName = '';
         });
       }
-    }
-    else if (message == 'call_accept') {
+    } else if (message == 'call_accept') {
       if (data["udid"] == null) {
         return;
       }
       if (data["udid"] == AppManager.selectUser!.id) {}
-    }
-    else if (message == 'not_connect') {
+    } else if (message == 'not_connect') {
       if (data["info"] == null) {
         return;
       }
       _notConnect(data["info"]);
-    }
-    else if (message == 'call_reject') {
+    } else if (message == 'call_reject') {
       if (data["udid"] == null) {
         return;
       }
       if (AppManager.selectUser!.id == data["udid"]) {
         _callRejected();
       }
-    }
-    else if (message == 'talk_end') {
+    } else if (message == 'talk_end') {
       if (data["udid"] == null) {
         return;
       }
       _receiveHangup(data["udid"]);
-    }
-    else if (message == 'hold') {
+    } else if (message == 'hold') {
       print(data["udid"]);
       if (data["udid"] == null) {
         return;
       }
       _receiveHold(data["udid"]);
-    }
-    else if (message == 'hold_clear') {
+    } else if (message == 'hold_clear') {
       if (data["info"] == null) {
         return;
       }
@@ -1186,16 +1202,15 @@ class ElanCallPageState extends State<ElanCallPage>
         return;
       }
       _receiveClearHold(data["info"]["udid"]);
-    }
-    else if (message == 'change_camera') {
+    } else if (message == 'change_camera') {
       if (data["udid"] == null) {
         return;
       }
-      if (AppManager.status == AppStatus.Talk && AppManager.talkId1 == data["udid"]) {
+      if (AppManager.status == AppStatus.Talk &&
+          AppManager.talkId1 == data["udid"]) {
         _changeCamera();
       }
-    }
-    else if (message == 'threeway') {
+    } else if (message == 'threeway') {
       if (data["info"] == null) {
         return;
       }
@@ -1204,9 +1219,9 @@ class ElanCallPageState extends State<ElanCallPage>
           data["info"]["roomID"] == null) {
         return;
       }
-      _recvThreeway(data["info"]["talkID1"], data["info"]["talkID2"], data["info"]["roomID"]);
-    }
-    else if (message == 'threeway_response') {
+      _recvThreeway(data["info"]["talkID1"], data["info"]["talkID2"],
+          data["info"]["roomID"]);
+    } else if (message == 'threeway_response') {
       if (data["info"] == null) {
         return;
       }
@@ -1215,9 +1230,9 @@ class ElanCallPageState extends State<ElanCallPage>
           data["info"]["roomID"] == null) {
         return;
       }
-      _recvThreeway(data["info"]["talkID1"], data["info"]["talkID2"], data["info"]["roomID"]);
-    }
-    else if (message == 'request_photo') {
+      _recvThreeway(data["info"]["talkID1"], data["info"]["talkID2"],
+          data["info"]["roomID"]);
+    } else if (message == 'request_photo') {
       if (data["info"] == null) {
         return;
       }
@@ -1228,21 +1243,17 @@ class ElanCallPageState extends State<ElanCallPage>
           AppManager.talkId1 == data["info"]["udid"]) {
         _receiveRequestPhoto();
       }
-    }
-    else if (message == 'photo_request_error') {
+    } else if (message == 'photo_request_error') {
       AppManager.toast("画像取得に失敗しました。", gravity: ToastGravity.CENTER);
-    }
-    else if (message == 'close_drawview') {
+    } else if (message == 'close_drawview') {
       setState(() {
         _drawing = false;
       });
-    }
-    else if (message == 'safety_check_stop') {
+    } else if (message == 'safety_check_stop') {
       peer.close();
       _endSafetyCheck();
       AppManager.toast("操作されました。安全/安静目視を終了します");
-    }
-    else if (message == 'safety_check_error') {
+    } else if (message == 'safety_check_error') {
       peer.close();
       _endSafetyCheck();
       AppManager.toast("アプリが起動していないか操作中です。");
@@ -1271,13 +1282,11 @@ class ElanCallPageState extends State<ElanCallPage>
       var sdp = (data["sdpOffer"] ?? '');
       print('callresponse $to');
       onCallResponse(to, sdp);
-    }
-    else if (id == 'startCommunication') {
+    } else if (id == 'startCommunication') {
       var sdp = (data["sdpAnswer"] ?? '');
       var to = (data["to"] ?? '');
       onStartCommunication(to, sdp);
-    }
-    else if (id == 'iceCandidate') {
+    } else if (id == 'iceCandidate') {
       var from = data["from"];
       var candidate = data["candidate"];
       if (from == null || candidate == null) {
@@ -1328,8 +1337,7 @@ class ElanCallPageState extends State<ElanCallPage>
         };
         socketservice.io.emit("talk", [sendData]);
       }
-    }
-    else if (id2 == 'shareRecv') {
+    } else if (id2 == 'shareRecv') {
       if (data['frameW'] == null || data['frameH'] == null) {
         return;
       }
@@ -1341,8 +1349,7 @@ class ElanCallPageState extends State<ElanCallPage>
       _remoteCanvasHeight = double.parse(frameH);
 
       _showDrawView();
-    }
-    else if (id2 == 'draw') {
+    } else if (id2 == 'draw') {
       if (data['event'] == null || data['x'] == null || data['y'] == null) {
         return;
       }
@@ -1351,11 +1358,9 @@ class ElanCallPageState extends State<ElanCallPage>
       double y =
           double.parse(data['y']) * _localCanvasHeight / _remoteCanvasHeight;
       _controller.receiveDraw(data['event'], x, y);
-    }
-    else if (id2 == 'shareUndo') {
+    } else if (id2 == 'shareUndo') {
       _controller.receiveDraw('undo', 0.0, 0.0);
-    }
-    else if (id2 == 'shareEraseMode') {
+    } else if (id2 == 'shareEraseMode') {
       if (data['mode'] == null) {
         return;
       }
@@ -1364,8 +1369,7 @@ class ElanCallPageState extends State<ElanCallPage>
       } else {
         _controller.setIsClear2(false);
       }
-    }
-    else if (id2 == 'threewayToCall') {
+    } else if (id2 == 'threewayToCall') {
       if (data['from'] == null || data['to'] == null) {
         return;
       }
@@ -1515,9 +1519,7 @@ class ElanCallPageState extends State<ElanCallPage>
   }
 
   @override
-  void onIoDisConnect() {
-
-  }
+  void onIoDisConnect() {}
 
   @override
   void onIoMessage(data) {
@@ -1526,20 +1528,15 @@ class ElanCallPageState extends State<ElanCallPage>
 
     if (messageId == 'existingParticipants') {
       _onExistingParticipants(data);
-    }
-    else if (messageId == 'newParticipantArrived') {
+    } else if (messageId == 'newParticipantArrived') {
       _onNewParticipant(data);
-    }
-    else if (messageId == 'participantLeft') {
+    } else if (messageId == 'participantLeft') {
       _onParticipantLeft(data);
-    }
-    else if (messageId == 'receiveVideoAnswer') {
+    } else if (messageId == 'receiveVideoAnswer') {
       _onReceiveVideoAnswer(data);
-    }
-    else if (messageId == 'joinRoomResponse') {
+    } else if (messageId == 'joinRoomResponse') {
       // _onJoinRoomResponse(data);
-    }
-    else if (messageId == 'iceCandidate') {
+    } else if (messageId == 'iceCandidate') {
       // print(data);
       if (data["name"] == null || data["candidate"] == null) {
         return;

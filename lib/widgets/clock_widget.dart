@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 class ClockWidget extends StatefulWidget {
+  const ClockWidget({super.key});
+
 
   @override
   _ClockWidgetState createState() => _ClockWidgetState();

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:amiapp/helpers/widget_util.dart';
 import 'package:amiapp/pages/family/family.dart';
 import 'package:amiapp/pages/room/room_page.dart';
-import 'package:amiapp/pages/staff/manager_page.dart';
 import 'package:amiapp/pages/staff/staff_page.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
@@ -10,9 +9,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/services/appmanager.dart';
-import 'package:amiapp/pages/live/live_page.dart';
 
 class SignInPage extends StatefulWidget {
+  const SignInPage({super.key});
+
   @override
   _SignInPageState createState() => _SignInPageState();
 }

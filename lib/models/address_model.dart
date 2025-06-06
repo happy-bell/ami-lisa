@@ -1,4 +1,3 @@
-import 'package:amiapp/appdefine.dart';
 
 class Address {
   String id;

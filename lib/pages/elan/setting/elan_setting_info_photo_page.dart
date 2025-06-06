@@ -1,17 +1,15 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/helpers/widget_util.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 class ElanSettingInfoPhotoPage extends StatefulWidget {
+  const ElanSettingInfoPhotoPage({super.key});
+
 
   @override
   ElanSettingInfoPhotoPageState createState() => ElanSettingInfoPhotoPageState();
@@ -19,7 +17,7 @@ class ElanSettingInfoPhotoPage extends StatefulWidget {
 
 class ElanSettingInfoPhotoPageState extends State<ElanSettingInfoPhotoPage> {
   bool _loading = true;
-  var _init = true;
+  final _init = true;
   List<dynamic> _data = [];
   final ImagePicker _picker = ImagePicker();
 
@@ -233,7 +231,7 @@ class ElanSettingInfoPhotoPageState extends State<ElanSettingInfoPhotoPage> {
     );
   }
 
-  Future<void> _pickImage(ImageSource source, {BuildContext? context, bool isMultiImage = false}) async {
+  Future<void> _pickImage(ImageSource source) async {
     final XFile? file = await _picker.pickImage(source: source);
     if (file != null) {
       _upload(file.path);

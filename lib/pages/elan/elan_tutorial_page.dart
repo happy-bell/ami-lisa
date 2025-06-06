@@ -1,13 +1,12 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:amiapp/appdefine.dart';
-import 'package:amiapp/pages/common/webview_page.dart';
 
 import '../../helpers/widget_util.dart';
 import 'elan_signin_page.dart';
 
 class ElanTutorialPage extends StatelessWidget {
+  const ElanTutorialPage({super.key});
+
 
   @override
   Widget build(BuildContext context) {

@@ -1,19 +1,12 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import 'package:http/http.dart' show get;
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/helpers/widget_util.dart';
-import 'package:amiapp/pages/setting/setting_args.dart';
 import 'package:amiapp/services/appmanager.dart';
-import 'package:amiapp/services/audio_service.dart';
 
 class ElanInputUserNamePage extends StatefulWidget {
   final dynamic item;
-  ElanInputUserNamePage({Key? key, required this.item});
+  const ElanInputUserNamePage({Key? key, required this.item}) : super(key: key);
 
   @override
   ElanInputUserNamePageState createState() => ElanInputUserNamePageState();
@@ -22,8 +15,8 @@ class ElanInputUserNamePage extends StatefulWidget {
 class ElanInputUserNamePageState extends State<ElanInputUserNamePage> {
   bool _loading = false;
   var title = '';
-  var _init = true;
-  List<dynamic> _data = [];
+  final _init = true;
+  final List<dynamic> _data = [];
   final TextEditingController _textController = TextEditingController();
   String? _err;
 
@@ -55,17 +48,19 @@ class ElanInputUserNamePageState extends State<ElanInputUserNamePage> {
     });
 
     final dio = Dio();
-    var url = '${AppDefine.baseURL}elan/api/change_user_name?token=${AppManager
-        .settings['api_token']}';
+    var url =
+        '${AppDefine.baseURL}elan/api/change_user_name?token=${AppManager.settings['api_token']}';
 
-    var data = await dio.post(
+    var data = await dio
+        .post(
       url,
       data: FormData.fromMap({
         'name': _textController.text,
         'code': widget.item['code'].toString(),
         'mst_id': widget.item['mst_id'].toString()
       }),
-    ).then((response) {
+    )
+        .then((response) {
       return response.data;
     }).catchError((err) {
       print(err);
@@ -93,7 +88,8 @@ class ElanInputUserNamePageState extends State<ElanInputUserNamePage> {
     final Size size = MediaQuery.of(context).size;
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: WidgetUtil.appBar('利用者名変更',
+      appBar: WidgetUtil.appBar(
+        '利用者名変更',
         backgroundColor: WidgetUtil.iosNavbarBG,
         foregroundColor: Colors.black,
       ),
@@ -113,8 +109,7 @@ class ElanInputUserNamePageState extends State<ElanInputUserNamePage> {
                 ],
               ),
             ),
-            if (_loading)
-              WidgetUtil.loadingIndicator,
+            if (_loading) WidgetUtil.loadingIndicator,
           ],
         ),
       ),

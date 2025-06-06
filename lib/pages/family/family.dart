@@ -11,11 +11,12 @@ import 'package:amiapp/services/appmanager.dart';
 import '../../appdefine.dart';
 import '../../notifiers/address_notifier.dart';
 import '../../services/socket_io_service.dart';
-import '../../services/socket_service.dart';
 import '../setting/setting_page.dart';
 import '../singin/signin_page.dart';
 
 class FamilyPage extends StatefulWidget {
+  const FamilyPage({super.key});
+
   @override
   _FamilyPageState createState() => _FamilyPageState();
 }
@@ -108,54 +109,51 @@ class _FamilyPageState extends State<FamilyPage> with WidgetsBindingObserver, So
       return;
     }
 
-    if (loginAt != null) {
+    print('check account: $loginAt');
+    final url = '${AppDefine.baseURL}app/check_account';
+    print({'code': AppManager.delegatorCode, 'user_id': AppManager.myId, 'type': AppManager.settings['MCSTYPE'], 'loginAt': loginAt, 'manager': AppManager.isManager ? '1' : '0'});
 
-      print('check account: $loginAt');
-      final url = '${AppDefine.baseURL}app/check_account';
-      print({'code': AppManager.delegatorCode, 'user_id': AppManager.myId, 'type': AppManager.settings['MCSTYPE'], 'loginAt': loginAt, 'manager': AppManager.isManager ? '1' : '0'});
+    final dio = Dio();
+    final data = await dio.post(
+        url,
+        data: FormData.fromMap({'code': AppManager.delegatorCode, 'user_id': AppManager.myId, 'type': AppManager.settings['MCSTYPE'], 'loginAt': loginAt, 'manager': AppManager.isManager ? '1' : '0'})
+    ).then((response) {
+      print(response.data);
 
-      final dio = Dio();
-      final data = await dio.post(
-          url,
-          data: FormData.fromMap({'code': AppManager.delegatorCode, 'user_id': AppManager.myId, 'type': AppManager.settings['MCSTYPE'], 'loginAt': loginAt, 'manager': AppManager.isManager ? '1' : '0'})
-      ).then((response) {
-        print(response.data);
-
-        if (response.data['status'] == '1') {
-          return response.data;
-        }
-        return null;
-      }).catchError((err) {
-        print(err);
-        return null;
-      });
-
-      if (data == null) {
-        _stopCheckAccountTimer();
-
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('確認'),
-              content: Text('ログイン情報が更新されました。再度ログインをお願いします。'),
-              actions: <Widget>[
-                TextButton(
-                  child: const Text('OK'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            );
-          },
-        );
-        print('to logout');
-        _logout();
+      if (response.data['status'] == '1') {
+        return response.data;
       }
+      return null;
+    }).catchError((err) {
+      print(err);
+      return null;
+    });
+
+    if (data == null) {
+      _stopCheckAccountTimer();
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('確認'),
+            content: Text('ログイン情報が更新されました。再度ログインをお願いします。'),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('OK'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+      print('to logout');
+      _logout();
     }
-  }
+    }
 
   void _loadAddress() {
     SharedPreferences.getInstance().then((prefs) {
@@ -256,8 +254,7 @@ class _FamilyPageState extends State<FamilyPage> with WidgetsBindingObserver, So
                         Padding(
                           padding: EdgeInsets.only(left: 12.0),
                           child: Text(
-                            (_isconnect ? 'ON' : 'OFF') +
-                                ' LINE ',
+                            '${_isconnect ? 'ON' : 'OFF'} LINE ',
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.black,

@@ -1,34 +1,104 @@
-buildscript {
-    ext.kotlin_version = '1.7.10'
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:7.1.2'
-        // START: FlutterFire Configuration
-        classpath 'com.google.gms:google-services:4.3.10'
-        // END: FlutterFire Configuration
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
+/*
+ * android/build.gradle  – root project
+ *   namespace 付与 / BuildConfig 有効化 / JVM Target 統一 / 特定モジュール除外
+ */
+buildscript {}    // ← 何も無ければ空で OK
 
 allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url "https://storage.googleapis.com/download.flutter.io" }
     }
 }
 
-rootProject.buildDir = '../build'
-subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(':app')
+rootProject.buildDir = "../build"
+
+tasks.register("clean", Delete) {
+    delete rootProject.layout.buildDirectory
 }
 
-task clean(type: Delete) {
-    delete rootProject.buildDir
+subprojects { p ->
+
+    /* ---------------- 出力ディレクトリ統一 ---------------- */
+    p.buildDir = "${rootProject.buildDir}/${p.name}"
+
+    /* ---------------- namespace & BuildConfig ------------- */
+    p.plugins.withId("com.android.library") {
+
+        def androidExt = p.extensions.getByName("android")
+
+        // ── ❷ assets_audio_player は元の名前を維持 ──
+        if (p.name == "assets_audio_player") {
+            androidExt.namespace = "com.github.florent37.assets_audio_player"
+        } else if (p.name == "webview_flutter_android") {
+            androidExt.namespace = "io.flutter.plugins.webviewflutter"
+        } else if (!androidExt.namespace) {
+            androidExt.namespace =
+        "${rootProject.name}.${p.name}".replace('-', '_').toLowerCase()
+        }
+
+        if (androidExt.buildFeatures?.buildConfig != true) {
+            androidExt.buildFeatures.buildConfig = true
+        }
+    }
+
+        // すべてのモジュールで Java の target を 17 へ統一
+    p.tasks.withType(JavaCompile).configureEach {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    if (p.name == "assets_audio_player_web") {
+    p.afterEvaluate { proj ->
+        proj.tasks.configureEach { task ->
+            task.enabled = false
+        }
+        println "★ skip Android build for :assets_audio_player_web"
+    }
+}
+
+    /* ---------- assets_audio_player だけ Java17 を後勝ちで押し込む ---------- */
+if (p.name == "assets_audio_player") {
+    p.afterEvaluate {   // ← ★ ここに全部まとめる
+        /* ① compileOptions を後勝ちで 17 */
+        def androidExt = p.extensions.findByName("android")
+        androidExt?.compileOptions?.sourceCompatibility = JavaVersion.VERSION_17
+        androidExt?.compileOptions?.targetCompatibility = JavaVersion.VERSION_17
+        tasks.withType(JavaCompile).configureEach {
+            sourceCompatibility = JavaVersion.VERSION_17
+            targetCompatibility = JavaVersion.VERSION_17
+        }
+
+        /* ② Stub drawable を **追加** */
+        def resDir = file("${p.projectDir}/src/main/res/drawable")
+        resDir.mkdirs()
+        def stub = '''<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+        android:width="24dp" android:height="24dp"
+        android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="@android:color/transparent"/>
+</vector>'''
+        [
+          // ▶▶ ExoPlayer 側のファイル名を**全部**列挙
+          "exo_icon_circular_play.xml",
+          "exo_icon_play.xml",
+          "exo_icon_pause.xml",
+          "exo_icon_next.xml",
+          "exo_icon_previous.xml",
+          "exo_icon_stop.xml",
+          // 既存 6 つ
+          "ic_skip_previous_white_24dp.xml",
+          "ic_skip_next_white_24dp.xml",
+          "ic_play_arrow_white_24dp.xml",
+          "ic_pause_white_24dp.xml",
+          "ic_clear_white_24dp.xml",
+          "ic_music_note_white_24dp.xml"
+        ].each { fname ->
+            def f = new File(resDir, fname)
+            if (!f.exists()) f.write(stub, "UTF-8")
+        }
+        println "★ stub drawables & Java17 patched for ${p.path}"
+    }
+}
 }

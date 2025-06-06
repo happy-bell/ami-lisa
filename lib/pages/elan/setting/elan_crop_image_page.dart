@@ -36,10 +36,7 @@ class ElanCropImagePageState extends State<ElanCropImagePage> {
     super.initState();
   }
 
-  void _close() {
-
-  }
-
+  void _close() {}
 
   Future<void> _cropImage() async {
     final croppedFile = await ImageCropper().cropImage(
@@ -65,17 +62,7 @@ class ElanCropImagePageState extends State<ElanCropImagePage> {
         ),
         WebUiSettings(
           context: context,
-          presentStyle: CropperPresentStyle.dialog,
-          boundary: const CroppieBoundary(
-            width: 520,
-            height: 520,
-          ),
-          viewPort:
-          const CroppieViewPort(width: 480, height: 480, type: 'circle'),
-          enableExif: true,
-          enableZoom: true,
-          showZoomer: true,
-        ),
+        )
       ],
     );
     if (croppedFile != null) {
@@ -144,8 +131,7 @@ class ElanCropImagePageState extends State<ElanCropImagePage> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Padding(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Card(
                       elevation: 4.0,
                       child: Padding(

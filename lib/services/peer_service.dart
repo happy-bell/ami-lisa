@@ -13,24 +13,24 @@ enum SignalingState {
   ConnectionError,
 }
 
-typedef void SignalingStateCallback(String id, RTCSignalingState state);
-typedef void StreamStateCallback(MediaStream stream);
-typedef void RemoteStreamStateCallback(String id, MediaStream stream);
-typedef void IceCandidateCallback(String id, dynamic event);
-typedef void OtherEventCallback(dynamic event);
-typedef void DataChannelMessageCallback(
+typedef SignalingStateCallback = void Function(String id, RTCSignalingState state);
+typedef StreamStateCallback = void Function(MediaStream stream);
+typedef RemoteStreamStateCallback = void Function(String id, MediaStream stream);
+typedef IceCandidateCallback = void Function(String id, dynamic event);
+typedef OtherEventCallback = void Function(dynamic event);
+typedef DataChannelMessageCallback = void Function(
     RTCDataChannel dc, RTCDataChannelMessage data);
-typedef void DataChannelCallback(RTCDataChannel dc);
+typedef DataChannelCallback = void Function(RTCDataChannel dc);
 
 class Peer {
   RTCPeerConnection? peerConnection;
   RTCDataChannel? dataChannel;
-  var _remoteCandidates = {};
+  final _remoteCandidates = {};
   // var _turnCredential;
 
   MediaStream? _localStream;
   set localStream(value) => _localStream = value;
-  List<MediaStream> _remoteStreams = [];
+  final List<MediaStream> _remoteStreams = [];
   SignalingStateCallback? onStateChange;
   StreamStateCallback? onLocalStream;
   RemoteStreamStateCallback? onAddRemoteStream;
@@ -42,7 +42,7 @@ class Peer {
   OtherEventCallback? onEventUpdate;
   DataChannelMessageCallback? onDataChannelMessage;
   DataChannelCallback? onDataChannel;
-  Map<String, RTCPeerConnection> _peerConnections = {};
+  final Map<String, RTCPeerConnection> _peerConnections = {};
 
   String get sdpSemantics => 'unified-plan';
   // String get sdpSemantics => 'plan-b';

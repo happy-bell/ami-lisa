@@ -26,6 +26,8 @@ import '../../services/sensor.dart';
 import '../common/webview_page.dart';
 
 class ManagerPage extends StatefulWidget {
+  const ManagerPage({super.key});
+
   @override
   _ManagerPageState createState() => _ManagerPageState();
 }
@@ -39,7 +41,7 @@ class _ManagerPageState extends State<ManagerPage>
   SensorService sensorService = SensorService();
   bool _isconnect = false;
   List<Address> addressList = [];
-  List<dynamic> _callStatuses = [];
+  final List<dynamic> _callStatuses = [];
   bool _islist = false;
   bool _isActive = false;
   Widget? biosilverPopup;
@@ -368,7 +370,7 @@ class _ManagerPageState extends State<ManagerPage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Container(
+          SizedBox(
             width: textWidth,
             child: Text(
               address.name,
@@ -525,8 +527,7 @@ class _ManagerPageState extends State<ManagerPage>
     var id1 = AppManager.myId;
     var id2 = address.id;
     var name = address.name;
-    var url = AppDefine.baseURL +
-        "talk_history.php?cd=$cd&id1=$id1&id2=$id2&na=$name";
+    var url = "${AppDefine.baseURL}talk_history.php?cd=$cd&id1=$id1&id2=$id2&na=$name";
     print(url);
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -580,7 +581,7 @@ class _ManagerPageState extends State<ManagerPage>
   }
 
   Future<void> _biosilverOnClose() async {
-    print('_biosilverOnClose, ' + AppManager.selectUser!.id);
+    print('_biosilverOnClose, ${AppManager.selectUser!.id}');
     var addressStore = context.read<AddressStore>();
     addressStore.setSensors(AppManager.selectUser!.id, []);
     sensorService.biosilverAlerts.remove(AppManager.selectUser!.id);
@@ -805,8 +806,7 @@ class _ManagerPageState extends State<ManagerPage>
                                 height: iconSize - 20.0,
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    primary: Colors.blue,
-                                    onPrimary: Colors.white,
+                                    foregroundColor: Colors.white, backgroundColor: Colors.blue,
                                     padding: const EdgeInsets.symmetric(horizontal: 2),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),

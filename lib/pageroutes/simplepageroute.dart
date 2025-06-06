@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class SimplePageRoute extends PageRouteBuilder {
   final Widget page;
+  @override
   final RouteSettings settings;
   SimplePageRoute({required this.page, required this.settings})
       : super(

@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
-import 'appmanager.dart';
 
 mixin SocketServiceDelegate {
   void onIoConnect();
@@ -21,7 +19,7 @@ class SocketService {
   bool connected = false;
 
   Future<void> connect() async {
-    print('room socket connect to ' + url);
+    print('room socket connect to $url');
     if (_socket != null) {
       if (_socket!.connected) {
         print('room socket already connected');

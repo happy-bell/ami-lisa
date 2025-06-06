@@ -36,8 +36,7 @@ class WidgetUtil {
   static Color get textBorderGray => const Color(0xFFCCCCCC);
 
   static ButtonStyle get basicButtonStyle => ElevatedButton.styleFrom(
-    primary: const Color.fromARGB(255, 85, 146, 246),
-    onPrimary: Colors.white,
+    foregroundColor: Colors.white, backgroundColor: const Color.fromARGB(255, 85, 146, 246),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(10),
     ),
@@ -197,8 +196,7 @@ class WidgetUtil {
           height: WidgetUtil.buttonHeight,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              primary: const Color(0xFF108f10),
-              onPrimary: Colors.white,
+              foregroundColor: Colors.white, backgroundColor: const Color(0xFF108f10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
               ),

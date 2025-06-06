@@ -1,4 +1,3 @@
-import 'package:amiapp/models/address_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:amiapp/services/appmanager.dart';
@@ -6,6 +5,8 @@ import 'package:amiapp/services/socket_io_service.dart';
 import 'package:amiapp/services/peer_service.dart';
 
 class StaffLiveViewPage extends StatefulWidget {
+  const StaffLiveViewPage({super.key});
+
   @override
   _StaffLiveViewPageState createState() => _StaffLiveViewPageState();
 }

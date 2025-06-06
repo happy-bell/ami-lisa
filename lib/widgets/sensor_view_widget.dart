@@ -4,7 +4,7 @@ import 'package:amiapp/pages/staff/staff_talk_page.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 class SensorViewWidget extends StatefulWidget {
-  SensorViewWidget({required Key key}) : super(key: key);
+  const SensorViewWidget({required Key key}) : super(key: key);
 
   @override
   SensorViewWidgetState createState() => SensorViewWidgetState();

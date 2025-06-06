@@ -1,16 +1,14 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/helpers/widget_util.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 class ElanSettingInfoVideoPage extends StatefulWidget {
+  const ElanSettingInfoVideoPage({super.key});
+
 
   @override
   ElanSettingInfoVideoPageState createState() => ElanSettingInfoVideoPageState();
@@ -213,7 +211,7 @@ class ElanSettingInfoVideoPageState extends State<ElanSettingInfoVideoPage> {
     );
   }
 
-  Future<void> _pickImage(ImageSource source, {BuildContext? context, bool isMultiImage = false}) async {
+  Future<void> _pickImage(ImageSource source) async {
     final XFile? file = await _picker.pickVideo(source: source, maxDuration: const Duration(seconds: 300));
     if (file != null) {
       _upload(file.path);

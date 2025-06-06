@@ -28,6 +28,8 @@ import '../../services/sensor.dart';
 import '../common/webview_page.dart';
 
 class StaffPage extends StatefulWidget {
+  const StaffPage({super.key});
+
   @override
   _StaffPageState createState() => _StaffPageState();
 }
@@ -41,7 +43,7 @@ class _StaffPageState extends State<StaffPage>
   SensorService sensorService = SensorService();
   bool _isconnect = false;
   List<Address> addressList = [];
-  List<dynamic> _callStatuses = [];
+  final List<dynamic> _callStatuses = [];
   bool _islist = false;
   bool _isActive = false;
   Widget? biosilverPopup;
@@ -165,50 +167,47 @@ class _StaffPageState extends State<StaffPage>
       return;
     }
 
-    if (loginAt != null) {
+    final url = '${AppDefine.baseURL}app/check_account';
 
-      final url = '${AppDefine.baseURL}app/check_account';
+    final dio = Dio();
+    final data = await dio.post(
+        url,
+        data: FormData.fromMap({'code': AppManager.delegatorCode, 'user_id': AppManager.myId, 'type': AppManager.settings['MCSTYPE'], 'loginAt': loginAt, 'manager': AppManager.isManager ? '1' : '0'})
+    ).then((response) {
 
-      final dio = Dio();
-      final data = await dio.post(
-          url,
-          data: FormData.fromMap({'code': AppManager.delegatorCode, 'user_id': AppManager.myId, 'type': AppManager.settings['MCSTYPE'], 'loginAt': loginAt, 'manager': AppManager.isManager ? '1' : '0'})
-      ).then((response) {
-
-        if (response.data['status'] == '1') {
-          return response.data;
-        }
-        return null;
-      }).catchError((err) {
-        print(err);
-        return null;
-      });
-
-      if (data == null) {
-        _stopCheckAccountTimer();
-
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('確認'),
-              content: Text('ログイン情報が更新されました。再度ログインをお願いします。'),
-              actions: <Widget>[
-                TextButton(
-                  child: const Text('OK'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            );
-          },
-        );
-        _logout();
+      if (response.data['status'] == '1') {
+        return response.data;
       }
+      return null;
+    }).catchError((err) {
+      print(err);
+      return null;
+    });
+
+    if (data == null) {
+      _stopCheckAccountTimer();
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('確認'),
+            content: Text('ログイン情報が更新されました。再度ログインをお願いします。'),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('OK'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+      _logout();
     }
-  }
+    }
 
   Future<void> _logout() async {
     _disconnect();
@@ -514,7 +513,7 @@ class _StaffPageState extends State<StaffPage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Container(
+          SizedBox(
             width: textWidth,
             child: Text(
               address.name,
@@ -712,7 +711,7 @@ class _StaffPageState extends State<StaffPage>
     var id1 = AppManager.myId;
     var id2 = address.id;
     var name = address.name;
-    var url = _getTalkHistoryURL() + "?cd=$cd&id1=$id1&id2=$id2&na=$name";
+    var url = "${_getTalkHistoryURL()}?cd=$cd&id1=$id1&id2=$id2&na=$name";
     print(url);
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -770,7 +769,7 @@ class _StaffPageState extends State<StaffPage>
   }
 
   Future<void> _biosilverOnClose() async {
-    print('_biosilverOnClose, ' + AppManager.selectUser!.id);
+    print('_biosilverOnClose, ${AppManager.selectUser!.id}');
     var addressStore = context.read<AddressStore>();
     addressStore.setSensors(AppManager.selectUser!.id, []);
     sensorService.biosilverAlerts.remove(AppManager.selectUser!.id);
@@ -1016,8 +1015,7 @@ class _StaffPageState extends State<StaffPage>
                                 height: iconSize - 20.0,
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    primary: Colors.blue,
-                                    onPrimary: Colors.white,
+                                    foregroundColor: Colors.white, backgroundColor: Colors.blue,
                                     padding: const EdgeInsets.symmetric(horizontal: 2),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -1281,11 +1279,9 @@ class _StaffPageState extends State<StaffPage>
       } else {
         if (AppManager.appsettings["AUTO_RECEIVE"] == '1') {
           if (AppManager.selectUser == null) {
-            if (address != null) {
-              AppManager.autoReceiveId = address.id;
-              _selectAddress(address);
-            }
-          }
+            AppManager.autoReceiveId = address.id;
+            _selectAddress(address);
+                    }
           return;
         }
         audio.ringtone();

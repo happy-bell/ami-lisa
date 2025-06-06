@@ -1,19 +1,16 @@
-import 'dart:io';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/pages/elan/elan_tutorial_page.dart';
 import 'package:amiapp/pages/family/family.dart';
 import 'package:amiapp/pages/family/familytalk.dart';
 import 'package:amiapp/pages/room/room_page.dart';
-import 'package:amiapp/pages/staff/manager_page.dart';
 import 'package:amiapp/services/audio_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wakelock/wakelock.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:amiapp/pages/elan/elan_tab_page.dart';
 import 'package:amiapp/pages/elan/elan_signin_page.dart';
 import 'package:amiapp/services/appmanager.dart';
@@ -21,9 +18,9 @@ import 'package:amiapp/pages/live/live_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
 import 'package:amiapp/pages/staff/staff_page.dart';
 import 'package:amiapp/pages/tutorial/tutorial_page.dart';
-import 'notifiers/address_notifier.dart';
 
 class App extends StatelessWidget {
+  const App({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -62,19 +59,20 @@ class App extends StatelessWidget {
 }
 
 class AppPage extends StatefulWidget {
+  const AppPage({super.key});
+
   @override
   State createState() => AppState();
 }
 
 class AppState extends State<AppPage> {
-
   AudioService audio = AudioService();
 
   @override
   void initState() {
     super.initState();
 
-    Wakelock.enable();
+    WakelockPlus.enable();
 
     // Run code required to handle interacted messages in an async function
     // as initState() must not be async
@@ -90,7 +88,8 @@ class AppState extends State<AppPage> {
   Future<void> setupInteractedMessage() async {
     // Get any messages which caused the application to open from
     // a terminated state.
-    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    RemoteMessage? initialMessage =
+        await FirebaseMessaging.instance.getInitialMessage();
 
     // If the message also contains a data property with a "type" of "chat",
     // navigate to a chat screen
@@ -106,13 +105,13 @@ class AppState extends State<AppPage> {
 
   String _targetIdFromRemoteMessage(RemoteMessage message) {
     print('Message data: ${message.data}');
-    var data = message?.data;
+    var data = message.data;
     RemoteNotification? notification = message.notification;
     AndroidNotification? android = notification?.android;
     AppleNotification? ios = notification?.apple;
     print('Message notification: ${message.notification}');
-    print('Message android: ${android}');
-    print('Message ios: ${ios}');
+    print('Message android: $android');
+    print('Message ios: $ios');
     if (notification != null) {
       final title = notification.title ?? '';
       final body = notification.body ?? '';
@@ -134,11 +133,9 @@ class AppState extends State<AppPage> {
       // Android用の処理はこちらで行います。
     }
     // 共通のデータペイロードです。パラメータ処理はここから行います。
-    if (data != null) {
-      // 辞書型でデータを取り出せます。
-      var value = data["key"];
-    }
-    return '';
+    // 辞書型でデータを取り出せます。
+    var value = data["key"];
+      return '';
   }
 
   void _onMessage(RemoteMessage message) {
@@ -169,13 +166,13 @@ class AppState extends State<AppPage> {
     });
     // 2.アプリがオンメモリの状態で通知から起動した場合
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('onMessageOpenedApp Message data: ${message}');
+      print('onMessageOpenedApp Message data: $message');
       _onMessageOpendApp(message);
     });
 
     // 3.アプリが完全に終了している状態で通知から起動した場合
     FirebaseMessaging.instance.getInitialMessage().then((message) {
-      print('getInitialMessage Message data: ${message}');
+      print('getInitialMessage Message data: $message');
       if (message != null) {
         _onMessageOpendApp(message);
       }
@@ -273,17 +270,17 @@ class AppState extends State<AppPage> {
     }
 
     status = 2;
-    var _load = await AppManager.loadSetting();
-    if (_load) {
+    var load = await AppManager.loadSetting();
+    if (load) {
       if (AppManager.settings['MCSTYPE'] == '4') {
         status = 5;
       } else if (AppManager.settings['DISPTYPE'] == '1') {
         status = 3;
       } else if (AppManager.settings['DISPTYPE'] == '2') {
         status = 4;
-      // }
-      // if (AppManager.settings['MASPROSENSOR'] == "1") {
-      //   status = 10;
+        // }
+        // if (AppManager.settings['MASPROSENSOR'] == "1") {
+        //   status = 10;
       }
       if (AppManager.isManager) {
         status = 9;
@@ -296,38 +293,37 @@ class AppState extends State<AppPage> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-      future: _getLaunchType(),
-      builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
-        final hasData = snapshot.hasData;
-        if (!hasData) {
-          return const CircularProgressIndicator();
-        }
+        future: _getLaunchType(),
+        builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
+          final hasData = snapshot.hasData;
+          if (!hasData) {
+            return const CircularProgressIndicator();
+          }
 
-        final launchType = snapshot.data;
-        print("launchType: $launchType");
-        if (launchType == 10) {
-          return ElanTutorialPage();
-        } else if (launchType == 11) {
-          return ElanSignInPage();
-        } else if (launchType == 12) {
-          return ElanTabPage();
-        }
-        if (launchType == 0) {
-          return TutorialPage();
-        } else if (launchType == 1) {
-          return SignInPage();
-        } else if (launchType == 3) {
-          return RoomPage();
-        } else if (launchType == 4) {
-          return LivePage();
-        } else if (launchType == 5) {
-          return FamilyPage();
-        } else if (launchType == 9) {
+          final launchType = snapshot.data;
+          print("launchType: $launchType");
+          if (launchType == 10) {
+            return ElanTutorialPage();
+          } else if (launchType == 11) {
+            return ElanSignInPage();
+          } else if (launchType == 12) {
+            return ElanTabPage();
+          }
+          if (launchType == 0) {
+            return TutorialPage();
+          } else if (launchType == 1) {
+            return SignInPage();
+          } else if (launchType == 3) {
+            return RoomPage();
+          } else if (launchType == 4) {
+            return LivePage();
+          } else if (launchType == 5) {
+            return FamilyPage();
+          } else if (launchType == 9) {
+            return StaffPage();
+          }
+
           return StaffPage();
-        }
-
-        return StaffPage();
-      }
-    );
+        });
   }
 }

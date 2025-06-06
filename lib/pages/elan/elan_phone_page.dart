@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:amiapp/notifiers/app_notifier.dart';
 import 'package:amiapp/pages/elan/elan_call_page.dart';
 import 'package:amiapp/pages/elan/elan_tab_page.dart';
@@ -9,14 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:persistent_bottom_nav_bar_v2/persistent-tab-view.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/models/address_model.dart';
 import 'package:amiapp/notifiers/address_notifier.dart';
-import 'package:amiapp/pages/staff/staff_live_view_page.dart';
-import 'package:amiapp/pages/staff/staff_talk_page.dart';
 import 'package:amiapp/pages/setting/setting_page.dart';
-import 'package:amiapp/pages/singin/signin_page.dart';
 import 'package:amiapp/services/appmanager.dart';
 import 'package:amiapp/services/audio_service.dart';
 import 'package:amiapp/services/socket_io_service.dart';
@@ -25,8 +19,8 @@ import 'package:real_volume/real_volume.dart';
 import '../../helpers/widget_util.dart';
 
 class ElanPhonePage extends StatefulWidget {
-final ElanTabPageState tabPageState;
-ElanPhonePage({Key? key, required this.tabPageState}) : super(key: key);
+  final ElanTabPageState tabPageState;
+  const ElanPhonePage({super.key, required this.tabPageState});
 
   @override
   ElanPhonePageState createState() => ElanPhonePageState();
@@ -40,7 +34,7 @@ class ElanPhonePageState extends State<ElanPhonePage>
   AudioService audio = AudioService();
   bool _isconnect = false;
   List<Address> addressList = [];
-  bool _islist = false;
+  final bool _islist = false;
 
   @override
   void initState() {
@@ -82,11 +76,9 @@ class ElanPhonePageState extends State<ElanPhonePage>
     var imageName = 'assets/images/status/dummy.png';
     if (address.call == 1) {
       imageName = 'assets/images/status/addr_call.png';
-    }
-    else if (address.called == 1) {
+    } else if (address.called == 1) {
       imageName = 'assets/images/status/addr_called.png';
-    }
-    else if (address.status == 0 || address.status == 1) {
+    } else if (address.status == 0 || address.status == 1) {
       imageName = 'assets/images/status/addr.png';
       if (address.photo.isNotEmpty) {
         var photo = address.photo;
@@ -96,8 +88,7 @@ class ElanPhonePageState extends State<ElanPhonePage>
           bytes = base64Decode(photo);
         }
       }
-    }
-    else if (address.status == 2 ||
+    } else if (address.status == 2 ||
         address.status == 3 ||
         address.status == 4 ||
         address.status == 5) {
@@ -123,7 +114,9 @@ class ElanPhonePageState extends State<ElanPhonePage>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              padding: const EdgeInsets.only(left: 8,),
+              padding: const EdgeInsets.only(
+                left: 8,
+              ),
               decoration: const BoxDecoration(
                 color: Colors.grey,
                 borderRadius: BorderRadius.only(
@@ -202,16 +195,15 @@ class ElanPhonePageState extends State<ElanPhonePage>
 
     // await Navigator.of(context, rootNavigator: true)
     //     .push(MaterialPageRoute(builder: (context) => ElanCallPage(tabPageState: widget.tabPageState), fullscreenDialog: true,));
-    final toHome = await Navigator.of(context, rootNavigator: true)
-        .push(
-        PageRouteBuilder(
-          pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-            return ElanCallPage(tabPageState: widget.tabPageState);
-          },
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-        )
-    );
+    final toHome =
+        await Navigator.of(context, rootNavigator: true).push(PageRouteBuilder(
+      pageBuilder: (BuildContext context, Animation<double> animation1,
+          Animation<double> animation2) {
+        return ElanCallPage(tabPageState: widget.tabPageState);
+      },
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+    ));
 
     // TODO: implement sensorService
     // sensorService.clearAlert(address.id);
@@ -277,21 +269,23 @@ class ElanPhonePageState extends State<ElanPhonePage>
     const iconSize = 50.0;
     var connectMyId = AppManager.myId;
     if (AppDefine.amiApp) {
-      connectMyId = AppManager.myId.replaceAll(AppManager.settings["DELEGATORCODE"] + "_", "");
+      connectMyId = AppManager.myId
+          .replaceAll(AppManager.settings["DELEGATORCODE"] + "_", "");
     }
 
     final AppStore appStore = Provider.of<AppStore>(context);
 
     return Scaffold(
-      appBar: WidgetUtil.appBar('相手を選んでください',
+      appBar: WidgetUtil.appBar(
+        '相手を選んでください',
         foregroundColor: Colors.black,
         leading: TextButton(
           child: const Text(
             '< 戻る',
             style: TextStyle(
-              color: Colors.blueAccent,  //文字の色を白にする
-              fontWeight: FontWeight.bold,  //文字を太字する
-              fontSize: 16.0,  //文字のサイズを調整する
+              color: Colors.blueAccent, //文字の色を白にする
+              fontWeight: FontWeight.bold, //文字を太字する
+              fontSize: 16.0, //文字のサイズを調整する
             ),
           ),
           onPressed: () {
@@ -309,18 +303,22 @@ class ElanPhonePageState extends State<ElanPhonePage>
                 const gridPadding = 4.0;
                 var gridSpacing = 10.0;
                 var cols = _colNum(constraints.maxWidth, constraints.maxHeight);
-                var colWidth = (constraints.maxWidth - (gridSpacing * (cols - 1) + gridPadding * 2)) / cols;
+                var colWidth = (constraints.maxWidth -
+                        (gridSpacing * (cols - 1) + gridPadding * 2)) /
+                    cols;
                 var colHeight = (colWidth / 3 * 2) + 24;
                 var gridRatio = colWidth / colHeight;
                 return Consumer<AddressStore>(builder: (BuildContext context,
                     AddressStore addressStore, Widget? child) {
                   return GridView.extent(
                     maxCrossAxisExtent: colWidth,
-                    padding: const EdgeInsets.fromLTRB(gridPadding, 10, gridPadding, 60),
+                    padding: const EdgeInsets.fromLTRB(
+                        gridPadding, 10, gridPadding, 60),
                     mainAxisSpacing: gridSpacing,
                     crossAxisSpacing: gridSpacing,
                     childAspectRatio: gridRatio,
-                    children: addressStore.staffList()
+                    children: addressStore
+                        .staffList()
                         .map((data) => _gridItem(data))
                         .toList(),
                   );
@@ -343,7 +341,9 @@ class ElanPhonePageState extends State<ElanPhonePage>
                       mainAxisAlignment: MainAxisAlignment.start,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const SizedBox(width: 8,),
+                        const SizedBox(
+                          width: 8,
+                        ),
                         Image.asset(appStore.connect
                             ? 'assets/images/led/ledG.png'
                             : 'assets/images/led/led2.png'),
@@ -368,12 +368,14 @@ class ElanPhonePageState extends State<ElanPhonePage>
                             style: ElevatedButton.styleFrom(
                               foregroundColor: Colors.white,
                               backgroundColor: Colors.blue,
-                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 2),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
-                            child: const Text("WebMeet",
+                            child: const Text(
+                              "WebMeet",
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.white,
@@ -405,7 +407,9 @@ class ElanPhonePageState extends State<ElanPhonePage>
                         //     _toSetting();
                         //   },
                         // ),
-                        const SizedBox(width: 8,),
+                        const SizedBox(
+                          width: 8,
+                        ),
                       ],
                     ),
                   ],
@@ -449,7 +453,8 @@ class ElanPhonePageState extends State<ElanPhonePage>
       setState(() {
         _isconnect = true;
       });
-      socketservice.io.emit("clients_status", [AppManager.settings['addressGroup']]);
+      socketservice.io
+          .emit("clients_status", [AppManager.settings['addressGroup']]);
       // TODO: implement _checkFcm
       // _checkFcm();
       // TODO: implement _checkPushSensor
@@ -516,7 +521,8 @@ class ElanPhonePageState extends State<ElanPhonePage>
       } else {
         if (AppManager.appsettings["AUTO_RECEIVE"] == '1') {
           if (AppManager.selectUser == null) {
-            var address = context.read<AddressStore>().find(data["info"]["udid"]);
+            var address =
+                context.read<AddressStore>().find(data["info"]["udid"]);
             if (address != null) {
               AppManager.autoReceiveId = address.id;
               selectAddress(address);

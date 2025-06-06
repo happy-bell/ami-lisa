@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:amiapp/helpers/widget_util.dart';
 import 'package:amiapp/pages/elan/elan_signin_page.dart';
 import 'package:amiapp/pages/elan/setting/elan_setting_info_message_page.dart';
@@ -12,19 +11,13 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/pages/setting/setting_about_page.dart';
-import 'package:amiapp/pages/setting/setting_input_page.dart';
-import 'package:amiapp/pages/setting/setting_select_page.dart';
-import 'package:amiapp/pages/setting/setting_multi_select_page.dart';
-import 'package:amiapp/pages/setting/setting_user_page.dart';
-import 'package:amiapp/pages/staff/staff_page.dart';
-import 'package:amiapp/pages/singin/signin_page.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 import '../../../notifiers/address_notifier.dart';
 import 'elan_setting_select_page.dart';
 
 class ElanSettingPage extends StatefulWidget {
-  ElanSettingPage({Key? key}) : super(key: key);
+  const ElanSettingPage({super.key});
 
   @override
   ElanSettingPageState createState() => ElanSettingPageState();
@@ -37,7 +30,8 @@ class ElanSettingPageState extends State<ElanSettingPage> {
   final TextStyle _titleTextStyle1 = const TextStyle(
     fontSize: 14,
   );
-  final TextStyle _titleTextStyle2 = const TextStyle(fontSize: 14, color: Colors.blue);
+  final TextStyle _titleTextStyle2 =
+      const TextStyle(fontSize: 14, color: Colors.blue);
 
   @override
   void initState() {
@@ -91,16 +85,14 @@ class ElanSettingPageState extends State<ElanSettingPage> {
         await prefs.setBool('login', false);
 
         if (mounted) {
-          Navigator.of(context, rootNavigator: true)
-              .push(
-              PageRouteBuilder(
-                pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-                  return ElanSignInPage();
-                },
-                transitionDuration: Duration.zero,
-                reverseTransitionDuration: Duration.zero,
-              )
-          );
+          Navigator.of(context, rootNavigator: true).push(PageRouteBuilder(
+            pageBuilder: (BuildContext context, Animation<double> animation1,
+                Animation<double> animation2) {
+              return ElanSignInPage();
+            },
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ));
         }
         break;
       case "0":
@@ -128,10 +120,14 @@ class ElanSettingPageState extends State<ElanSettingPage> {
 
   String _getAddressURL() {
     if (AppDefine.amiApp) {
-      var mstId = AppManager.settings['MYID'].replaceAll(AppManager.settings['DELEGATORCODE'] + "_", "");
-      return AppDefine.baseURL + "app/address_list?code=" + AppManager.settings['DELEGATORCODE'] +
-          "&mst_id=" + mstId +
-          "&token=" + AppManager.settings['api_token'];
+      var mstId = AppManager.settings['MYID']
+          .replaceAll(AppManager.settings['DELEGATORCODE'] + "_", "");
+      return "${AppDefine.baseURL}app/address_list?code=" +
+          AppManager.settings['DELEGATORCODE'] +
+          "&mst_id=" +
+          mstId +
+          "&token=" +
+          AppManager.settings['api_token'];
     }
 
     var token = AppDefine.getRMSToken();
@@ -157,9 +153,11 @@ class ElanSettingPageState extends State<ElanSettingPage> {
     final url = _getAddressURL();
 
     final dio = Dio();
-    var data = await dio.get(
-        url,
-    ).then((response) {
+    var data = await dio
+        .get(
+      url,
+    )
+        .then((response) {
       // print(response.data);
       return response.data;
     }).catchError((err) {
@@ -183,10 +181,12 @@ class ElanSettingPageState extends State<ElanSettingPage> {
     AppManager.ringtones = [];
     var ringtones = response['ringtones'];
     for (var i = 0; i < ringtones.length; i++) {
-      AppManager.ringtones.add([ringtones[i]['id'].toString(), ringtones[i]['name'].toString()]);
+      AppManager.ringtones.add(
+          [ringtones[i]['id'].toString(), ringtones[i]['name'].toString()]);
     }
-    var result = await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (context) => ElanSettingSelectPage(keyName: 'RINGTONE', value: AppManager.appsettings['RINGTONE'])));
+    var result = await Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => ElanSettingSelectPage(
+            keyName: 'RINGTONE', value: AppManager.appsettings['RINGTONE'])));
     if (result != null) {
       AppManager.appsettings['RINGTONE'] = result;
     }
@@ -200,7 +200,8 @@ class ElanSettingPageState extends State<ElanSettingPage> {
       return '${AppDefine.baseURL}app/ringtone_list?code=${AppManager.settings["DELEGATORCODE"]}&token=${AppManager.settings["api_token"]}';
     }
     var token = AppDefine.getRMSToken();
-    var url = 'https://${AppManager.settings['MCSURL']}/json/appringtonelist?gcd=${AppManager.settings['MCSGROUPCODE']}&ccd=${AppManager.settings['MCSCLINICCODE']}&token=${token}';
+    var url =
+        'https://${AppManager.settings['MCSURL']}/json/appringtonelist?gcd=${AppManager.settings['MCSGROUPCODE']}&ccd=${AppManager.settings['MCSCLINICCODE']}&token=$token';
     return url;
   }
 
@@ -212,9 +213,11 @@ class ElanSettingPageState extends State<ElanSettingPage> {
     print(url);
 
     final dio = Dio();
-    var data = await dio.get(
+    var data = await dio
+        .get(
       url,
-    ).then((response) {
+    )
+        .then((response) {
       print(response.data);
       return response.data;
     }).catchError((err) {
@@ -230,17 +233,19 @@ class ElanSettingPageState extends State<ElanSettingPage> {
   }
 
   Future<void> _getWeatherArea() async {
-
     setState(() {
       _load = true;
     });
-    final url = '${AppDefine.baseURL}app/weather_area?code=${AppManager.settings["DELEGATORCODE"]}&token=${AppManager.settings["api_token"]}';
+    final url =
+        '${AppDefine.baseURL}app/weather_area?code=${AppManager.settings["DELEGATORCODE"]}&token=${AppManager.settings["api_token"]}';
     print(url);
 
     final dio = Dio();
-    final data = await dio.get(
+    final data = await dio
+        .get(
       url,
-    ).then((response) {
+    )
+        .then((response) {
       print(response.data);
       return response.data;
     }).catchError((err) {
@@ -257,11 +262,15 @@ class ElanSettingPageState extends State<ElanSettingPage> {
       area = data['area'].toString();
       AppManager.weatherAreas = [];
       for (var i = 0; i < data['weatherArea'].length; i++) {
-        AppManager.weatherAreas.add([data['weatherArea'][i][0].toString(), data['weatherArea'][i][1].toString()]);
+        AppManager.weatherAreas.add([
+          data['weatherArea'][i][0].toString(),
+          data['weatherArea'][i][1].toString()
+        ]);
       }
     }
-    var result = await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (context) => ElanSettingSelectPage(keyName: 'WEATHER_AREA', value: area)));
+    var result = await Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) =>
+            ElanSettingSelectPage(keyName: 'WEATHER_AREA', value: area)));
 
     setState(() {
       _savedSwitch = !_savedSwitch;
@@ -278,10 +287,12 @@ class ElanSettingPageState extends State<ElanSettingPage> {
     AppManager.callScreenImages = [];
     var items = response['items'];
     for (var i = 0; i < items.length; i++) {
-      AppManager.callScreenImages.add([items[i]['id'].toString(), items[i]['name'].toString()]);
+      AppManager.callScreenImages
+          .add([items[i]['id'].toString(), items[i]['name'].toString()]);
     }
-    var result = await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (context) => ElanSettingSelectPage(keyName: keyName, value: AppManager.appsettings[keyName])));
+    var result = await Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => ElanSettingSelectPage(
+            keyName: keyName, value: AppManager.appsettings[keyName])));
     if (result != null) {
       AppManager.appsettings[keyName] = result;
     }
@@ -304,9 +315,11 @@ class ElanSettingPageState extends State<ElanSettingPage> {
     print(url);
 
     final dio = Dio();
-    var data = await dio.get(
+    var data = await dio
+        .get(
       url,
-    ).then((response) {
+    )
+        .then((response) {
       print(response.data);
       return response.data;
     }).catchError((err) {
@@ -330,33 +343,31 @@ class ElanSettingPageState extends State<ElanSettingPage> {
   }
 
   Future<void> _toInfoVideoPage() async {
-    var result = await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (context) => ElanSettingInfoVideoPage()));
+    var result = await Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => ElanSettingInfoVideoPage()));
     setState(() {
       _savedSwitch = !_savedSwitch;
     });
   }
 
   Future<void> _toInfoPhotoPage() async {
-    var result = await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (context) => ElanSettingInfoPhotoPage()));
+    var result = await Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => ElanSettingInfoPhotoPage()));
     setState(() {
       _savedSwitch = !_savedSwitch;
     });
   }
 
   List<Widget> _listContainers() {
-    var _separator = separator();
+    const String label = "契約者名";
 
-    var label = "契約者名";
-
-    var listContainers = [
-      _separator,
+    List<Widget> listContainers = <Widget>[
+      _separator(),
       basicListContainer(label, AppManager.settings['MCSCLINICNAME']),
       tapListContainer('ログアウト', _logout),
     ];
     listContainers.addAll([
-      _separator,
+      _separator(),
       basicListContainer('自分のID', AppManager.settings['myId']),
       tapListContainer('リスト更新', _getAddress),
     ]);
@@ -365,7 +376,7 @@ class ElanSettingPageState extends State<ElanSettingPage> {
     var dispNum = AppManager.appsettings['DISPLAYNUM'];
     var anminModeFlg = AppManager.settings['ANMINMODEFLG'];
     listContainers.addAll([
-      _separator,
+      _separator(),
       // nextListContainer('表示', AppManager.dispType(dispType), () async {
       //   var result = await Navigator.of(context)
       //       .push(MaterialPageRoute(builder: (context) => ElanSettingSelectPage(keyName: 'DISPTYPE', value: AppManager.settings['DISPTYPE'])));
@@ -375,7 +386,10 @@ class ElanSettingPageState extends State<ElanSettingPage> {
       //   });
       // }),
       nextListContainer('表示数', AppManager.displyNumber(dispNum), () async {
-        var result = await Navigator.of(context).push(MaterialPageRoute(builder: (context) => ElanSettingSelectPage(keyName: 'DISPLAYNUM', value: AppManager.appsettings['DISPLAYNUM'])));
+        var result = await Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => ElanSettingSelectPage(
+                keyName: 'DISPLAYNUM',
+                value: AppManager.appsettings['DISPLAYNUM'])));
         if (result != null) {
           AppManager.appsettings['DISPLAYNUM'] = result;
         }
@@ -395,16 +409,16 @@ class ElanSettingPageState extends State<ElanSettingPage> {
     ]);
 
     listContainers.addAll([
-      _separator,
+      _separator(),
       nextListContainer('利用者名・画像の変更', '', toUserListPage),
       nextListContainer('お知らせ動画', '', _toInfoVideoPage),
       nextListContainer('スライドショー', '', _toInfoPhotoPage),
       nextListContainer('メッセージ配信', '', () async {
-        await Navigator.of(context)
-            .push(MaterialPageRoute(builder: (context) => ElanSettingInfoMessagePage()));
+        await Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => ElanSettingInfoMessagePage()));
       }),
       nextListContainer('天気予報コード', '', _getWeatherArea),
-      _separator,
+      _separator(),
     ]);
 
     return listContainers;
@@ -415,7 +429,8 @@ class ElanSettingPageState extends State<ElanSettingPage> {
     var listContainers = _listContainers();
 
     return Scaffold(
-      appBar: WidgetUtil.appBar('設定',
+      appBar: WidgetUtil.appBar(
+        '設定',
         backgroundColor: WidgetUtil.iosNavbarBG,
         foregroundColor: Colors.black,
       ),
@@ -428,16 +443,13 @@ class ElanSettingPageState extends State<ElanSettingPage> {
               children: listContainers,
             ),
           ),
-          if (_load)
-            WidgetUtil.loadingIndicator,
+          if (_load) WidgetUtil.loadingIndicator,
         ],
       ),
     );
   }
 
-  Widget separator() {
-    return const SizedBox(height: 20,);
-  }
+  Widget _separator() => const SizedBox(height: 20);
 
   Widget basicListContainer(String title, String subtitle) {
     return Container(
@@ -475,7 +487,7 @@ class ElanSettingPageState extends State<ElanSettingPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(
-            bottom: new BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
+            bottom: BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
           ),
         ),
         height: WidgetUtil.listHeight,
@@ -565,7 +577,9 @@ class ElanSettingPageState extends State<ElanSettingPage> {
               if (value) {
                 val = '1';
               }
-              if (key == 'AUTO_RECEIVE' || key == 'VOLUME_CALL' || key == 'CLOCKDISP') {
+              if (key == 'AUTO_RECEIVE' ||
+                  key == 'VOLUME_CALL' ||
+                  key == 'CLOCKDISP') {
                 AppManager.saveAppSetting(key, val);
               } else if (key == 'SLEEP_MODE') {
                 AppManager.saveAppSetting(key, val);

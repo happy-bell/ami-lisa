@@ -1,0 +1,5 @@
+name: assets_audio_player_web
+description: Dummy package to override the problematic web plugin for Android build.
+version: 0.0.1
+environment:
+  sdk: ">=2.12.0 <4.0.0"
