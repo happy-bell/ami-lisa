@@ -34,7 +34,6 @@ class ElanDayServicePageState extends State<ElanDayServicePage> {
       ..loadRequest(Uri.parse(_url));
   }
 
-  /* ------- 外部からの手動リロード用 ------- */
   void reload() => _controller.loadRequest(Uri.parse(_url));
 
   @override
