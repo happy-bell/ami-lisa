@@ -1,12 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/helpers/widget_util.dart';
-import 'package:amiapp/pages/setting/setting_args.dart';
 import 'package:amiapp/services/appmanager.dart';
 import 'package:amiapp/services/audio_service.dart';
 
@@ -14,7 +11,7 @@ class SettingSelectPage extends StatefulWidget {
   final String keyName;
   final String value;
 
-  SettingSelectPage({required this.keyName, required this.value});
+  const SettingSelectPage({super.key, required this.keyName, required this.value});
 
   @override
   SettingSelectPageState createState() => SettingSelectPageState();
@@ -102,14 +99,11 @@ class SettingSelectPageState extends State<SettingSelectPage> {
 
   String _ringtoneURL(String id) {
     if (AppDefine.amiApp) {
-      return AppDefine.baseURL + "app/ringtone_dl/" + id + "?token=" + AppManager.settings["api_token"];
+      return "${AppDefine.baseURL}app/ringtone_dl/$id?token=" + AppManager.settings["api_token"];
     }
     var token = AppDefine.getRMSToken();
-    var url = 'https://' +
-        AppManager.settings['MCSURL'] +
-        '/json/appringtone?id=' +
-        id +
-        '&token=' +
+    var url = '${'https://' +
+        AppManager.settings['MCSURL']}/json/appringtone?id=$id&token=' +
         token;
     return url;
   }

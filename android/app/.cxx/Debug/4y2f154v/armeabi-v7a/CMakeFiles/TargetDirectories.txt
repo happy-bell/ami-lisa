@@ -1,0 +1,2 @@
+/Users/yutatomatsu/Documents/ami3.3.27-9/android/app/.cxx/Debug/4y2f154v/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/yutatomatsu/Documents/ami3.3.27-9/android/app/.cxx/Debug/4y2f154v/armeabi-v7a/CMakeFiles/rebuild_cache.dir

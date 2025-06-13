@@ -125,7 +125,7 @@ class AddressStore with ChangeNotifier {
 
   setAddressStatus(udid, status) {
     final index = _findAddress(udid);
-    print('setAddressStatus   ' + index.toString());
+    print('setAddressStatus   $index');
     if (index < 0) {
       return;
     }

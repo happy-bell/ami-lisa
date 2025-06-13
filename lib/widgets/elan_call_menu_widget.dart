@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:amiapp/pages/staff/staff_talk_page.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 import '../pages/elan/elan_call_page.dart';
 
 class ElanCallMenuWidget extends StatefulWidget {
-  ElanCallMenuWidget({required Key key}) : super(key: key);
+  const ElanCallMenuWidget({required Key key}) : super(key: key);
 
   @override
   ElanCallMenuWidgetState createState() => ElanCallMenuWidgetState();

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,7 +23,7 @@ mixin SocketIOServiceDelegate {
 }
 
 class SocketIOService {
-  static SocketIOService _instance = SocketIOService._internal();
+  static final SocketIOService _instance = SocketIOService._internal();
 
   String url = '';
   SocketIOServiceDelegate? delegate;

@@ -25,6 +25,7 @@ import '../../services/socket_io_service.dart';
 import 'elan_signin_page.dart';
 
 class ElanTabPage extends StatefulWidget {
+  const ElanTabPage({super.key});
 
   @override
   ElanTabPageState createState() => ElanTabPageState();
@@ -36,13 +37,18 @@ class ElanTabPageState extends State<ElanTabPage>
   late PersistentTabController _controller;
   // bool _show = true;
   // final GlobalKey<NavigatorState> homeTabNavKey = GlobalKey<NavigatorState>();
-  final GlobalKey<NavigatorState> settingTabNavKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> settingTabNavKey =
+      GlobalKey<NavigatorState>();
   final GlobalKey<ElanHomePageState> homeKey = GlobalKey<ElanHomePageState>();
   final GlobalKey<ElanDrugPageState> drugKey = GlobalKey<ElanDrugPageState>();
-  final GlobalKey<ElanHealthPageState> healthKey = GlobalKey<ElanHealthPageState>();
-  final GlobalKey<ElanDayServicePageState> dayServiceKey = GlobalKey<ElanDayServicePageState>();
-  final GlobalKey<ElanPhonePageState> phoneKey = GlobalKey<ElanPhonePageState>();
-  final GlobalKey<ElanSettingPageState> settingKey = GlobalKey<ElanSettingPageState>();
+  final GlobalKey<ElanHealthPageState> healthKey =
+      GlobalKey<ElanHealthPageState>();
+  final GlobalKey<ElanDayServicePageState> dayServiceKey =
+      GlobalKey<ElanDayServicePageState>();
+  final GlobalKey<ElanPhonePageState> phoneKey =
+      GlobalKey<ElanPhonePageState>();
+  final GlobalKey<ElanSettingPageState> settingKey =
+      GlobalKey<ElanSettingPageState>();
   int _currentIndex = 0;
 
   List<Widget> _pages = [];
@@ -55,7 +61,8 @@ class ElanTabPageState extends State<ElanTabPage>
   void initState() {
     super.initState();
     print('[DEBUG PRINT] elan tab page initState');
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
     _controller = PersistentTabController(initialIndex: 0);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -64,7 +71,8 @@ class ElanTabPageState extends State<ElanTabPage>
     WidgetsBinding.instance.addObserver(this);
     socketservice.delegate = this;
 
-    _pingTimer = Timer.periodic(const Duration(milliseconds: 30 * 1000), (Timer timer) {
+    _pingTimer =
+        Timer.periodic(const Duration(milliseconds: 30 * 1000), (Timer timer) {
       if (socketservice.isConnect()) {
         socketservice.io.emit("ping");
       }
@@ -117,8 +125,8 @@ class ElanTabPageState extends State<ElanTabPage>
   Future<void> _logout() async {
     var prefs = await SharedPreferences.getInstance();
     await prefs.setBool('login', false);
-    Navigator.of(context, rootNavigator: true)
-        .pushReplacement(MaterialPageRoute(builder: (context) => ElanSignInPage()));
+    Navigator.of(context, rootNavigator: true).pushReplacement(
+        MaterialPageRoute(builder: (context) => ElanSignInPage()));
   }
 
   void _loadAddress() {
@@ -195,7 +203,6 @@ class ElanTabPageState extends State<ElanTabPage>
       settingKey.currentState?.toUserListPage();
     }
 
-
     _tabItemSelected(index);
   }
 
@@ -204,7 +211,7 @@ class ElanTabPageState extends State<ElanTabPage>
       DeviceOrientation.portraitUp,
     ]);
     setState(() {
-      _controller.index = 0;//_currentIndex;
+      _controller.index = 0; //_currentIndex;
     });
   }
 
@@ -243,17 +250,14 @@ class ElanTabPageState extends State<ElanTabPage>
     ];
     List<PersistentBottomNavBarItem> navbarItems = [];
     for (var item in items) {
-      navbarItems.add(
-          PersistentBottomNavBarItem(
-              icon: OriginalImageIconWidget(
-                AssetImage('assets/images/bottom_navi/${item['image']!}'),
-                semanticLabel: item['title'],
-              ),
-              inactiveColorPrimary: Colors.grey,
-              activeColorPrimary: const Color(0xff296934),
-              title: item['title']
-          )
-      );
+      navbarItems.add(PersistentBottomNavBarItem(
+          icon: OriginalImageIconWidget(
+            AssetImage('assets/images/bottom_navi/${item['image']!}'),
+            semanticLabel: item['title'],
+          ),
+          inactiveColorPrimary: Colors.grey,
+          activeColorPrimary: const Color(0xff296934),
+          title: item['title']));
     }
     return navbarItems;
   }
@@ -263,70 +267,72 @@ class ElanTabPageState extends State<ElanTabPage>
     final AddressStore addressStore = Provider.of<AddressStore>(context);
 
     return Scaffold(
-      body: _pages.isEmpty ? Container() :
-      Stack(
-        children: [
-          PersistentTabView.custom(
-            context,
-            controller: _controller,
-            itemCount: _pages.length,
-            backgroundColor: WidgetUtil.primaryBG,
-            screens: _pages,
-            navBarHeight: _controller.index == 3 ? 0 : kBottomNavigationBarHeight,
-            customWidget: (navBarEssentials) => CustomNavBarWidget(
-              items: _navBarsItems(),
-              selectedIndex: _controller.index,
-              onItemSelected: (index) {
-                _tabItemSelected(index);
-              },
-            ),
-          ),
-          if (addressStore.calledUser != null && _controller.index != 3)
-            GestureDetector(
-              onTap: () {
-                if (AppManager.selectUser != null) {
-                  if (AppManager.selectUser!.id == addressStore.calledUser!.id) {
-                    print('called user is selected');
-                    return;
-                  }
-                }
-                if (phoneKey.currentState == null) {
-                  print('phonkey state is null');
-                  addressStore.setSelectUser(addressStore.calledUser);
-                } else {
-                  phoneKey.currentState!.selectAddress(addressStore.calledUser!);
-                }
-                setState(() {
-                  _controller.index = 3;
-                });
-              },
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      color: Colors.black,
-                      width: 160,
-                      height: 30,
-                      child: Text(
-                        addressStore.calledUser!.name,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 160,
-                      child: Image.asset('assets/images/status/addr_call.png'),
-                    ),
-                  ]
+      body: _pages.isEmpty
+          ? Container()
+          : Stack(
+              children: [
+                PersistentTabView.custom(
+                  context,
+                  controller: _controller,
+                  itemCount: _pages.length,
+                  backgroundColor: WidgetUtil.primaryBG,
+                  screens: _pages,
+                  navBarHeight:
+                      _controller.index == 3 ? 0 : kBottomNavigationBarHeight,
+                  customWidget: (navBarEssentials) => CustomNavBarWidget(
+                    items: _navBarsItems(),
+                    selectedIndex: _controller.index,
+                    onItemSelected: (index) {
+                      _tabItemSelected(index);
+                    },
+                  ),
                 ),
-              ),
+                if (addressStore.calledUser != null && _controller.index != 3)
+                  GestureDetector(
+                    onTap: () {
+                      if (AppManager.selectUser != null) {
+                        if (AppManager.selectUser!.id ==
+                            addressStore.calledUser!.id) {
+                          print('called user is selected');
+                          return;
+                        }
+                      }
+                      if (phoneKey.currentState == null) {
+                        print('phonkey state is null');
+                        addressStore.setSelectUser(addressStore.calledUser);
+                      } else {
+                        phoneKey.currentState!
+                            .selectAddress(addressStore.calledUser!);
+                      }
+                      setState(() {
+                        _controller.index = 3;
+                      });
+                    },
+                    child: Center(
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Container(
+                          color: Colors.black,
+                          width: 160,
+                          height: 30,
+                          child: Text(
+                            addressStore.calledUser!.name,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 160,
+                          child:
+                              Image.asset('assets/images/status/addr_call.png'),
+                        ),
+                      ]),
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
     );
   }
 
@@ -361,22 +367,21 @@ class ElanTabPageState extends State<ElanTabPage>
         // AppManager.toast("ログイン済のアカウントです。");
         return;
       }
-      socketservice.io.emit("clients_status", [AppManager.settings['addressGroup']]);
+      socketservice.io
+          .emit("clients_status", [AppManager.settings['addressGroup']]);
       var appStore = context.read<AppStore>();
       appStore.setConnect(true);
-    }
-    else if (message == 'clients_status') {
+    } else if (message == 'clients_status') {
       var statuses = data['data'];
       statuses.forEach((udid, value) {
         _setAddressStatus(udid, value['status']);
       });
-    }
-    else if (message == 'login') {
+    } else if (message == 'login') {
       if (data['info']['client']['udid'] != null) {
-        _setAddressStatus(data['info']['client']['udid'], data['info']['client']['status']);
+        _setAddressStatus(
+            data['info']['client']['udid'], data['info']['client']['status']);
       }
-    }
-    else if (message == 'status_change') {
+    } else if (message == 'status_change') {
       if (data["info"]["MYID"] != null && data["info"]["STATUS"] != null) {
         var addressStore = context.read<AddressStore>();
         var udid = data["info"]["MYID"];
@@ -390,8 +395,7 @@ class ElanTabPageState extends State<ElanTabPage>
         }
         _setAddressStatus(udid, data["info"]["STATUS"]);
       }
-    }
-    else if (message == 'call') {
+    } else if (message == 'call') {
       if (AppManager.status == AppStatus.Call ||
           AppManager.status == AppStatus.Talk ||
           AppManager.status == AppStatus.Multi ||
@@ -419,8 +423,7 @@ class ElanTabPageState extends State<ElanTabPage>
         addressStore.setCalledUser(address);
       }
       audio.ringtone();
-    }
-    else if (message == 'call_cancel') {
+    } else if (message == 'call_cancel') {
       if (data["udid"] == null) {
         return;
       }
@@ -443,5 +446,4 @@ class ElanTabPageState extends State<ElanTabPage>
   void onTalkMessage(data) {
     // TODO: implement onTalkMessage
   }
-
 }

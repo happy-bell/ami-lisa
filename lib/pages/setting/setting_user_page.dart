@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:amiapp/notifiers/address_notifier.dart';
 
 class SettingUserPage extends StatefulWidget {
+  const SettingUserPage({super.key});
+
   @override
   _SettingUserPageState createState() => _SettingUserPageState();
 }

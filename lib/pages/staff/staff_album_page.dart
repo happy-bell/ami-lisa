@@ -8,6 +8,8 @@ import 'package:amiapp/helpers/widget_util.dart';
 import '../../services/appmanager.dart';
 
 class StaffAlbumPage extends StatefulWidget {
+  const StaffAlbumPage({super.key});
+
   @override
   State<StaffAlbumPage> createState() => StaffAlbumPageState();
 }
@@ -52,15 +54,7 @@ class StaffAlbumPageState extends State<StaffAlbumPage> {
     var arr = path.split('/');
     String name =
     arr[arr.length - 1].replaceAll('.png', '').replaceAll('.jpg', '');
-    var dateString = name.substring(0, 4) +
-        "/" +
-        name.substring(4, 6) +
-        "/" +
-        name.substring(6, 8) +
-        " " +
-        name.substring(8, 10) +
-        ":" +
-        name.substring(10, 12);
+    var dateString = "${name.substring(0, 4)}/${name.substring(4, 6)}/${name.substring(6, 8)} ${name.substring(8, 10)}:${name.substring(10, 12)}";
 
     return dateString;
   }
@@ -85,18 +79,18 @@ class StaffAlbumPageState extends State<StaffAlbumPage> {
 
     var value = await showDialog(
       context: context,
-      builder: (BuildContext context) => new AlertDialog(
-        title: new Text('確認'),
-        content: new Text('画像を削除しますか？'),
+      builder: (BuildContext context) => AlertDialog(
+        title: Text('確認'),
+        content: Text('画像を削除しますか？'),
         actions: <Widget>[
-          new SimpleDialogOption(
-            child: new Text('はい'),
+          SimpleDialogOption(
+            child: Text('はい'),
             onPressed: () {
               Navigator.pop(context, "1");
             },
           ),
-          new SimpleDialogOption(
-            child: new Text('いいえ'),
+          SimpleDialogOption(
+            child: Text('いいえ'),
             onPressed: () {
               Navigator.pop(context, "0");
             },
@@ -130,11 +124,11 @@ class StaffAlbumPageState extends State<StaffAlbumPage> {
   }
 
   void _deleteSelectImages() {
-    _selectImages.forEach((index) {
+    for (var index in _selectImages) {
       var file = files[index];
       var upFile = File(file.path);
       upFile.deleteSync();
-    });
+    }
     _selectImages.clear();
     _getFiles();
   }
@@ -145,18 +139,18 @@ class StaffAlbumPageState extends State<StaffAlbumPage> {
     }
     var value = await showDialog(
       context: context,
-      builder: (BuildContext context) => new AlertDialog(
-        title: new Text('確認'),
-        content: new Text('アップロードしますか？'),
+      builder: (BuildContext context) => AlertDialog(
+        title: Text('確認'),
+        content: Text('アップロードしますか？'),
         actions: <Widget>[
-          new SimpleDialogOption(
-            child: new Text('はい'),
+          SimpleDialogOption(
+            child: Text('はい'),
             onPressed: () {
               Navigator.pop(context, "1");
             },
           ),
-          new SimpleDialogOption(
-            child: new Text('いいえ'),
+          SimpleDialogOption(
+            child: Text('いいえ'),
             onPressed: () {
               Navigator.pop(context, "0");
             },
@@ -179,9 +173,9 @@ class StaffAlbumPageState extends State<StaffAlbumPage> {
 
   String _uploadURL() {
     if (AppDefine.amiApp) {
-      return AppDefine.baseURL + 'app/upload_photos';
+      return '${AppDefine.baseURL}app/upload_photos';
     }
-    return AppDefine.baseURL + "app/upphototest.php";
+    return "${AppDefine.baseURL}app/upphototest.php";
   }
 
   void _uploadSelectIndex() async {
@@ -217,12 +211,12 @@ class StaffAlbumPageState extends State<StaffAlbumPage> {
     await Future.forEach(_selectImages, (index) async {
       var file = files[index];
       String fileName = file.path.split('/').last;
-      formDataMap["files" + fileNo.toString()] = await MultipartFile.fromFile(file.path, filename: fileName);
+      formDataMap["files$fileNo"] = await MultipartFile.fromFile(file.path, filename: fileName);
       fileNo++;
     });
     print(formDataMap);
     FormData formData = FormData.fromMap(formDataMap);
-    var url = AppDefine.baseURL + "app/upphototest.php";
+    var url = "${AppDefine.baseURL}app/upphototest.php";
     var dio = Dio();
     try {
       var response = await dio.post(url, data: formData);
@@ -349,9 +343,9 @@ class StaffAlbumPageState extends State<StaffAlbumPage> {
             child: Container(
               decoration: BoxDecoration(
                 color: Color.fromARGB(255, 248, 248, 248),
-                border: new Border(
+                border: Border(
                   top:
-                  new BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
+                  BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
                 ),
               ),
               child: Row(

@@ -1,7 +1,4 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:amiapp/pages/setting/setting_args.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 import '../../helpers/widget_util.dart';
@@ -10,7 +7,7 @@ class SettingInputPage extends StatefulWidget {
   final String keyName;
   final String value;
 
-  SettingInputPage({required this.keyName, required this.value});
+  const SettingInputPage({super.key, required this.keyName, required this.value});
 
   @override
   SettingInputPageState createState() => SettingInputPageState();
@@ -107,8 +104,7 @@ class SettingInputPageState extends State<SettingInputPage> {
               padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 96),
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  primary: Colors.lightBlueAccent,
-                  onPrimary: Colors.white,
+                  foregroundColor: Colors.white, backgroundColor: Colors.lightBlueAccent,
                   // shape: RoundedRectangleBorder(
                   //   borderRadius: BorderRadius.circular(10),
                   // ),

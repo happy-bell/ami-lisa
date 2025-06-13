@@ -2,14 +2,12 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 mixin PaintControllerDelegate {
   void onPaint(data);
 }
 
 class _PaintData {
-
   _PaintData({
     required this.path,
   }) : super();
@@ -19,11 +17,13 @@ class _PaintData {
 
 class PaintHistory {
   // ペイントの履歴リスト
-  List<MapEntry<_PaintData, Paint>> _paintList = <MapEntry<_PaintData, Paint>>[];
+  final List<MapEntry<_PaintData, Paint>> _paintList =
+      <MapEntry<_PaintData, Paint>>[];
   // ペイントundoリスト
-  List<MapEntry<_PaintData, Paint>> _undoneList = <MapEntry<_PaintData, Paint>>[];
+  final List<MapEntry<_PaintData, Paint>> _undoneList =
+      <MapEntry<_PaintData, Paint>>[];
   // 背景ペイント
-  Paint _backgroundPaint = Paint();
+  final Paint _backgroundPaint = Paint();
   // ドラッグ中フラグ
   bool _inDrag = false;
   // カレントペイント
@@ -36,18 +36,17 @@ class PaintHistory {
   /*
    * undo可能か
    */
-  bool canUndo() => _paintList.length > 0;
+  bool canUndo() => _paintList.isNotEmpty;
 
   /*
    * redo可能か
    */
-  bool canRedo() => _undoneList.length > 0;
+  bool canRedo() => _undoneList.isNotEmpty;
 
   /*
    * undo
    */
   void undo() {
-
     if (!_inDrag && canUndo()) {
       _undoneList.add(_paintList.removeLast());
     }
@@ -57,7 +56,6 @@ class PaintHistory {
    * redo
    */
   void redo() {
-
     if (!_inDrag && canRedo()) {
       _paintList.add(_undoneList.removeLast());
     }
@@ -67,7 +65,6 @@ class PaintHistory {
    * クリア
    */
   void clear() {
-
     if (!_inDrag) {
       _paintList.clear();
       _undoneList.clear();
@@ -83,13 +80,13 @@ class PaintHistory {
    * 線ペイント開始
    */
   void addPaint(Offset startPoint) {
-
     if (!_inDrag) {
       _inDrag = true;
       Path path = Path();
       path.moveTo(startPoint.dx, startPoint.dy);
       _PaintData data = _PaintData(path: path);
-      _paintList.add(MapEntry<_PaintData, Paint>(data, (_isClear ? erasePaint : currentPaint)));
+      _paintList.add(MapEntry<_PaintData, Paint>(
+          data, (_isClear ? erasePaint : currentPaint)));
     }
   }
 
@@ -97,9 +94,7 @@ class PaintHistory {
    * 線ペイント更新
    */
   void updatePaint(Offset nextPoint) {
-
     if (_inDrag) {
-
       _PaintData data = _paintList.last.key;
       Path path = data.path;
       path.lineTo(nextPoint.dx, nextPoint.dy);
@@ -110,7 +105,6 @@ class PaintHistory {
    * 線ペイント終了
    */
   void endPaint() {
-
     _inDrag = false;
   }
 
@@ -118,12 +112,14 @@ class PaintHistory {
    * 描写
    */
   void draw(Canvas canvas, Size size) async {
-    canvas.saveLayer(Rect.fromLTWH(
-      0.0,
-      0.0,
-      size.width,
-      size.height,
-    ), Paint());
+    canvas.saveLayer(
+        Rect.fromLTWH(
+          0.0,
+          0.0,
+          size.width,
+          size.height,
+        ),
+        Paint());
     canvas.drawRect(
       Rect.fromLTWH(
         0.0,
@@ -138,9 +134,7 @@ class PaintHistory {
      * 線描写
      */
     for (MapEntry<_PaintData, Paint> data in _paintList) {
-      if (data.key.path != null) {
-        canvas.drawPath(data.key.path, data.value);
-      }
+      canvas.drawPath(data.key.path, data.value);
     }
     canvas.restore();
   }
@@ -150,7 +144,6 @@ class PaintHistory {
  * ペイント
  */
 class Painter extends StatefulWidget {
-
   // ペイントコントローラ
   final PaintController paintController;
   ui.Image image;
@@ -163,10 +156,7 @@ class Painter extends StatefulWidget {
     required this.image,
     required this.width,
     required this.height,
-  }) : super(key: ValueKey<PaintController>(paintController)) {
-
-    assert(this.paintController != null);
-  }
+  }) : super(key: ValueKey<PaintController>(paintController));
 
   @override
   _PainterState createState() => _PainterState();
@@ -181,11 +171,17 @@ class _PainterState extends State<Painter> {
 
   @override
   Widget build(BuildContext context) {
-
-    return Container(
+    return SizedBox(
+      // イベント監視
+      width: widget.width,
+      height: widget.height,
 
       // イベント監視
       child: GestureDetector(
+        // カスタムペイント
+        onPanStart: _onPaintStart,
+        onPanUpdate: _onPaintUpdate,
+        onPanEnd: _onPaintEnd,
 
         // カスタムペイント
         child: CustomPaint(
@@ -199,15 +195,7 @@ class _PainterState extends State<Painter> {
             repaint: widget.paintController,
           ),
         ),
-
-        // イベントリスナー
-        onPanStart: _onPaintStart,
-        onPanUpdate: _onPaintUpdate,
-        onPanEnd: _onPaintEnd,
-
       ),
-      width: widget.width,
-      height: widget.height,
     );
   }
 
@@ -215,9 +203,13 @@ class _PainterState extends State<Painter> {
    * 線ペイントの開始
    */
   void _onPaintStart(DragStartDetails start) {
-
-    widget.paintController.delegate?.onPaint({'event': 'began', 'x': start.localPosition.dx.toString(), 'y': start.localPosition.dy.toString()});
-    widget.paintController._paintHistory.addPaint(_getGlobalToLocalPosition(start.globalPosition));
+    widget.paintController.delegate?.onPaint({
+      'event': 'began',
+      'x': start.localPosition.dx.toString(),
+      'y': start.localPosition.dy.toString()
+    });
+    widget.paintController._paintHistory
+        .addPaint(_getGlobalToLocalPosition(start.globalPosition));
     widget.paintController._notifyListeners();
 
     lastX = start.localPosition.dx;
@@ -230,15 +222,23 @@ class _PainterState extends State<Painter> {
   void _onPaintUpdate(DragUpdateDetails update) {
     print(update.localPosition);
     print(widget.height);
-    if (update.localPosition.dx < 0 || update.localPosition.dx > widget.width ||
-        update.localPosition.dy < 0 || update.localPosition.dy > widget.height) {
-      widget.paintController.delegate?.onPaint({'event': 'ended', 'x': lastX.toString(), 'y': lastY.toString()});
+    if (update.localPosition.dx < 0 ||
+        update.localPosition.dx > widget.width ||
+        update.localPosition.dy < 0 ||
+        update.localPosition.dy > widget.height) {
+      widget.paintController.delegate?.onPaint(
+          {'event': 'ended', 'x': lastX.toString(), 'y': lastY.toString()});
       widget.paintController._paintHistory.endPaint();
       widget.paintController._notifyListeners();
       return;
     }
-    widget.paintController.delegate?.onPaint({'event': 'moved', 'x': update.localPosition.dx.toString(), 'y': update.localPosition.dy.toString()});
-    widget.paintController._paintHistory.updatePaint(_getGlobalToLocalPosition(update.globalPosition));
+    widget.paintController.delegate?.onPaint({
+      'event': 'moved',
+      'x': update.localPosition.dx.toString(),
+      'y': update.localPosition.dy.toString()
+    });
+    widget.paintController._paintHistory
+        .updatePaint(_getGlobalToLocalPosition(update.globalPosition));
     widget.paintController._notifyListeners();
 
     lastX = update.localPosition.dx;
@@ -249,7 +249,8 @@ class _PainterState extends State<Painter> {
    * 線ペイントの終了
    */
   void _onPaintEnd(DragEndDetails end) {
-    widget.paintController.delegate?.onPaint({'event': 'ended', 'x': lastX.toString(), 'y': lastY.toString()});
+    widget.paintController.delegate?.onPaint(
+        {'event': 'ended', 'x': lastX.toString(), 'y': lastY.toString()});
     widget.paintController._paintHistory.endPaint();
     widget.paintController._notifyListeners();
   }
@@ -258,7 +259,6 @@ class _PainterState extends State<Painter> {
    * ローカルのオフセットへ変換
    */
   Offset _getGlobalToLocalPosition(Offset global) {
-
     return (context.findRenderObject() as RenderBox).globalToLocal(global);
   }
 }
@@ -267,28 +267,24 @@ class _PainterState extends State<Painter> {
  * カスタムペイント
  */
 class _CustomPainter extends CustomPainter {
-
   final PaintHistory _paintHistory;
   final PaintHistory _paint2History;
   ui.Image image;
   ByteData? imageData;
 
-  _CustomPainter(
-      this._paintHistory,
-      this._paint2History,
-      this.image,
-      {
-        required Listenable repaint
-      }) : super(repaint: repaint);
+  _CustomPainter(this._paintHistory, this._paint2History, this.image,
+      {required Listenable repaint})
+      : super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {
     // ByteData data = image.toByteData();
     // canvas.drawImage(image, new Offset(0.0, 0.0), new Paint());
 
-    final src = Rect.fromLTWH(0.0, 0.0, image.width.toDouble(), image.height.toDouble());
+    final src = Rect.fromLTWH(
+        0.0, 0.0, image.width.toDouble(), image.height.toDouble());
     final dst = Rect.fromLTWH(0.0, 0.0, size.width, size.height);
-    canvas.drawImageRect(image, src, dst, new Paint());
+    canvas.drawImageRect(image, src, dst, Paint());
 
     _paintHistory.draw(canvas, size);
 
@@ -304,8 +300,8 @@ class _CustomPainter extends CustomPainter {
  */
 class PaintController extends ChangeNotifier {
   // ペイント履歴
-  PaintHistory _paintHistory = PaintHistory();
-  PaintHistory _paint2History = PaintHistory();
+  final PaintHistory _paintHistory = PaintHistory();
+  final PaintHistory _paint2History = PaintHistory();
 
   PaintControllerDelegate? delegate;
 
@@ -313,22 +309,21 @@ class PaintController extends ChangeNotifier {
   Color _drawColor = Color.fromARGB(255, 255, 0, 0);
   Color _draw2Color = Color.fromARGB(255, 255, 0, 0);
   // 線幅
-  double _thickness = 5.0;
+  final double _thickness = 5.0;
   // 背景色
-  Color _backgroundColor = Color.fromARGB(0, 255, 255, 255);
+  final Color _backgroundColor = Color.fromARGB(0, 255, 255, 255);
 
   /*
    * コンストラクタ
    */
   PaintController() : super() {
-
     // ペイント設定
     // Paint paint = Paint();
     // paint.color = _drawColor;
     // paint.style = PaintingStyle.stroke;
     // paint.strokeWidth = _thickness;
     // _paintHistory.currentPaint = paint;
-    // _paintHistory.backgroundColor = _backgroundColor;
+    // _paintHistory.colorScheme.background = _backgroundColor;
   }
 
   /*
@@ -377,7 +372,7 @@ class PaintController extends ChangeNotifier {
 
   void receiveDraw(String event, double x, double y) {
     print('receive draw $event');
-    Offset offset = new Offset(x, y);
+    Offset offset = Offset(x, y);
     if (event == 'began') {
       _paint2History.addPaint(offset);
     } else if (event == 'moved') {
@@ -394,7 +389,6 @@ class PaintController extends ChangeNotifier {
    * undo実行
    */
   void undo() {
-
     _paintHistory.undo();
     notifyListeners();
   }
@@ -403,7 +397,6 @@ class PaintController extends ChangeNotifier {
    * redo実行
    */
   void redo() {
-
     _paintHistory.redo();
     notifyListeners();
   }
@@ -422,7 +415,6 @@ class PaintController extends ChangeNotifier {
    * リスナー実行
    */
   void _notifyListeners() {
-
     notifyListeners();
   }
 
@@ -442,15 +434,17 @@ class PaintController extends ChangeNotifier {
   Future<ui.Image> image(ui.Image image, Size size) {
     ui.PictureRecorder recorder = ui.PictureRecorder();
     Canvas canvas = Canvas(recorder);
-    final src = Rect.fromLTWH(0.0, 0.0, image.width.toDouble(), image.height.toDouble());
+    final src = Rect.fromLTWH(
+        0.0, 0.0, image.width.toDouble(), image.height.toDouble());
     final dst = Rect.fromLTWH(0.0, 0.0, size.width, size.height);
-    canvas.drawImageRect(image, src, dst, new Paint());
+    canvas.drawImageRect(image, src, dst, Paint());
 
     _paintHistory.draw(canvas, size);
 
     _paint2History.draw(canvas, size);
 
-    return recorder.endRecording()
+    return recorder
+        .endRecording()
         .toImage(size.width.floor(), size.height.floor());
   }
 }

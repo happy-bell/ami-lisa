@@ -1,20 +1,17 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
-import 'package:amiapp/pages/elan/setting/elan_crop_image_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/helpers/widget_util.dart';
-import 'package:amiapp/pages/setting/setting_args.dart';
 import 'package:amiapp/pages/elan/setting/elan_input_user_name_page.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 class ElanUserListPage extends StatefulWidget {
+  const ElanUserListPage({super.key});
 
   @override
   ElanUserListPageState createState() => ElanUserListPageState();
@@ -44,7 +41,6 @@ class ElanUserListPageState extends State<ElanUserListPage> {
       _init = false;
       _getData();
     }
-
   }
 
   Future<void> _getData() async {
@@ -53,12 +49,15 @@ class ElanUserListPageState extends State<ElanUserListPage> {
     });
 
     final dio = Dio();
-    var url = '${AppDefine.baseURL}elan/api/user_list?token=${AppManager.settings['api_token']}';
+    var url =
+        '${AppDefine.baseURL}elan/api/user_list?token=${AppManager.settings['api_token']}';
     print(url);
 
-    var data = await dio.get(
+    var data = await dio
+        .get(
       url,
-    ).then((response) {
+    )
+        .then((response) {
       return response.data;
     }).catchError((err) {
       print(err);
@@ -88,7 +87,10 @@ class ElanUserListPageState extends State<ElanUserListPage> {
         title: const Text('画像を選択'),
         actions: <CupertinoActionSheetAction>[
           CupertinoActionSheetAction(
-            child: const Text('カメラで撮影', style: TextStyle(fontSize: fontSize),),
+            child: const Text(
+              'カメラで撮影',
+              style: TextStyle(fontSize: fontSize),
+            ),
             onPressed: () {
               Navigator.of(context).pop();
               _changeImageUser = item;
@@ -96,7 +98,10 @@ class ElanUserListPageState extends State<ElanUserListPage> {
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('写真を選択', style: TextStyle(fontSize: fontSize),),
+            child: const Text(
+              '写真を選択',
+              style: TextStyle(fontSize: fontSize),
+            ),
             onPressed: () {
               Navigator.of(context).pop();
               _changeImageUser = item;
@@ -105,7 +110,10 @@ class ElanUserListPageState extends State<ElanUserListPage> {
           ),
         ],
         cancelButton: CupertinoButton(
-          child: const Text("キャンセル", style: TextStyle(color: Colors.red),),
+          child: const Text(
+            "キャンセル",
+            style: TextStyle(color: Colors.red),
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -167,10 +175,12 @@ class ElanUserListPageState extends State<ElanUserListPage> {
     ]);
     var url = '${AppDefine.baseURL}elan/api/store_user_image';
     final dio = Dio();
-    final data = await dio.post(
+    final data = await dio
+        .post(
       url,
       data: formData,
-    ).then((response) {
+    )
+        .then((response) {
       print(response.data);
 
       if (response.data['status'] == 'ok') {
@@ -238,7 +248,8 @@ class ElanUserListPageState extends State<ElanUserListPage> {
             ),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: bytes.isNotEmpty ? Colors.transparent : Colors.grey),
+                border: Border.all(
+                    color: bytes.isNotEmpty ? Colors.transparent : Colors.grey),
               ),
               margin: const EdgeInsets.only(right: 20),
               width: 80,
@@ -252,8 +263,10 @@ class ElanUserListPageState extends State<ElanUserListPage> {
             Expanded(
               child: InkWell(
                 onTap: () async {
-                  var result = await Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (context) => ElanInputUserNamePage(item: item)));
+                  var result = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              ElanInputUserNamePage(item: item)));
                   if (result != null) {
                     _isChange = true;
                     _getData();
@@ -278,7 +291,8 @@ class ElanUserListPageState extends State<ElanUserListPage> {
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
-        appBar: WidgetUtil.appBar('利用者名変更',
+        appBar: WidgetUtil.appBar(
+          '利用者名変更',
           backgroundColor: WidgetUtil.iosNavbarBG,
           foregroundColor: Colors.black,
         ),
@@ -296,8 +310,7 @@ class ElanUserListPageState extends State<ElanUserListPage> {
                   itemCount: _data.length,
                 ),
               ),
-              if (_loading)
-                WidgetUtil.loadingIndicator,
+              if (_loading) WidgetUtil.loadingIndicator,
             ],
           ),
         ),

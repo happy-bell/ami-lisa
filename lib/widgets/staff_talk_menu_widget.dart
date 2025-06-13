@@ -3,7 +3,7 @@ import 'package:amiapp/pages/staff/staff_talk_page.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 class StaffTalkMenuWidget extends StatefulWidget {
-  StaffTalkMenuWidget({required Key key}) : super(key: key);
+  const StaffTalkMenuWidget({required Key key}) : super(key: key);
 
   @override
   StaffTalkMenuWidgetState createState() => StaffTalkMenuWidgetState();
@@ -73,7 +73,7 @@ class StaffTalkMenuWidgetState extends State<StaffTalkMenuWidget> {
         children: [
           MaterialButton(
             onPressed: () {
-              staffTalkPageState?.safetyCheckEndButton();
+              staffTalkPageState.safetyCheckEndButton();
             },
             color: Colors.red,
             textColor: Colors.white,

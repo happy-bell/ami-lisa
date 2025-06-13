@@ -12,6 +12,8 @@ import 'package:amiapp/services/socket_io_service.dart';
 import 'package:amiapp/widgets/clock_widget.dart';
 
 class LivePage extends StatefulWidget {
+  const LivePage({super.key});
+
   @override
   _LivePageState createState() => _LivePageState();
 }

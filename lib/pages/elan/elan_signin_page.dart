@@ -5,9 +5,10 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/services/appmanager.dart';
-import 'package:amiapp/pages/live/live_page.dart';
 
 class ElanSignInPage extends StatefulWidget {
+  const ElanSignInPage({super.key});
+
   @override
   _ElanSignInPageState createState() => _ElanSignInPageState();
 }

@@ -1,10 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/helpers/widget_util.dart';
-import 'package:amiapp/pages/setting/setting_args.dart';
 import 'package:amiapp/services/appmanager.dart';
-import 'package:amiapp/services/audio_service.dart';
 
 import '../../appdefine.dart';
 
@@ -12,7 +8,7 @@ class SettingMultiSelectPage extends StatefulWidget {
   final String keyName;
   final String value;
 
-  SettingMultiSelectPage({required this.keyName, required this.value});
+  const SettingMultiSelectPage({super.key, required this.keyName, required this.value});
 
   @override
   SettingMultiSelectPageState createState() => SettingMultiSelectPageState();

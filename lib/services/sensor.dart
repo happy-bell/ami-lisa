@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:async';
 import 'package:dio/dio.dart';
 
@@ -98,7 +97,7 @@ class SensorService {
   }
 
   Future<bool> _requestLegame() async {
-    var url = AppDefine.baseURL + 'app/legame/alert?cd=' + AppManager.delegatorCode + '&ti=' + sensorTime1;
+    var url = '${AppDefine.baseURL}app/legame/alert?cd=${AppManager.delegatorCode}&ti=$sensorTime1';
     var dio = Dio();
     try {
       var response = await dio.get(url);
@@ -127,7 +126,7 @@ class SensorService {
   }
 
   Future<bool> _requestPir() async {
-    var url = AppDefine.baseURL + 'app/pir/alert';
+    var url = '${AppDefine.baseURL}app/pir/alert';
 
     FormData formData = FormData.fromMap({
       "cd": AppManager.delegatorCode,
@@ -152,7 +151,7 @@ class SensorService {
             alerts[udid] = 'pir_' + alert;
             isChange = true;
           }
-          if (tin.length > 0) {
+          if (tin.isNotEmpty) {
             noneTimes[udid] = tin;
           }
         }
@@ -166,7 +165,7 @@ class SensorService {
   }
 
   Future<bool> _requestFlame() async {
-    var url = AppDefine.baseURL + 'app/flame/alert';
+    var url = '${AppDefine.baseURL}app/flame/alert';
 
     FormData formData = FormData.fromMap({
       "cd": AppManager.delegatorCode,
@@ -191,7 +190,7 @@ class SensorService {
             alerts[udid] = 'flame';
             isChange = true;
           }
-          if (tin.length > 0) {
+          if (tin.isNotEmpty) {
             flameAlertTimes[udid] = tin;
           }
         }
@@ -206,7 +205,7 @@ class SensorService {
 
   Future<void> resetBiosilver(udid) async {
 
-    var url = AppDefine.baseURL + 'app/biosilver/reset';
+    var url = '${AppDefine.baseURL}app/biosilver/reset';
     FormData formData = FormData.fromMap({
       "cd": AppManager.delegatorCode,
       "udid": udid,
@@ -220,7 +219,7 @@ class SensorService {
   }
 
   Future<bool> _requestBiosilver() async {
-    var url = AppDefine.baseURL + 'app/biosilver/alert';
+    var url = '${AppDefine.baseURL}app/biosilver/alert';
 
     FormData formData = FormData.fromMap({
       "cd": AppManager.delegatorCode,
@@ -291,11 +290,11 @@ class SensorService {
   }
 
   static String biosilverImageName(List<dynamic> alerts) {
-    if (alerts.length == 0) {
+    if (alerts.isEmpty) {
       return '';
     }
 
     var flag = alerts[0].toString();
-    return 'assets/images/sensor/bs_' + flag + '.png';
+    return 'assets/images/sensor/bs_$flag.png';
   }
 }

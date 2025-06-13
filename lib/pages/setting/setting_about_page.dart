@@ -5,6 +5,8 @@ import 'package:amiapp/pages/common/webview_page.dart';
 import '../../helpers/widget_util.dart';
 
 class SettingAboutPage extends StatefulWidget {
+  const SettingAboutPage({super.key});
+
   @override
   _SettingAboutPageState createState() => _SettingAboutPageState();
 }

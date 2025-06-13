@@ -6,6 +6,8 @@ import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/pages/common/webview_page.dart';
 
 class TutorialPage extends StatelessWidget {
+  const TutorialPage({super.key});
+
 
   @override
   Widget build(BuildContext context) {

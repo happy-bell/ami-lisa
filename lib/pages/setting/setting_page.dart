@@ -12,7 +12,6 @@ import 'package:amiapp/pages/setting/setting_about_page.dart';
 import 'package:amiapp/pages/setting/setting_input_page.dart';
 import 'package:amiapp/pages/setting/setting_select_page.dart';
 import 'package:amiapp/pages/setting/setting_multi_select_page.dart';
-import 'package:amiapp/pages/setting/setting_user_page.dart';
 import 'package:amiapp/pages/staff/staff_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
 import 'package:amiapp/services/appmanager.dart';
@@ -23,6 +22,8 @@ import '../live/live_page.dart';
 import '../room/room_page.dart';
 
 class SettingPage extends StatefulWidget {
+  const SettingPage({super.key});
+
   @override
   _SettingPageState createState() => _SettingPageState();
 }
@@ -35,7 +36,8 @@ class _SettingPageState extends State<SettingPage> {
   final TextStyle _titleTextStyle1 = const TextStyle(
     fontSize: 14,
   );
-  final TextStyle _titleTextStyle2 = const TextStyle(fontSize: 14, color: Colors.blue);
+  final TextStyle _titleTextStyle2 =
+      const TextStyle(fontSize: 14, color: Colors.blue);
 
   @override
   void initState() {
@@ -86,14 +88,14 @@ class _SettingPageState extends State<SettingPage> {
         await prefs.remove('codes');
 
         if (mounted) {
-          Navigator.of(context, rootNavigator: true)
-              .push(PageRouteBuilder(
-                pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-                  return SignInPage();
-                },
-                transitionDuration: Duration.zero,
-                reverseTransitionDuration: Duration.zero,
-              ));
+          Navigator.of(context, rootNavigator: true).push(PageRouteBuilder(
+            pageBuilder: (BuildContext context, Animation<double> animation1,
+                Animation<double> animation2) {
+              return SignInPage();
+            },
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ));
         }
         break;
       case "0":
@@ -117,7 +119,8 @@ class _SettingPageState extends State<SettingPage> {
       if (AppManager.isManager) {
         return "${AppDefine.baseURL}app/staff_address_list?code=${AppManager.settings['DELEGATORCODE']}&token=${AppManager.settings['api_token']}";
       }
-      var mstId = AppManager.settings['MYID'].replaceAll(AppManager.settings['DELEGATORCODE'] + "_", "");
+      var mstId = AppManager.settings['MYID']
+          .replaceAll(AppManager.settings['DELEGATORCODE'] + "_", "");
       return "${AppDefine.baseURL}app/address_list?code=${AppManager.settings['DELEGATORCODE']}&mst_id=$mstId&token=${AppManager.settings['api_token']}";
     }
 
@@ -145,9 +148,11 @@ class _SettingPageState extends State<SettingPage> {
     print(url);
 
     final dio = Dio();
-    var data = await dio.get(
-        url,
-    ).then((response) {
+    var data = await dio
+        .get(
+      url,
+    )
+        .then((response) {
       print(response.data);
       return response.data;
     }).catchError((err) {
@@ -171,10 +176,12 @@ class _SettingPageState extends State<SettingPage> {
     AppManager.ringtones = [];
     var ringtones = response['ringtones'];
     for (var i = 0; i < ringtones.length; i++) {
-      AppManager.ringtones.add([ringtones[i]['id'].toString(), ringtones[i]['name'].toString()]);
+      AppManager.ringtones.add(
+          [ringtones[i]['id'].toString(), ringtones[i]['name'].toString()]);
     }
-    var result = await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (context) => SettingSelectPage(keyName: 'RINGTONE', value: AppManager.appsettings['RINGTONE'])));
+    var result = await Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => SettingSelectPage(
+            keyName: 'RINGTONE', value: AppManager.appsettings['RINGTONE'])));
     AppManager.appsettings['RINGTONE'] = result;
     setState(() {
       _savedSwitch = !_savedSwitch;
@@ -186,7 +193,8 @@ class _SettingPageState extends State<SettingPage> {
       return '${AppDefine.baseURL}app/ringtone_list?code=${AppManager.settings["DELEGATORCODE"]}&token=${AppManager.settings["api_token"]}';
     }
     var token = AppDefine.getRMSToken();
-    var url = 'https://${AppManager.settings['MCSURL']}/json/appringtonelist?gcd=${AppManager.settings['MCSGROUPCODE']}&ccd=${AppManager.settings['MCSCLINICCODE']}&token=${token}';
+    var url =
+        'https://${AppManager.settings['MCSURL']}/json/appringtonelist?gcd=${AppManager.settings['MCSGROUPCODE']}&ccd=${AppManager.settings['MCSCLINICCODE']}&token=$token';
     return url;
   }
 
@@ -198,9 +206,11 @@ class _SettingPageState extends State<SettingPage> {
     print(url);
 
     final dio = Dio();
-    var data = await dio.get(
+    var data = await dio
+        .get(
       url,
-    ).then((response) {
+    )
+        .then((response) {
       print(response.data);
       return response.data;
     }).catchError((err) {
@@ -216,8 +226,8 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   Future<void> _toInfoVideoPage() async {
-    var result = await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (context) => ElanSettingInfoVideoPage()));
+    var result = await Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => ElanSettingInfoVideoPage()));
     setState(() {
       _savedSwitch = !_savedSwitch;
     });
@@ -240,14 +250,13 @@ class _SettingPageState extends State<SettingPage> {
         mode = 'staff2';
       }
     }
-    var _separator = separator();
 
     var label = "医療機関";
     if (AppDefine.amiApp) {
       label = "契約者名";
     }
-    var listContainers = [
-      _separator,
+    List<Widget> listContainers = [
+      _separator(),
       dispListContainer(label, AppManager.settings['MCSCLINICNAME']),
       tapListContainer('ログアウト', () {
         print('logout');
@@ -256,13 +265,13 @@ class _SettingPageState extends State<SettingPage> {
     ];
 
     if (AppManager.settings['MCSTYPE'] == '4') {
-      listContainers.addAll([_separator, abountListContainer()]);
+      listContainers.addAll([_separator(), abountListContainer()]);
       return listContainers;
     }
 
     if (AppDefine.amiApp) {
       listContainers.addAll([
-        _separator,
+        _separator(),
         dispListContainer('自分のID', AppManager.settings['myId']),
         tapListContainer('リスト更新', () {
           _getAddress();
@@ -270,11 +279,12 @@ class _SettingPageState extends State<SettingPage> {
       ]);
     } else {
       listContainers.addAll([
-        _separator,
+        _separator(),
         dispListContainer('自分のID', AppManager.settings['myId']),
         nextListContainer('グループ', AppManager.settings['group'], () async {
-          var result = await Navigator.of(context)
-              .push(MaterialPageRoute(builder: (context) => SettingInputPage(keyName: 'group', value: AppManager.settings['group'])));
+          var result = await Navigator.of(context).push(MaterialPageRoute(
+              builder: (context) => SettingInputPage(
+                  keyName: 'group', value: AppManager.settings['group'])));
           if (result != null) {
             AppManager.settings['group'] = result;
           }
@@ -283,9 +293,11 @@ class _SettingPageState extends State<SettingPage> {
           });
         }),
         nextListContainer('住所録グループ', AppManager.settings['addressGroup'],
-                () async {
-          var result = await Navigator.of(context)
-              .push(MaterialPageRoute(builder: (context) => SettingInputPage(keyName: 'addressGroup', value: AppManager.settings['addressGroup'])));
+            () async {
+          var result = await Navigator.of(context).push(MaterialPageRoute(
+              builder: (context) => SettingInputPage(
+                  keyName: 'addressGroup',
+                  value: AppManager.settings['addressGroup'])));
           if (result != null) {
             AppManager.settings['addressGroup'] = result;
           }
@@ -302,18 +314,23 @@ class _SettingPageState extends State<SettingPage> {
     var dispType = AppManager.settings['DISPTYPE'];
     var anminModeFlg = AppManager.settings['ANMINMODEFLG'];
     listContainers.addAll([
-      _separator,
+      _separator(),
       nextListContainer('表示', AppManager.dispType(dispType), () async {
-        var result = await Navigator.of(context)
-            .push(MaterialPageRoute(builder: (context) => SettingSelectPage(keyName: 'DISPTYPE', value: AppManager.settings['DISPTYPE'])));
+        var result = await Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => SettingSelectPage(
+                keyName: 'DISPTYPE', value: AppManager.settings['DISPTYPE'])));
         AppManager.settings['DISPTYPE'] = result;
         setState(() {
           _savedSwitch = !_savedSwitch;
         });
       }),
-      nextListContainer('表示数', AppManager.displyNumber(AppManager.appsettings['DISPLAYNUM']), () async {
-        var result = await Navigator.of(context)
-            .push(MaterialPageRoute(builder: (context) => SettingSelectPage(keyName: 'DISPLAYNUM', value: AppManager.appsettings['DISPLAYNUM'])));
+      nextListContainer(
+          '表示数', AppManager.displyNumber(AppManager.appsettings['DISPLAYNUM']),
+          () async {
+        var result = await Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => SettingSelectPage(
+                keyName: 'DISPLAYNUM',
+                value: AppManager.appsettings['DISPLAYNUM'])));
         AppManager.appsettings['DISPLAYNUM'] = result;
         setState(() {
           _savedSwitch = !_savedSwitch;
@@ -333,10 +350,12 @@ class _SettingPageState extends State<SettingPage> {
     }
 
     if (dispType == '1') {
-      listContainers
-          .add(nextListContainer('明るさ', AppManager.sleepModeBrightness(), () async {
-        var result = await Navigator.of(context)
-            .push(MaterialPageRoute(builder: (context) => SettingSelectPage(keyName: 'SLEEPMODEBRIGHTNESS', value: AppManager.appsettings['SLEEPMODEBRIGHTNESS'])));
+      listContainers.add(
+          nextListContainer('明るさ', AppManager.sleepModeBrightness(), () async {
+        var result = await Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => SettingSelectPage(
+                keyName: 'SLEEPMODEBRIGHTNESS',
+                value: AppManager.appsettings['SLEEPMODEBRIGHTNESS'])));
         AppManager.appsettings['SLEEPMODEBRIGHTNESS'] = result;
         setState(() {
           _savedSwitch = !_savedSwitch;
@@ -346,8 +365,10 @@ class _SettingPageState extends State<SettingPage> {
     if (dispType == '1' || dispType == '2') {
       listContainers
           .add(nextListContainer('時計', AppManager.clockMode(), () async {
-        var result = await Navigator.of(context)
-            .push(MaterialPageRoute(builder: (context) => SettingSelectPage(keyName: 'SLEEP_CLOCK', value: AppManager.appsettings['SLEEP_CLOCK'])));
+        var result = await Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => SettingSelectPage(
+                keyName: 'SLEEP_CLOCK',
+                value: AppManager.appsettings['SLEEP_CLOCK'])));
         AppManager.appsettings['SLEEP_CLOCK'] = result;
         setState(() {
           _savedSwitch = !_savedSwitch;
@@ -366,8 +387,9 @@ class _SettingPageState extends State<SettingPage> {
           // final args = SettingArguments();
           // args.key = 'SENSOR';
           // args.value = '';
-          var result = await Navigator.of(context)
-              .push(MaterialPageRoute(builder: (context) => SettingMultiSelectPage(keyName: 'SENSOR', value: AppManager.settings['DISPTYPE'])));
+          var result = await Navigator.of(context).push(MaterialPageRoute(
+              builder: (context) => SettingMultiSelectPage(
+                  keyName: 'SENSOR', value: AppManager.settings['DISPTYPE'])));
           // await Navigator.of(context)
           //     .pushNamed('/settingmultiselect', arguments: args);
           // AppManager.settings['DISPTYPE'] = result;
@@ -384,14 +406,14 @@ class _SettingPageState extends State<SettingPage> {
 
     if (mode != 'staff1') {
       listContainers.addAll([
-        _separator,
+        _separator(),
         nextListContainer('着信音', '', () {
           _getRingtone();
         }),
-        _separator,
+        _separator(),
       ]);
     } else {
-      listContainers.add(_separator);
+      listContainers.add(_separator());
     }
     if (dispType == '1') {
       listContainers.add(
@@ -406,14 +428,14 @@ class _SettingPageState extends State<SettingPage> {
           nextListContainer('お知らせ動画', '', _toInfoVideoPage),
           nextListContainer('スライドショー', '', _toInfoPhotoPage),
           nextListContainer('メッセージ配信', '', () async {
-            await Navigator.of(context)
-                .push(MaterialPageRoute(builder: (context) => SettingInfoMessagePage()));
+            await Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => SettingInfoMessagePage()));
           }),
         ]);
       }
     }
 
-    listContainers.addAll([_separator, abountListContainer()]);
+    listContainers.addAll([_separator(), abountListContainer()]);
 
     return listContainers;
   }
@@ -441,13 +463,14 @@ class _SettingPageState extends State<SettingPage> {
           Navigator.pushAndRemoveUntil(
             context,
             PageRouteBuilder(
-              pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
+              pageBuilder: (BuildContext context, Animation<double> animation1,
+                  Animation<double> animation2) {
                 return RoomPage();
               },
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
-                (route) => false,
+            (route) => false,
           );
         } else if (AppManager.settings['DISPTYPE'] == '2') {
           nextpage = '/live';
@@ -460,25 +483,27 @@ class _SettingPageState extends State<SettingPage> {
           Navigator.pushAndRemoveUntil(
             context,
             PageRouteBuilder(
-              pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
+              pageBuilder: (BuildContext context, Animation<double> animation1,
+                  Animation<double> animation2) {
                 return LivePage();
               },
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
-                (route) => false,
+            (route) => false,
           );
         } else if (AppManager.settings['MCSTYPE'] == 'SSSS') {
           Navigator.pushAndRemoveUntil(
             context,
             PageRouteBuilder(
-              pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
+              pageBuilder: (BuildContext context, Animation<double> animation1,
+                  Animation<double> animation2) {
                 return ManagerPage();
               },
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
-                (route) => false,
+            (route) => false,
           );
         } else {
           // Navigator.pushAndRemoveUntil(
@@ -489,13 +514,14 @@ class _SettingPageState extends State<SettingPage> {
           Navigator.pushAndRemoveUntil(
             context,
             PageRouteBuilder(
-              pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
+              pageBuilder: (BuildContext context, Animation<double> animation1,
+                  Animation<double> animation2) {
                 return StaffPage();
               },
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
-                (route) => false,
+            (route) => false,
           );
         }
         // Navigator.of(context).pushNamedAndRemoveUntil(nextpage, (route) => false);
@@ -503,7 +529,8 @@ class _SettingPageState extends State<SettingPage> {
         return Future.value(false);
       },
       child: Scaffold(
-        appBar: WidgetUtil.appBar('設定',
+        appBar: WidgetUtil.appBar(
+          '設定',
           backgroundColor: WidgetUtil.iosNavbarBG,
           foregroundColor: Colors.black,
         ),
@@ -533,13 +560,7 @@ class _SettingPageState extends State<SettingPage> {
     );
   }
 
-  Widget separator() {
-    return SizedBox(height: 20,);
-    return Container(
-      color: Color.fromARGB(255, 240, 240, 240),
-      padding: EdgeInsets.all(10.0),
-    );
-  }
+  Widget _separator() => const SizedBox(height: 20);
 
   Widget dispListContainer(String title, String subtitle) {
     return Container(
@@ -577,7 +598,7 @@ class _SettingPageState extends State<SettingPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(
-            bottom: new BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
+            bottom: BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
           ),
         ),
         height: _listHeight,
@@ -673,13 +694,13 @@ class _SettingPageState extends State<SettingPage> {
               if (value) {
                 val = '1';
               }
-              if (key == 'AUTO_RECEIVE' || key == 'VOLUME_CALL' || key == 'CLOCKDISP') {
+              if (key == 'AUTO_RECEIVE' ||
+                  key == 'VOLUME_CALL' ||
+                  key == 'CLOCKDISP') {
                 AppManager.saveAppSetting(key, val);
-              }
-              else if (key == 'SLEEP_MODE' || key == 'CALLSTATUSDISP') {
+              } else if (key == 'SLEEP_MODE' || key == 'CALLSTATUSDISP') {
                 AppManager.saveAppSetting(key, val);
-              }
-              else if (key == 'AUTH_RECEIVE') {
+              } else if (key == 'AUTH_RECEIVE') {
                 AppManager.saveAuthReceives(val);
               }
 
@@ -687,7 +708,7 @@ class _SettingPageState extends State<SettingPage> {
                 _savedSwitch = !_savedSwitch;
               });
             },
-            activeColor: Colors.red,
+            activeTrackColor: Colors.red,
           ),
         ],
       ),

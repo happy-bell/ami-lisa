@@ -27,6 +27,8 @@ import '../../services/socket_service.dart';
 import '../../widgets/sensor_view_widget.dart';
 
 class StaffTalkViewPage extends StatefulWidget {
+  const StaffTalkViewPage({super.key});
+
   @override
   StaffTalkViewPageState createState() => StaffTalkViewPageState();
 }
@@ -41,7 +43,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   final _remote2Renderer = RTCVideoRenderer();
   bool _hasRemoteVideo = false;
   bool _hasRemote2Video = false;
-  double _remoteMargin = 0;
+  final double _remoteMargin = 0;
   bool _minimiseLocalRenderer = false;
   SocketIOService socketservice = SocketIOService();
   SocketService? socketioservice;
@@ -157,9 +159,9 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   void dispose() {
     print('stafftalk dispose');
     // WidgetsBinding.instance.removeObserver(this);
-    _localRenderer?.dispose();
-    _remoteRenderer?.dispose();
-    _remote2Renderer?.dispose();
+    _localRenderer.dispose();
+    _remoteRenderer.dispose();
+    _remote2Renderer.dispose();
     _blinkAnimationController?.dispose();
     _stopRusuTimer();
     super.dispose();
@@ -272,7 +274,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     await audio.call();
     socketservice.io.emit("call", [AppManager.selectUser!.id]);
 
-    print("call to " + AppManager.selectUser!.id);
+    print("call to ${AppManager.selectUser!.id}");
 
     _rusuTimer = Timer.periodic(Duration(milliseconds: AppDefine.absenceSec1), (Timer timer) {
       _cancelcall();
@@ -637,7 +639,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     if (AppManager.status != AppStatus.Talk) {
       isEnableThreeway = false;
     }
-    if (AppManager.holdId.length == 0) {
+    if (AppManager.holdId.isEmpty) {
       isEnableThreeway = false;
     }
 
@@ -967,9 +969,9 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
 
   String _uploadURL() {
     if (AppDefine.amiApp) {
-      return AppDefine.baseURL + 'app/upload_photos';
+      return '${AppDefine.baseURL}app/upload_photos';
     }
-    return AppDefine.baseURL + "app/upphototest.php";
+    return "${AppDefine.baseURL}app/upphototest.php";
   }
 
   void _uploadPhotoImage(filepath) async {
@@ -980,7 +982,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       "ccd": AppManager.settings["MCSCLINICCODE"],
       "mid": AppManager.selectUser!.id,
       "code": AppManager.selectUser!.code,
-      "mst_id": AppManager.selectUser!.id.replaceAll(AppManager.selectUser!.code + "_", ""),
+      "mst_id": AppManager.selectUser!.id.replaceAll("${AppManager.selectUser!.code}_", ""),
       "files0": await MultipartFile.fromFile(filepath, filename: fileName),
     });
     var url = _uploadURL();
@@ -1081,7 +1083,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   }
 
   Future<void> graphButton(String sensorType) async {
-    print('sensorType' + sensorType);
+    print('sensorType$sensorType');
     await Navigator.of(context).push(
         PageRouteBuilder(
           pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
@@ -1132,7 +1134,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
               ? size.height / 2
               : size.height,
           width: size.width - _remoteMargin,
-          child: RTCVideoView(_remoteRenderer!, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,),
+          child: RTCVideoView(_remoteRenderer, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,),
         ));
       }
       if (_talking) {
@@ -1144,7 +1146,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
           child: Opacity(
             opacity: AppManager.safetyCheckId.isNotEmpty ? 0.0 : 1.0,
             child: RTCVideoView(
-              _localRenderer!,
+              _localRenderer,
               mirror: true,
               objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
             ),
@@ -1210,7 +1212,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
                         ? size.height / 2
                         : size.height,
                     width: size.width - _remoteMargin,
-                    child: RTCVideoView(_remoteRenderer!, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,),
+                    child: RTCVideoView(_remoteRenderer, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,),
                   ),
                 if (_talking && AppManager.safetyCheckId.isEmpty)
                   Positioned(
@@ -1254,7 +1256,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
                         height: 28,
                         width: 28,
                       ) : RTCVideoView(
-                        _localRenderer!,
+                        _localRenderer,
                         mirror: true,
                         objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                       ),
@@ -1772,7 +1774,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     //   _localRenderer = RTCVideoRenderer();
     //   await _localRenderer!.initialize();
     // }
-    _localRenderer!.srcObject = stream;
+    _localRenderer.srcObject = stream;
   }
 
   void _onAddRemoteStream(id, stream) {

@@ -4,17 +4,16 @@ import 'package:amiapp/helpers/widget_util.dart';
 
 class CustomNavBarWidget extends StatelessWidget {
   final int selectedIndex;
-  final List<PersistentBottomNavBarItem> items; // NOTE: You CAN declare your own model here instead of `PersistentBottomNavBarItem`.
+  final List<PersistentBottomNavBarItem>
+      items; // NOTE: You CAN declare your own model here instead of `PersistentBottomNavBarItem`.
   final ValueChanged<int>? onItemSelected;
 
-  CustomNavBarWidget(
-      {
-        Key? key,
-        required this.selectedIndex,
-        required this.items,
-        this.onItemSelected,
-      }
-      );
+  const CustomNavBarWidget({
+    Key? key,
+    required this.selectedIndex,
+    required this.items,
+    this.onItemSelected,
+  }) : super(key: key);
 
   Widget _buildItem(PersistentBottomNavBarItem item, bool isSelected) {
     return Container(
@@ -43,14 +42,14 @@ class CustomNavBarWidget extends StatelessWidget {
               type: MaterialType.transparency,
               child: FittedBox(
                   child: Text(
-                    item.title!,
-                    style: TextStyle(
-                        color: isSelected
-                            ? (item.activeColorSecondary ?? item.activeColorPrimary)
-                            : item.inactiveColorPrimary,
-                        fontWeight: FontWeight.w400,
-                        fontSize: 12.0),
-                  )),
+                item.title!,
+                style: TextStyle(
+                    color: isSelected
+                        ? (item.activeColorSecondary ?? item.activeColorPrimary)
+                        : item.inactiveColorPrimary,
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12.0),
+              )),
             ),
           )
         ],

@@ -8,6 +8,8 @@ import '../../services/peer_service.dart';
 import '../../services/socket_io_service.dart';
 
 class FamilyTalkPage extends StatefulWidget {
+  const FamilyTalkPage({super.key});
+
   @override
   _FamilyTalkPageState createState() => _FamilyTalkPageState();
 }
@@ -52,7 +54,7 @@ class _FamilyTalkPageState extends State<FamilyTalkPage> with SocketIOServiceDel
       _init = false;
       AppManager.setStatusBarHidden(false);
 
-      print('発信中 ' + AppManager.selectUser!.id);
+      print('発信中 ${AppManager.selectUser!.id}');
       _call();
     }
   }
@@ -331,17 +333,17 @@ class _FamilyTalkPageState extends State<FamilyTalkPage> with SocketIOServiceDel
   void onMessage(data) {
     var id = data['id'];
     if (id == 'callResponse') {
-      var response = (data["response"] == null ? '' : data["response"]);
+      var response = (data["response"] ?? '');
       if (response != 'accepted') {
         return;
       }
-      var to = (data["to"] == null ? '' : data["to"]);
-      var sdp = (data["sdpOffer"] == null ? '' : data["sdpOffer"]);
+      var to = (data["to"] ?? '');
+      var sdp = (data["sdpOffer"] ?? '');
       print('callresponse $to');
       _onCallResponse(to, sdp);
     } else if (id == 'startCommunication') {
-      var sdp = (data["sdpAnswer"] == null ? '' : data["sdpAnswer"]);
-      var to = (data["to"] == null ? '' : data["to"]);
+      var sdp = (data["sdpAnswer"] ?? '');
+      var to = (data["to"] ?? '');
       _onStartCommunication(to, sdp);
     } else if (id == 'iceCandidate') {
       var from = data["from"];
@@ -407,7 +409,7 @@ class _FamilyTalkPageState extends State<FamilyTalkPage> with SocketIOServiceDel
   }
 
   void _onAddRemoteStream(id, stream) {
-    print('onremote stream $id ' + AppManager.talkId1 + ', ' + AppManager.talkId2);
+    print('onremote stream $id ${AppManager.talkId1}, ${AppManager.talkId2}');
     if (id == AppManager.talkId1) {
       _remoteRenderer.srcObject = stream;
     }

@@ -1,13 +1,11 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 
 class BiosilverPopupWidget extends StatefulWidget {
   final String udid;
   final List<dynamic> alerts;
   final Function onClose;
 
-  BiosilverPopupWidget({required this.udid, required this.alerts, required this.onClose});
+  const BiosilverPopupWidget({super.key, required this.udid, required this.alerts, required this.onClose});
 
   @override
   _BiosilverPopupWidgetState createState() => _BiosilverPopupWidgetState();
@@ -127,14 +125,14 @@ class _BiosilverPopupWidgetState extends State<BiosilverPopupWidget> {
                     width: imageWidth,
                     height: 36,
                     child: TextButton(
-                      child: const Text('閉じる'),
                       style: ElevatedButton.styleFrom(
-                        // primary: MyColors.btnGreen,
+                        // backgroundColor: MyColors.btnGreen,
                         // onPrimary: Colors.white,
                       ),
                       onPressed: () async {
                         widget.onClose();
                       },
+                      child: const Text('閉じる'),
                     ),
                   ),
                 ),

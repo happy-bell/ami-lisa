@@ -1,13 +1,10 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' show get;
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/helpers/widget_util.dart';
-import 'package:amiapp/pages/setting/setting_args.dart';
 import 'package:amiapp/services/appmanager.dart';
 import 'package:amiapp/services/audio_service.dart';
 
@@ -15,7 +12,7 @@ class ElanSettingSelectPage extends StatefulWidget {
   final String keyName;
   final String value;
 
-  ElanSettingSelectPage({required this.keyName, required this.value});
+  const ElanSettingSelectPage({super.key, required this.keyName, required this.value});
 
   @override
   ElanSettingSelectPageState createState() => ElanSettingSelectPageState();

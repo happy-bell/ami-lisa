@@ -178,9 +178,9 @@ class AppManager {
     }
     var autoreceiveJson = json.decode(autoreceive);
     if (autoreceiveJson is List) {
-      autoreceiveJson.forEach((value) {
+      for (var value in autoreceiveJson) {
         AppManager.autoreceives[value[0].toString()] = value[1].toString();
-      });
+      }
     }
   }
 
@@ -315,7 +315,7 @@ class AppManager {
 
   static String dateFormat(DateTime datetime, String format) {
     initializeDateFormatting("ja_JP");
-    var formatter = new DateFormat(format, "ja_JP");
+    var formatter = DateFormat(format, "ja_JP");
     var formatted = formatter.format(datetime); // DateからString
     return formatted;
   }
