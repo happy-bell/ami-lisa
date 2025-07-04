@@ -33,7 +33,10 @@ class ManagerPage extends StatefulWidget {
 }
 
 class _ManagerPageState extends State<ManagerPage>
-    with WidgetsBindingObserver, SocketIOServiceDelegate, SensorServiceDelegate {
+    with
+        WidgetsBindingObserver,
+        SocketIOServiceDelegate,
+        SensorServiceDelegate {
   bool _init = true;
   String _version = '1.0';
   SocketIOService socketservice = SocketIOService();
@@ -80,19 +83,21 @@ class _ManagerPageState extends State<ManagerPage>
       if (socketservice.connected) {
         _isconnect = true;
         Future(() {
-          socketservice.io.emit("clients_status", [AppManager.settings['addressGroup']]);
+          socketservice.io
+              .emit("clients_status", [AppManager.settings['addressGroup']]);
         });
       }
 
       _version = await AppManager.appVersion();
 
-      if (AppManager.appsettings['SENSOR1'] == '1' || AppManager.appsettings['SENSOR2'] == '1' || AppManager.appsettings['SENSOR3'] == '1' || AppManager.appsettings['SENSOR5'] == '1') {
+      if (AppManager.appsettings['SENSOR1'] == '1' ||
+          AppManager.appsettings['SENSOR2'] == '1' ||
+          AppManager.appsettings['SENSOR3'] == '1' ||
+          AppManager.appsettings['SENSOR5'] == '1') {
         sensorService.startWatch();
       }
 
-      setState(() {
-
-      });
+      setState(() {});
     }
   }
 
@@ -104,7 +109,9 @@ class _ManagerPageState extends State<ManagerPage>
     // });
     if (state == AppLifecycleState.resumed) {
       // print('resumed');
-      if (AppManager.appsettings['SENSOR1'] == '1' || AppManager.appsettings['SENSOR2'] == '1' || AppManager.appsettings['SENSOR3'] == '1') {
+      if (AppManager.appsettings['SENSOR1'] == '1' ||
+          AppManager.appsettings['SENSOR2'] == '1' ||
+          AppManager.appsettings['SENSOR3'] == '1') {
         sensorService.startWatch();
       }
 
@@ -397,70 +404,70 @@ class _ManagerPageState extends State<ManagerPage>
           Container(width: 5.0),
           Center(
               child: GestureDetector(
-                child: Image.asset(
-                  'assets/images/service/sc_video.png',
-                  width: buttonWidth,
-                  height: buttonHeight,
-                ),
-                onTap: () {
-                  _selectAddress(address);
-                },
-              )),
+            child: Image.asset(
+              'assets/images/service/sc_video.png',
+              width: buttonWidth,
+              height: buttonHeight,
+            ),
+            onTap: () {
+              _selectAddress(address);
+            },
+          )),
           Container(width: 5.0),
           issensor2
               ? Center(
-            child: GestureDetector(
-              child: Image.asset(
-                'assets/images/service/sc_pir.png',
-                width: buttonWidth,
-                height: buttonHeight,
-              ),
-              onTap: () {
-                _graphButton(address, "2");
-              },
-            ),
-          )
+                  child: GestureDetector(
+                    child: Image.asset(
+                      'assets/images/service/sc_pir.png',
+                      width: buttonWidth,
+                      height: buttonHeight,
+                    ),
+                    onTap: () {
+                      _graphButton(address, "2");
+                    },
+                  ),
+                )
               : Container(width: buttonWidth),
           Container(width: 5.0),
           issensor1
               ? Center(
-              child: GestureDetector(
-                child: Image.asset(
-                  'assets/images/service/sc_alert_H.png',
-                  width: buttonWidth,
-                  height: buttonHeight,
-                ),
-                onTap: () {
-                  _graphButton(address, "1");
-                },
-              ))
+                  child: GestureDetector(
+                  child: Image.asset(
+                    'assets/images/service/sc_alert_H.png',
+                    width: buttonWidth,
+                    height: buttonHeight,
+                  ),
+                  onTap: () {
+                    _graphButton(address, "1");
+                  },
+                ))
               : Container(width: buttonWidth),
           Container(width: 5.0),
           issensor3
               ? Center(
-              child: GestureDetector(
-                child: Image.asset(
-                  'assets/images/service/sc_flame.png',
-                  width: buttonWidth,
-                  height: buttonHeight,
-                ),
-                onTap: () {
-                  _graphButton(address, "3");
-                },
-              ))
+                  child: GestureDetector(
+                  child: Image.asset(
+                    'assets/images/service/sc_flame.png',
+                    width: buttonWidth,
+                    height: buttonHeight,
+                  ),
+                  onTap: () {
+                    _graphButton(address, "3");
+                  },
+                ))
               : Container(width: buttonWidth),
           issensor4
               ? Center(
-              child: GestureDetector(
-                child: Image.asset(
-                  'assets/images/service/sc_co2.png',
-                  width: buttonWidth,
-                  height: buttonHeight,
-                ),
-                onTap: () {
-                  _graphButton(address, "4");
-                },
-              ))
+                  child: GestureDetector(
+                  child: Image.asset(
+                    'assets/images/service/sc_co2.png',
+                    width: buttonWidth,
+                    height: buttonHeight,
+                  ),
+                  onTap: () {
+                    _graphButton(address, "4");
+                  },
+                ))
               : Container(width: buttonWidth),
         ],
       ),
@@ -484,7 +491,8 @@ class _ManagerPageState extends State<ManagerPage>
           padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8),
           decoration: const BoxDecoration(
             border: Border(
-              bottom: BorderSide(color: Color.fromARGB(255, 80, 80, 80), width: 0.5),
+              bottom: BorderSide(
+                  color: Color.fromARGB(255, 80, 80, 80), width: 0.5),
             ),
           ),
           child: Row(
@@ -527,7 +535,8 @@ class _ManagerPageState extends State<ManagerPage>
     var id1 = AppManager.myId;
     var id2 = address.id;
     var name = address.name;
-    var url = "${AppDefine.baseURL}talk_history.php?cd=$cd&id1=$id1&id2=$id2&na=$name";
+    var url =
+        "${AppDefine.baseURL}talk_history.php?cd=$cd&id1=$id1&id2=$id2&na=$name";
     print(url);
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -560,9 +569,7 @@ class _ManagerPageState extends State<ManagerPage>
       }
     }
     // print(_callStatuses);
-    setState(() {
-
-    });
+    setState(() {});
   }
 
   Future<void> _graphButton(Address address, String sensorType) async {
@@ -589,46 +596,44 @@ class _ManagerPageState extends State<ManagerPage>
 
     AppManager.selectUser = null;
     biosilverPopup = null;
-    setState(() {
-
-    });
+    setState(() {});
   }
 
   Future<void> _selectAddress(Address address) async {
     print(address.id);
     if (address.id.endsWith('_STAFF')) {
       AppManager.selectUser = address;
-      await Navigator.of(context, rootNavigator: true)
-          .push(
-          PageRouteBuilder(
-            pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-              return StaffTalkViewPage();
-            },
-            transitionDuration: Duration.zero,
-            reverseTransitionDuration: Duration.zero,
-            fullscreenDialog: true,
-          )
-      );
+      await Navigator.of(context, rootNavigator: true).push(PageRouteBuilder(
+        pageBuilder: (BuildContext context, Animation<double> animation1,
+            Animation<double> animation2) {
+          return StaffTalkViewPage();
+        },
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        fullscreenDialog: true,
+      ));
       return;
     }
     AppManager.selectCode = address.code;
-    await Navigator.of(context, rootNavigator: true)
-        .push(
-        PageRouteBuilder(
-          pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-            return StaffPage();
-          },
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-          fullscreenDialog: true,
-        )
-    );
+    await Navigator.of(context, rootNavigator: true).push(PageRouteBuilder(
+      pageBuilder: (BuildContext context, Animation<double> animation1,
+          Animation<double> animation2) {
+        return StaffPage();
+      },
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+      fullscreenDialog: true,
+    ));
     return;
     audio.stopButtonCall();
 
     if (address.sensors.isNotEmpty) {
       setState(() {
-        biosilverPopup = BiosilverPopupWidget(udid: address.id, alerts: address.sensors, onClose: () => {_biosilverOnClose()},);
+        biosilverPopup = BiosilverPopupWidget(
+          udid: address.id,
+          alerts: address.sensors,
+          onClose: () => {_biosilverOnClose()},
+        );
       });
       return;
     }
@@ -641,17 +646,15 @@ class _ManagerPageState extends State<ManagerPage>
       return;
     }
 
-    await Navigator.of(context, rootNavigator: true)
-        .push(
-        PageRouteBuilder(
-          pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-            return StaffTalkViewPage();
-          },
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-          fullscreenDialog: true,
-        )
-    );
+    await Navigator.of(context, rootNavigator: true).push(PageRouteBuilder(
+      pageBuilder: (BuildContext context, Animation<double> animation1,
+          Animation<double> animation2) {
+        return StaffTalkViewPage();
+      },
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+      fullscreenDialog: true,
+    ));
 
     // TODO: implement sensorService
     sensorService.clearAlert(address.id);
@@ -675,16 +678,14 @@ class _ManagerPageState extends State<ManagerPage>
   Future<void> _toSetting() async {
     _disconnect();
     context.read<AddressStore>().clear();
-    await Navigator.of(context, rootNavigator: true)
-        .push(
-        PageRouteBuilder(
-          pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-            return SettingPage();
-          },
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-        )
-    );
+    await Navigator.of(context, rootNavigator: true).push(PageRouteBuilder(
+      pageBuilder: (BuildContext context, Animation<double> animation1,
+          Animation<double> animation2) {
+        return SettingPage();
+      },
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+    ));
   }
 
   Future<void> _toMeet() async {
@@ -709,227 +710,232 @@ class _ManagerPageState extends State<ManagerPage>
     const iconSize = 50.0;
     var connectMyId = AppManager.myId;
     if (AppDefine.amiApp && AppManager.settings["DELEGATORCODE"] != null) {
-      connectMyId = AppManager.myId.replaceAll(AppManager.settings["DELEGATORCODE"] + "_", "");
+      connectMyId = AppManager.myId
+          .replaceAll(AppManager.settings["DELEGATORCODE"] + "_", "");
     }
     var callStatusBoxMaxHeight = MediaQuery.of(context).size.height - 80;
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: LayoutBuilder(
-            builder: (context, constraints) {
-              var spanaSize = Size(51, 36);
-              const gridPadding = 4.0;
-              var gridSpacing = 10.0;
-              var cols = 3;
-              var maxWidth = constraints.maxWidth;
-              if (maxWidth > 500) {
-                cols = 5;
-                spanaSize = Size(60, 45);
-              }
-              var colWidth =
-                  (maxWidth - (gridSpacing * (cols - 1) + gridPadding * 2)) /
-                      cols;
-              var colHeight = (colWidth / 3 * 2) + 20;
+        child: LayoutBuilder(builder: (context, constraints) {
+          var spanaSize = Size(51, 36);
+          const gridPadding = 4.0;
+          var gridSpacing = 10.0;
+          var cols = 3;
+          var maxWidth = constraints.maxWidth;
+          if (maxWidth > 500) {
+            cols = 5;
+            spanaSize = Size(60, 45);
+          }
+          var colWidth =
+              (maxWidth - (gridSpacing * (cols - 1) + gridPadding * 2)) / cols;
+          var colHeight = (colWidth / 3 * 2) + 20;
 
-              if (_islist) {
-                cols = 1;
-                colWidth = maxWidth;
-                colHeight = 50;
-                gridSpacing = 0.0;
-                if (maxWidth > 500) {
-                  colHeight = 80;
-                }
-              }
+          if (_islist) {
+            cols = 1;
+            colWidth = maxWidth;
+            colHeight = 50;
+            gridSpacing = 0.0;
+            if (maxWidth > 500) {
+              colHeight = 80;
+            }
+          }
 
-              var gridRatio = colWidth / colHeight;
+          var gridRatio = colWidth / colHeight;
 
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  Consumer<AddressStore>(
-                    builder: (context, addressStore, _) {
-                      return GridView.extent(
-                        maxCrossAxisExtent: colWidth,
-                        padding: const EdgeInsets.only(
-                          left: gridPadding,
-                          right: gridPadding,
-                          bottom: iconSize,
-                        ),
-                        mainAxisSpacing: gridSpacing,
-                        crossAxisSpacing: gridSpacing,
-                        childAspectRatio: gridRatio,
-                        children: addressStore.managerList()
-                            .map((data) => _addressCell(data))
-                            .toList(),
-                      );
-                    },
-                  ),
-                  Positioned(
-                    top: constraints.maxHeight - iconSize,
-                    left: 0,
-                    width: constraints.maxWidth,
-                    height: iconSize,
-                    // right: constraints.maxWidth,
-                    child: Container(
-                      color: Colors.black,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Consumer<AddressStore>(
+                builder: (context, addressStore, _) {
+                  return GridView.extent(
+                    maxCrossAxisExtent: colWidth,
+                    padding: const EdgeInsets.only(
+                      left: gridPadding,
+                      right: gridPadding,
+                      bottom: iconSize,
+                    ),
+                    mainAxisSpacing: gridSpacing,
+                    crossAxisSpacing: gridSpacing,
+                    childAspectRatio: gridRatio,
+                    children: addressStore
+                        .managerList()
+                        .map((data) => _addressCell(data))
+                        .toList(),
+                  );
+                },
+              ),
+              Positioned(
+                top: constraints.maxHeight - iconSize,
+                left: 0,
+                width: constraints.maxWidth,
+                height: iconSize,
+                // right: constraints.maxWidth,
+                child: Container(
+                  color: Colors.black,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 30,
-                                child: Image.asset(_isconnect
-                                    ? 'assets/images/led/ledG.png'
-                                    : 'assets/images/led/led2.png'),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 4.0),
-                                child: Text(
-                                  '${_isconnect ? 'ON' : 'OFF'} LINE $connectMyId',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          SizedBox(
+                            width: 30,
+                            child: Image.asset(_isconnect
+                                ? 'assets/images/led/ledG.png'
+                                : 'assets/images/led/led2.png'),
                           ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              SizedBox(
-                                width: 64.0,
-                                height: iconSize - 20.0,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    foregroundColor: Colors.white, backgroundColor: Colors.blue,
-                                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: const Text("Web会議",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  onPressed: () async {
-                                    _toMeet();
-                                  },
-                                ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4.0),
+                            child: Text(
+                              '${_isconnect ? 'ON' : 'OFF'} LINE $connectMyId',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
                               ),
-                              const SizedBox(width: 8,),
-                              SizedBox(
-                                width: 50.0,
-                                height: iconSize - 20.0,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.grey,
-                                    foregroundColor: Colors.white,
-                                    padding: EdgeInsets.symmetric(horizontal: 2),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: const Text("表示",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.white,
-                                    ),),
-                                  onPressed: () async {
-                                    setState(() {
-                                      _islist = !_islist;
-                                    });
-                                  },
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                    left: 4.0, right: 4.0, top: 8.0),
-                                child: Text(
-                                  'Ver. $_version',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () {
-                                  _toSetting();
-                                },
-                                child: Image.asset(
-                                  'assets/images/spana2.png',
-                                  width: spanaSize.width,
-                                  height: spanaSize.height,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                  if (biosilverPopup != null)
-                    biosilverPopup!,
-                  if (_callStatuses.isNotEmpty)
-                    ... [
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _callStatuses.clear();
-                          });
-                        },
-                        child: Opacity(
-                          opacity: 0.5,
-                          child: Container(
-                            color: Colors.grey,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          SizedBox(
+                            width: 64.0,
+                            height: iconSize - 20.0,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                backgroundColor: Colors.blue,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 2),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                "Web会議",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              onPressed: () async {
+                                _toMeet();
+                              },
+                            ),
                           ),
-                        ),
-                      ),
-                      Center(
-                        child: Container(
-                          width: 400,
-                          height: 100.0 * _callStatuses.length + 48,
-                          color: Colors.white,
-                          constraints: BoxConstraints(
-                            maxHeight: callStatusBoxMaxHeight,
+                          const SizedBox(
+                            width: 8,
                           ),
-                          child: ListView.builder(
-                            itemBuilder: (BuildContext context, int index) {
-                              if (index == 0) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8),
-                                    decoration: const BoxDecoration(
-                                        border: Border(
-                                          bottom: BorderSide(
-                                            color: Colors.grey,
-                                            width: 0.5,
-                                          ),
-                                        )
-                                    ),
-                                    child: Center(child: WidgetUtil.basicText('CALL STATUS')),
-                                  ),
-                                );
-                              }
-                              return _callStatusPopupListItem(index - 1);
+                          SizedBox(
+                            width: 50.0,
+                            height: iconSize - 20.0,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(horizontal: 2),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                "表示",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              onPressed: () async {
+                                setState(() {
+                                  _islist = !_islist;
+                                });
+                              },
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(
+                                left: 4.0, right: 4.0, top: 8.0),
+                            child: Text(
+                              'Ver. $_version',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              _toSetting();
                             },
-                            itemCount: _callStatuses.length + 1,
+                            child: Image.asset(
+                              'assets/images/spana2.png',
+                              width: spanaSize.width,
+                              height: spanaSize.height,
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
-                ],
-              );
-            }
-        ),
+                  ),
+                ),
+              ),
+              if (biosilverPopup != null) biosilverPopup!,
+              if (_callStatuses.isNotEmpty) ...[
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _callStatuses.clear();
+                    });
+                  },
+                  child: Opacity(
+                    opacity: 0.5,
+                    child: Container(
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Container(
+                    width: 400,
+                    height: 100.0 * _callStatuses.length + 48,
+                    color: Colors.white,
+                    constraints: BoxConstraints(
+                      maxHeight: callStatusBoxMaxHeight,
+                    ),
+                    child: ListView.builder(
+                      itemBuilder: (BuildContext context, int index) {
+                        if (index == 0) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4.0, vertical: 8),
+                              decoration: const BoxDecoration(
+                                  border: Border(
+                                bottom: BorderSide(
+                                  color: Colors.grey,
+                                  width: 0.5,
+                                ),
+                              )),
+                              child: Center(
+                                  child: WidgetUtil.basicText('CALL STATUS')),
+                            ),
+                          );
+                        }
+                        return _callStatusPopupListItem(index - 1);
+                      },
+                      itemCount: _callStatuses.length + 1,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        }),
       ),
     );
   }
@@ -969,25 +975,23 @@ class _ManagerPageState extends State<ManagerPage>
       setState(() {
         _isconnect = true;
       });
-      socketservice.io.emit("clients_status", [AppManager.settings['addressGroup']]);
+      socketservice.io
+          .emit("clients_status", [AppManager.settings['addressGroup']]);
       // TODO: implement _checkFcm
       // _checkFcm();
       // TODO: implement _checkPushSensor
       // _checkPushSensor();
-    }
-    else if (message == 'clients_status') {
+    } else if (message == 'clients_status') {
       var statuses = data['data'];
       statuses.forEach((udid, value) {
         _setAddressStatus(udid, value['status']);
       });
-    }
-    else if (message == 'login') {
+    } else if (message == 'login') {
       if (data['info']['client']['udid'] != null) {
         var udid = data['info']['client']['udid'];
         _setAddressStatus(udid, data['info']['client']['status']);
       }
-    }
-    else if (message == 'status_change') {
+    } else if (message == 'status_change') {
       if (data["info"]["MYID"] != null && data["info"]["STATUS"] != null) {
         if (!mounted) {
           return;
@@ -1008,8 +1012,7 @@ class _ManagerPageState extends State<ManagerPage>
         }
         _setAddressStatus(data["info"]["MYID"], data["info"]["STATUS"]);
       }
-    }
-    else if (message == 'viewcan_image') {
+    } else if (message == 'viewcan_image') {
       if (data["info"] == null) {
         return;
       }
@@ -1033,8 +1036,7 @@ class _ManagerPageState extends State<ManagerPage>
       var image64 = image.replaceAll("\r\n", "");
       // print(image64);
       addressStore.setLiveImage(udid, image64);
-    }
-    else if (message == 'call') {
+    } else if (message == 'call') {
       if (data["info"]["udid"] == null) {
         return;
       }
@@ -1055,7 +1057,8 @@ class _ManagerPageState extends State<ManagerPage>
       } else {
         if (AppManager.appsettings["AUTO_RECEIVE"] == '1') {
           if (AppManager.selectUser == null) {
-            var address = context.read<AddressStore>().find(data["info"]["udid"]);
+            var address =
+                context.read<AddressStore>().find(data["info"]["udid"]);
             if (address != null) {
               AppManager.autoReceiveId = address.id;
               _selectAddress(address);
@@ -1066,8 +1069,7 @@ class _ManagerPageState extends State<ManagerPage>
         audio.ringtone();
       }
       _openCallStatusPopup();
-    }
-    else if (message == 'call_cancel') {
+    } else if (message == 'call_cancel') {
       if (data["udid"] == null) {
         return;
       }
@@ -1081,12 +1083,10 @@ class _ManagerPageState extends State<ManagerPage>
   }
 
   @override
-  void onMessage(data) {
-  }
+  void onMessage(data) {}
 
   @override
-  void onTalkMessage(data) {
-  }
+  void onTalkMessage(data) {}
 
   @override
   void onSensorAlertsChange() {

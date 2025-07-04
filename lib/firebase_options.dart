@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -28,15 +25,9 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -50,23 +41,51 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCS0SggiaEB61WiKbI20nbI7k5ZsnV0_XM',
-    appId: '1:871225930361:android:9b389be51eb68acf931aa8',
-    messagingSenderId: '871225930361',
-    projectId: 'frinurse',
-    databaseURL: 'https://frinurse.firebaseio.com',
-    storageBucket: 'frinurse.appspot.com',
+    apiKey: 'AIzaSyC4taodpKyludcxLWfA76ejVvWe7gTp3hY',
+    appId: '1:764771508054:android:075ec27533317ac8b4c0f7',
+    messagingSenderId: '764771508054',
+    projectId: 'ami-style',
+    storageBucket: 'ami-style.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCXGE0Z1cKJa3hJ8CyKAadd28dcFcVCWOI',
-    appId: '1:871225930361:ios:6a7bdcab4502722c931aa8',
-    messagingSenderId: '871225930361',
-    projectId: 'frinurse',
-    databaseURL: 'https://frinurse.firebaseio.com',
-    storageBucket: 'frinurse.appspot.com',
-    androidClientId: '871225930361-b4au5v3tkjqmgrencu5p2e2lkeutsfhr.apps.googleusercontent.com',
-    iosClientId: '871225930361-f53prj32qpg3nomdt2ou0bp1hgbgtti4.apps.googleusercontent.com',
-    iosBundleId: 'jp.dell-inc.so.test',
+    apiKey: 'AIzaSyAo04zrgYfi2dF1lsbaZu-QA9GfP_yhhYs',
+    appId: '1:764771508054:ios:d31d4fe01d2be377b4c0f7',
+    messagingSenderId: '764771508054',
+    projectId: 'ami-style',
+    storageBucket: 'ami-style.firebasestorage.app',
+    androidClientId: '764771508054-66k1jkb73opgdempo8jm5lj0ft17uc26.apps.googleusercontent.com',
+    iosBundleId: 'jp.amiplus.mulch',
   );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyBeTWm-abEMd6vB9OdiiYyfNqnrjmysQjk',
+    appId: '1:764771508054:web:57956be7f3a05061b4c0f7',
+    messagingSenderId: '764771508054',
+    projectId: 'ami-style',
+    authDomain: 'ami-style.firebaseapp.com',
+    storageBucket: 'ami-style.firebasestorage.app',
+    measurementId: 'G-53GZL7Z3V2',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyAo04zrgYfi2dF1lsbaZu-QA9GfP_yhhYs',
+    appId: '1:764771508054:ios:e20956b073daa490b4c0f7',
+    messagingSenderId: '764771508054',
+    projectId: 'ami-style',
+    storageBucket: 'ami-style.firebasestorage.app',
+    androidClientId: '764771508054-66k1jkb73opgdempo8jm5lj0ft17uc26.apps.googleusercontent.com',
+    iosBundleId: 'jp.amiplus.amiapp',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyBeTWm-abEMd6vB9OdiiYyfNqnrjmysQjk',
+    appId: '1:764771508054:web:d58a98d19b57536eb4c0f7',
+    messagingSenderId: '764771508054',
+    projectId: 'ami-style',
+    authDomain: 'ami-style.firebaseapp.com',
+    storageBucket: 'ami-style.firebasestorage.app',
+    measurementId: 'G-ETN8XGFH10',
+  );
+
 }
