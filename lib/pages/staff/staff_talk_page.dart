@@ -310,6 +310,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     context.read<AddressStore>().setCalled(AppManager.selectUser!.id, 0);
     setAppStatus(AppStatus.Talk);
     audio.stopCall();
+    // 通話開始時に必ず着信音を停止（デフォルト着信音対応）
+    audio.stopRingtone();
     // _onTalking();
   }
 
