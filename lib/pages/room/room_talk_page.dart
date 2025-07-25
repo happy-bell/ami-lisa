@@ -270,6 +270,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
     _callendIsEnabled = true;
     setAppStatus(AppStatus.Talk);
     audio.stopCall();
+    audio.stopRingtone(); // 通話開始時に必ず着信音を停止
   }
 
   void _cancelCall({bool isClose = true}) {

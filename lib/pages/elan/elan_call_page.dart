@@ -356,6 +356,8 @@ class ElanCallPageState extends State<ElanCallPage>
     context.read<AddressStore>().setCalled(AppManager.selectUser!.id, 0);
     setAppStatus(AppStatus.Talk);
     audio.stopCall();
+    // 通話開始時に必ず着信音を停止（デフォルト着信音対応）
+    audio.stopRingtone();
     peer.enableSpeaker(true);
     // _onTalking();
   }
