@@ -1,0 +1,16 @@
+{
+  "PRODUCT": "tCk0iYs9",
+  "MASTERID": "LkdR7nYeK3",
+  "CODE": "tCk0iYs9",
+  "CLINICID": "",
+  "TCPPORT": "55045",
+  "UDPPORT": "55045",
+  "INADDR_ANY": true,
+  "AMI_TOKEN": "xP2tWdDbTn6cuZmCAr4FWkgqCm6WG9b8",
+  "GCM_API_KEY": "",
+  "SSLUSE": true,
+  "SSLKEY": "/var/ssl/ssl.key",
+  "SSLCERT": "/var/ssl/server.crt",
+  "SSLCA": "/var/ssl/ca.crt",
+  "FIREBASE": "/var/firebase/ami-style-30957c800fa7.json"
+}

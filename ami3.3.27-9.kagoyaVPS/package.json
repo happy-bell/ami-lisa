@@ -1,0 +1,33 @@
+{
+  "name": "frinurse_delegator",
+  "version": "0.0.1",
+  "description": "",
+  "main": "delegator.js",
+  "dependencies": {
+    "body-parser": "*",
+    "config": "^1.25.1",
+    "cookie-parser": "*",
+    "ejs": "*",
+    "express": "*",
+    "express-session": "*",
+    "firebase-admin": "^11.10.1",
+    "mongoose": "*",
+    "node-gcm": "^0.14.4",
+    "request": "*",
+    "socket.io": "^3.1.2",
+    "sync-request": "^4.1.0"
+  },
+  "dependencies2": {
+    "sticky-session": "*",
+    "netmask": "^1.0.6",
+    "pm2": "*",
+    "sleep": "*"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node delegator.js"
+  },
+  "author": "",
+  "license": "ISC"
+}
