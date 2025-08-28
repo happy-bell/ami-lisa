@@ -6,8 +6,9 @@ import 'firebase_options.dart';
 import 'package:amiapp/app.dart';
 import 'package:amiapp/notifiers/address_notifier.dart';
 import 'package:amiapp/services/appmanager.dart';
-
 import 'notifiers/app_notifier.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -24,33 +25,36 @@ void main() async {
     name: 'jpfrinurse',
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  final messaging = FirebaseMessaging.instance;
-  await messaging.requestPermission(
-    alert: true,
-    announcement: false,
-    badge: true,
-    carPlay: false,
-    criticalAlert: false,
-    provisional: false,
-    sound: true,
-  );
-  try {
-    final token = await messaging.getToken();
-    if (token != null) {
-      AppManager.fcmtoken = token;
+
+  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    final messaging = FirebaseMessaging.instance;
+    await messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+    try {
+      final token = await messaging.getToken();
+      if (token != null) {
+        AppManager.fcmtoken = token;
+      }
+      print('FCM TOKEN: $token');
+    } catch (e) {
+      print(e);
     }
-    print('FCM TOKEN: $token');
-  } catch (e) {
-    print(e);
   }
-  runApp(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => AppStore()),
-          ChangeNotifierProvider(create: (_) => AddressStore()),
-        ],
-        child: App(),
-      )
-  );
+
+  runApp(MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => AppStore()),
+      ChangeNotifierProvider(create: (_) => AddressStore()),
+    ],
+    child: App(),
+  ));
 }

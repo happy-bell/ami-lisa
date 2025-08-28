@@ -4,6 +4,8 @@ import 'dart:math';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' as io;
 import 'package:amiapp/pages/staff/staff_album_web_page.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +28,9 @@ import '../../helpers/widget_util.dart';
 import '../../services/socket_service.dart';
 import '../../widgets/sensor_view_widget.dart';
 
+bool get isDesktop =>
+    (!kIsWeb) && (io.Platform.isMacOS || io.Platform.isWindows);
+
 class StaffTalkViewPage extends StatefulWidget {
   const StaffTalkViewPage({super.key});
 
@@ -34,7 +39,10 @@ class StaffTalkViewPage extends StatefulWidget {
 }
 
 class StaffTalkViewPageState extends State<StaffTalkViewPage>
-    with SocketIOServiceDelegate, SocketServiceDelegate, PaintControllerDelegate {
+    with
+        SocketIOServiceDelegate,
+        SocketServiceDelegate,
+        PaintControllerDelegate {
   bool _init = true;
   Peer peer = Peer();
   late Address _address;
@@ -57,6 +65,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   String _callingId = '';
   String _callingName = '';
   AnimationController? _blinkAnimationController;
+
   /// 画像共有
   ui.Image? _shareImage;
   bool _drawing = false;
@@ -87,13 +96,15 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     peer.onAddRemoteStream = _onAddRemoteStream;
     peer.onIceCandidate = _onIceCandidate;
     _initRenderers();
+    _prepareDesktopMedia();
 
     AppManager.isMute = false;
     AppManager.isVideoMute = false;
 
     Future(() async {
       var statusImage = '';
-      var address = context.read<AddressStore>().find(AppManager.selectUser!.id);
+      var address =
+          context.read<AddressStore>().find(AppManager.selectUser!.id);
       if (address != null) {
         _address = address;
         if (_address.id == AppManager.autoReceiveId) {
@@ -138,7 +149,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       _init = false;
       AppManager.setStatusBarHidden(false);
 
-      var address = context.read<AddressStore>().find(AppManager.selectUser!.id);
+      var address =
+          context.read<AddressStore>().find(AppManager.selectUser!.id);
       if (address == null) {
         _close();
       }
@@ -171,6 +183,25 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
     await _remote2Renderer.initialize();
+  }
+
+  Future<void> _prepareDesktopMedia() async {
+    if (!isDesktop) return; // モバイルは従来処理に任せる
+
+    final mediaConstraints = {
+      'audio': true,
+      'video': {
+        'width': 1280,
+        'height': 720,
+        'frameRate': 30,
+        'facingMode': 'user',
+      }
+    };
+
+    final stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+
+    peer.setLocalStream(stream);
+    _localRenderer.srcObject = stream;
   }
 
   void setAppStatus(newstatus) {
@@ -276,13 +307,15 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
 
     print("call to ${AppManager.selectUser!.id}");
 
-    _rusuTimer = Timer.periodic(Duration(milliseconds: AppDefine.absenceSec1), (Timer timer) {
+    _rusuTimer = Timer.periodic(Duration(milliseconds: AppDefine.absenceSec1),
+        (Timer timer) {
       _cancelcall();
       setState(() {
         _statusImage = ImageName.rusu;
       });
 
-      _rusuTimer = Timer.periodic(Duration(milliseconds: AppDefine.absenceSec2), (Timer timer) {
+      _rusuTimer = Timer.periodic(Duration(milliseconds: AppDefine.absenceSec2),
+          (Timer timer) {
         _close();
       });
     });
@@ -409,7 +442,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   }
 
   void _receiveHangup(String from) {
-    print("****************     receiveHangup: $from   talkId1 = ${AppManager.talkId1}   ********************************");
+    print(
+        "****************     receiveHangup: $from   talkId1 = ${AppManager.talkId1}   ********************************");
     AppStatus newStatus = AppStatus.None;
 
     if (AppManager.holdId == from) {
@@ -458,14 +492,16 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       return;
     }
 
-    var result = await WidgetUtil.showSimpleConfirmDialog(context, '録画を開始しますか？');
+    var result =
+        await WidgetUtil.showSimpleConfirmDialog(context, '録画を開始しますか？');
     if (result) {
       _requestRecord();
     }
   }
 
   Future<void> _recordEnd() async {
-    var result = await WidgetUtil.showSimpleConfirmDialog(context, '録画を終了しますか？');
+    var result =
+        await WidgetUtil.showSimpleConfirmDialog(context, '録画を終了しますか？');
     if (result) {
       socketservice.io.emit("record_stop", [
         {"to": AppManager.talkId1, "recid": AppManager.recordId}
@@ -475,7 +511,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   }
 
   void _requestRecord() {
-    var recId = '${AppManager.myId}_${AppManager.dateFormat(DateTime.now(), "yyyyMMddHHmmss")}';
+    var recId =
+        '${AppManager.myId}_${AppManager.dateFormat(DateTime.now(), "yyyyMMddHHmmss")}';
     var sendData = {'recid': recId, 'to': AppManager.talkId1};
     socketservice.io.emit("request_record", [sendData]);
     AppManager.recordId = '${recId}_1';
@@ -528,11 +565,13 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     }
     print('start record');
     if (AppManager.recordId.isEmpty) {
-      var recId = '${AppManager.myId}_${AppManager.dateFormat(DateTime.now(), "yyyyMMddHHmmss")}';
+      var recId =
+          '${AppManager.myId}_${AppManager.dateFormat(DateTime.now(), "yyyyMMddHHmmss")}';
       AppManager.recordId = '${recId}_1';
     }
     //self.recordConnectId = "REC_" + Date().toString("yyyyMMddHHmmss") + "_" + appManager.delegatorCode + "_" + appManager.myId
-    AppManager.recordConnectId = 'REC_${AppManager.dateFormat(DateTime.now(), "yyyyMMddHHmmss")}_${AppManager.delegatorCode}_${AppManager.myId}';
+    AppManager.recordConnectId =
+        'REC_${AppManager.dateFormat(DateTime.now(), "yyyyMMddHHmmss")}_${AppManager.delegatorCode}_${AppManager.myId}';
     setState(() {
       _isrecording = true;
     });
@@ -546,7 +585,6 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     } else {
       _connectRecRoom();
     }
-
   }
 
   void _connectRecRoom() {
@@ -697,7 +735,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   void _threewayToCall(String from, String to) async {
     print("_threewayToCall from:$from to:$to, status:${AppManager.status}");
 
-    if (AppManager.status == AppStatus.Multi && (AppManager.myId == from || AppManager.myId == to)) {
+    if (AppManager.status == AppStatus.Multi &&
+        (AppManager.myId == from || AppManager.myId == to)) {
       if (socketioservice != null) {
         socketioservice!.roomDelegate = null;
         socketioservice?.disconnect();
@@ -798,7 +837,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   /// photo and draw
   /// *******************************************************************************************
   void _requestPhoto() async {
-    var confirm = await WidgetUtil.showSimpleConfirmDialog(context, '画像を取得しますか？');
+    var confirm =
+        await WidgetUtil.showSimpleConfirmDialog(context, '画像を取得しますか？');
     if (confirm) {
       _doRequestPhoto("2");
     }
@@ -941,7 +981,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   }
 
   Future<void> _savePhoto() async {
-    var confirm = await WidgetUtil.showSimpleConfirmDialog(context, '画像を保存しますか？');
+    var confirm =
+        await WidgetUtil.showSimpleConfirmDialog(context, '画像を保存しますか？');
     if (confirm) {
       Directory docDir = await getApplicationDocumentsDirectory();
       String directory = "${docDir.path}/album/${AppManager.talkId1}";
@@ -962,7 +1003,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
         _shareImage!, Size(_localCanvasWidth, _localCanvasHeight));
     var pngBytes = await image.toByteData(format: ui.ImageByteFormat.png);
 
-    var filepath = '$directory/${AppManager.dateFormat(DateTime.now(), 'yyyyMMddHHmmss')}.png';
+    var filepath =
+        '$directory/${AppManager.dateFormat(DateTime.now(), 'yyyyMMddHHmmss')}.png';
     File imageFile = File(filepath);
     imageFile.writeAsBytesSync(pngBytes!.buffer.asInt8List());
     // AppManager.toast("保存しました", Colors.blue, Colors.white);
@@ -984,19 +1026,20 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       "ccd": AppManager.settings["MCSCLINICCODE"],
       "mid": AppManager.selectUser!.id,
       "code": AppManager.selectUser!.code,
-      "mst_id": AppManager.selectUser!.id.replaceAll("${AppManager.selectUser!.code}_", ""),
+      "mst_id": AppManager.selectUser!.id
+          .replaceAll("${AppManager.selectUser!.code}_", ""),
       "files0": await MultipartFile.fromFile(filepath, filename: fileName),
     });
     var url = _uploadURL();
     var dio = Dio();
     try {
       var response = await dio.post(url, data: formData);
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<void> _endShareButton() async {
-    var confirm = await WidgetUtil.showSimpleConfirmDialog(context, '画像共有を終了しますか？');
+    var confirm =
+        await WidgetUtil.showSimpleConfirmDialog(context, '画像共有を終了しますか？');
     if (confirm) {
       setState(() {
         _drawing = false;
@@ -1009,6 +1052,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   /// other buttons
   /// *******************************************************************************************
   void _changeCamera() {
+    if (isDesktop) return;
     peer.switchCamera();
   }
 
@@ -1031,19 +1075,18 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   }
 
   Future<void> albumButton() async {
-    await Navigator.of(context).push(
-        PageRouteBuilder(
-          pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-            return StaffAlbumWebPage(
-              title: 'アルバム',
-              targetId: AppManager.selectUser!.id,
-              targetName: AppManager.selectUser!.name,
-            );
-          },
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-        )
-    );
+    await Navigator.of(context).push(PageRouteBuilder(
+      pageBuilder: (BuildContext context, Animation<double> animation1,
+          Animation<double> animation2) {
+        return StaffAlbumWebPage(
+          title: 'アルバム',
+          targetId: AppManager.selectUser!.id,
+          targetName: AppManager.selectUser!.name,
+        );
+      },
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+    ));
   }
 
   /// *******************************************************************************************
@@ -1086,20 +1129,19 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
 
   Future<void> graphButton(String sensorType) async {
     print('sensorType$sensorType');
-    await Navigator.of(context).push(
-        PageRouteBuilder(
-          pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-            return StaffWebPage(
-              title: 'センサー',
-              sensorType: sensorType,
-              targetId: AppManager.selectUser!.id,
-              targetName: AppManager.selectUser!.name,
-            );
-          },
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-        )
-    );
+    await Navigator.of(context).push(PageRouteBuilder(
+      pageBuilder: (BuildContext context, Animation<double> animation1,
+          Animation<double> animation2) {
+        return StaffWebPage(
+          title: 'センサー',
+          sensorType: sensorType,
+          targetId: AppManager.selectUser!.id,
+          targetName: AppManager.selectUser!.name,
+        );
+      },
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+    ));
   }
 
   @override
@@ -1109,7 +1151,9 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     final statusImageSize = min(size.width / 2, 300.0);
 
     List<Widget> widgets = [];
-    if (!_talking && AppManager.safetyCheckId.isEmpty && AppManager.status != AppStatus.Call) {
+    if (!_talking &&
+        AppManager.safetyCheckId.isEmpty &&
+        AppManager.status != AppStatus.Call) {
       widgets.add(InkWell(
         onTap: () {
           Navigator.of(context).pop();
@@ -1126,7 +1170,6 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     }
 
     if (_drawing) {
-
     } else {
       if (_talking || AppManager.safetyCheckId.isNotEmpty) {
         widgets.add(Positioned(
@@ -1136,7 +1179,11 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
               ? size.height / 2
               : size.height,
           width: size.width - _remoteMargin,
-          child: RTCVideoView(_remoteRenderer, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,),
+          child: RTCVideoView(
+            _remoteRenderer,
+            mirror: false,
+            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+          ),
         ));
       }
       if (_talking) {
@@ -1171,260 +1218,285 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     return Scaffold(
       backgroundColor: Colors.black,
       body: LayoutBuilder(
-          builder: (context, constraints) {
-            final viewInsets = MediaQuery.of(context).viewInsets;
-            final viewPadding = MediaQuery.of(context).padding;
-            final topOffset = viewInsets.top + viewPadding.top;
-            final leftOffset = viewInsets.left + viewPadding.left + 12;
-            final bottomOffset = viewInsets.bottom + viewPadding.bottom;
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                if (!_talking && !_hasRemoteVideo && AppManager.status != AppStatus.Response)
-                  InkWell(
-                    onTap: () {
-                      _close();
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage(_imageName(size)),
-                          fit: BoxFit.cover,
-                        ),
+        builder: (context, constraints) {
+          final viewInsets = MediaQuery.of(context).viewInsets;
+          final viewPadding = MediaQuery.of(context).padding;
+          final topOffset = viewInsets.top + viewPadding.top;
+          final leftOffset = viewInsets.left + viewPadding.left + 12;
+          final bottomOffset = viewInsets.bottom + viewPadding.bottom;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              if (!_talking &&
+                  !_hasRemoteVideo &&
+                  AppManager.status != AppStatus.Response)
+                InkWell(
+                  onTap: () {
+                    _close();
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      image: DecorationImage(
+                        image: AssetImage(_imageName(size)),
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),
-                if (_hasRemote2Video)
-                  Positioned(
-                    top: constraints.maxHeight / 2,
-                    left: 0,
-                    height: constraints.maxHeight / 2,
-                    width: constraints.maxWidth,
-                    child: RTCVideoView(
-                      _remote2Renderer,
-                      mirror: true,
-                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                    ),
+                ),
+              if (_hasRemote2Video)
+                Positioned(
+                  top: constraints.maxHeight / 2,
+                  left: 0,
+                  height: constraints.maxHeight / 2,
+                  width: constraints.maxWidth,
+                  child: RTCVideoView(
+                    _remote2Renderer,
+                    mirror: true,
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                   ),
-                if (_hasRemoteVideo)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    height: AppManager.status == AppStatus.Multi
-                        ? size.height / 2
-                        : size.height,
-                    width: size.width - _remoteMargin,
-                    child: RTCVideoView(_remoteRenderer, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,),
+                ),
+              if (_hasRemoteVideo)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  height: AppManager.status == AppStatus.Multi
+                      ? size.height / 2
+                      : size.height,
+                  width: size.width - _remoteMargin,
+                  child: RTCVideoView(
+                    _remoteRenderer,
+                    mirror: false,
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                   ),
-                if (_talking && AppManager.safetyCheckId.isEmpty)
-                  Positioned(
-                    bottom: 20,
-                    right: _minimiseLocalRenderer ? 20 : 0,
-                    height: _minimiseLocalRenderer ? 28 : size.height / 4,
-                    width: _minimiseLocalRenderer ? 28 : size.height / 4 / 3 * 2,
-                    child: GestureDetector(
-                      onTap: () {
-                        if (_minimiseLocalRenderer) {
+                ),
+              if (_talking && AppManager.safetyCheckId.isEmpty)
+                Positioned(
+                  bottom: 20,
+                  right: _minimiseLocalRenderer ? 20 : 0,
+                  height: _minimiseLocalRenderer ? 28 : size.height / 4,
+                  width: _minimiseLocalRenderer ? 28 : size.height / 4 / 3 * 2,
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_minimiseLocalRenderer) {
+                        setState(() {
+                          _minimiseLocalRenderer = false;
+                        });
+                      }
+                    },
+                    onVerticalDragUpdate: (DragUpdateDetails details) {},
+                    onVerticalDragEnd: (details) {
+                      if (details.primaryVelocity != null) {
+                        print(details.primaryVelocity!);
+                        if (details.primaryVelocity! >= 0 &&
+                            !_minimiseLocalRenderer) {
+                          // 下向き
+                          setState(() {
+                            _minimiseLocalRenderer = true;
+                          });
+                        } else if (details.primaryVelocity! < 0 &&
+                            _minimiseLocalRenderer) {
+                          // 上向き
                           setState(() {
                             _minimiseLocalRenderer = false;
                           });
                         }
-                      },
-                      onVerticalDragUpdate: (DragUpdateDetails details) {
-
-                      },
-                      onVerticalDragEnd: (details) {
-                        if (details.primaryVelocity != null) {
-                          print(details.primaryVelocity!);
-                          if (details.primaryVelocity! >= 0 && !_minimiseLocalRenderer) {
-                            // 下向き
-                            setState(() {
-                              _minimiseLocalRenderer = true;
-                            });
-                          } else if (details.primaryVelocity! < 0 && _minimiseLocalRenderer) {
-                            // 上向き
-                            setState(() {
-                              _minimiseLocalRenderer = false;
-                            });
-                          }
-                        }
-                      },
-                      child: _minimiseLocalRenderer ?
-                      Container(
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.grey,
-                        ),
-                        height: 28,
-                        width: 28,
-                      ) : RTCVideoView(
-                        _localRenderer,
-                        mirror: true,
-                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                      ),
-                    ),
-                  ),
-                if (_talking)
-                  Positioned(
-                    top: topOffset,
-                    left: leftOffset,
-                    width: constraints.maxWidth - (leftOffset * 2),
-                    height: 60,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              _changeCamera();
-                            },
-                            child: SizedBox(
-                              width: smallButtonSize,
-                              height: smallButtonSize,
-                              child: Image.asset("assets/images/talk/btn-change_my_camera.png"),
+                      }
+                    },
+                    child: _minimiseLocalRenderer
+                        ? Container(
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.grey,
                             ),
+                            height: 28,
+                            width: 28,
+                          )
+                        : RTCVideoView(
+                            _localRenderer,
+                            mirror: true,
+                            objectFit: RTCVideoViewObjectFit
+                                .RTCVideoViewObjectFitCover,
                           ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              GestureDetector(
-                                onTap: () {
-                                  _requestPhoto();
-                                },
-                                child: SizedBox(
-                                  width: smallButtonSize,
-                                  height: smallButtonSize,
-                                  child: Image.asset("assets/images/talk/btn-photo_request.png"),
-                                ),
-                              ),
-                              const SizedBox(width: 20,),
-                              GestureDetector(
-                                onTap: () {
-                                  _recordButton();
-                                },
-                                child: _isrecording
-                                    ? Image.asset(
-                                  "assets/images/talk/btn-recordend.png",
-                                  width: smallButtonSize,
-                                  height: smallButtonSize,
-                                )
-                                    : Image.asset(
-                                  "assets/images/talk/btn-record.png",
-                                  width: smallButtonSize,
-                                  height: smallButtonSize,
-                                ),
-                              ),
-                              const SizedBox(width: 20,),
-                              GestureDetector(
-                                onTap: () {
-                                  _requestChangeCamera();
-                                },
-                                child: SizedBox(
-                                  width: smallButtonSize,
-                                  height: smallButtonSize,
-                                  child: Image.asset("assets/images/talk/btn-change_camera.png"),
-                                ),
-                              ),
-                            ],
+                  ),
+                ),
+              if (_talking)
+                Positioned(
+                  top: topOffset,
+                  left: leftOffset,
+                  width: constraints.maxWidth - (leftOffset * 2),
+                  height: 60,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            _changeCamera();
+                          },
+                          child: SizedBox(
+                            width: smallButtonSize,
+                            height: smallButtonSize,
+                            child: Image.asset(
+                                "assets/images/talk/btn-change_my_camera.png"),
                           ),
-                        ],
-                      ),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                _requestPhoto();
+                              },
+                              child: SizedBox(
+                                width: smallButtonSize,
+                                height: smallButtonSize,
+                                child: Image.asset(
+                                    "assets/images/talk/btn-photo_request.png"),
+                              ),
+                            ),
+                            const SizedBox(
+                              width: 20,
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                _recordButton();
+                              },
+                              child: _isrecording
+                                  ? Image.asset(
+                                      "assets/images/talk/btn-recordend.png",
+                                      width: smallButtonSize,
+                                      height: smallButtonSize,
+                                    )
+                                  : Image.asset(
+                                      "assets/images/talk/btn-record.png",
+                                      width: smallButtonSize,
+                                      height: smallButtonSize,
+                                    ),
+                            ),
+                            const SizedBox(
+                              width: 20,
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                _requestChangeCamera();
+                              },
+                              child: SizedBox(
+                                width: smallButtonSize,
+                                height: smallButtonSize,
+                                child: Image.asset(
+                                    "assets/images/talk/btn-change_camera.png"),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                StaffTalkMenuWidget(key: menuWidgetGlobalKey),
-                if (_statusImage.isNotEmpty)
-                  Positioned(
-                    top: size.height / 2 - (statusImageSize / 2),
-                    left: size.width / 2 - (statusImageSize / 2),
-                    height: statusImageSize,
-                    width: statusImageSize,
-                    child: Image.asset(_statusImage),
-                  ),
-                if (_drawing)
-                  ... [
-                    Container(
-                      color: Colors.black,
-                    ),
-                    Positioned(
-                      top: (constraints.maxHeight - _localCanvasHeight) / 2,
-                      left: (constraints.maxWidth - _localCanvasWidth) / 2,
+                ),
+              StaffTalkMenuWidget(key: menuWidgetGlobalKey),
+              if (_statusImage.isNotEmpty)
+                Positioned(
+                  top: size.height / 2 - (statusImageSize / 2),
+                  left: size.width / 2 - (statusImageSize / 2),
+                  height: statusImageSize,
+                  width: statusImageSize,
+                  child: Image.asset(_statusImage),
+                ),
+              if (_drawing) ...[
+                Container(
+                  color: Colors.black,
+                ),
+                Positioned(
+                  top: (constraints.maxHeight - _localCanvasHeight) / 2,
+                  left: (constraints.maxWidth - _localCanvasWidth) / 2,
+                  width: _localCanvasWidth,
+                  height: _localCanvasHeight,
+                  child: Container(
+                    color: Colors.black,
+                    child: Painter(
+                      paintController: _controller,
+                      image: _shareImage!,
                       width: _localCanvasWidth,
                       height: _localCanvasHeight,
-                      child: Container(
-                        color: Colors.black,
-                        child: Painter(
-                          paintController: _controller,
-                          image: _shareImage!,
-                          width: _localCanvasWidth,
-                          height: _localCanvasHeight,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: topOffset,
+                  left: leftOffset,
+                  height: 40.0,
+                  width: constraints.maxWidth - 32.0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      WidgetUtil.normalButton(
+                        '保存',
+                        _savePhoto,
+                        primaryColor: const Color.fromARGB(255, 179, 182, 186),
+                        foregroundColor: Colors.white,
+                      ),
+                      WidgetUtil.normalButton(
+                        '共有終了',
+                        _endShareButton,
+                        primaryColor: const Color.fromARGB(255, 238, 85, 104),
+                        foregroundColor: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  bottom: bottomOffset,
+                  left: leftOffset,
+                  height: 40.0,
+                  width: constraints.maxWidth - 32.0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: SizedBox(
+                          width: smallButtonSize,
+                          height: smallButtonSize,
+                          child: GestureDetector(
+                            onTap: () {
+                              _undoDraw();
+                            },
+                            child:
+                                Image.asset("assets/images/talk/icon_undo.png"),
+                          ),
                         ),
                       ),
-                    ),
-                    Positioned(
-                      top: topOffset,
-                      left: leftOffset,
-                      height: 40.0,
-                      width: constraints.maxWidth - 32.0,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          WidgetUtil.normalButton('保存', _savePhoto, primaryColor: const Color.fromARGB(255, 179, 182, 186), foregroundColor: Colors.white,),
-                          WidgetUtil.normalButton('共有終了', _endShareButton, primaryColor: const Color.fromARGB(255, 238, 85, 104), foregroundColor: Colors.white,),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      bottom: bottomOffset,
-                      left: leftOffset,
-                      height: 40.0,
-                      width: constraints.maxWidth - 32.0,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(right: 12.0),
-                            child: SizedBox(
-                              width: smallButtonSize,
-                              height: smallButtonSize,
-                              child: GestureDetector(
-                                onTap: () {
-                                  _undoDraw();
-                                },
-                                child: Image.asset("assets/images/talk/icon_undo.png"),
+                      GestureDetector(
+                        onTap: () {
+                          _toggleDrawClearMode();
+                        },
+                        child: _drawClearMode
+                            ? Image.asset(
+                                "assets/images/talk/icon_eraser_on.png",
+                                width: smallButtonSize,
+                                height: smallButtonSize,
+                              )
+                            : Image.asset(
+                                "assets/images/talk/icon_eraser_off.png",
+                                width: smallButtonSize,
+                                height: smallButtonSize,
                               ),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              _toggleDrawClearMode();
-                            },
-                            child: _drawClearMode
-                                ? Image.asset(
-                              "assets/images/talk/icon_eraser_on.png",
-                              width: smallButtonSize,
-                              height: smallButtonSize,
-                            )
-                                : Image.asset(
-                              "assets/images/talk/icon_eraser_off.png",
-                              width: smallButtonSize,
-                              height: smallButtonSize,
-                            ),
-                          ),
-                        ],
                       ),
-                    ),
-                  ],
-                if (!_sensorViewIsHidden)
-                  InkWell(
-                    onTap: () {
-                      hideSensorView();
-                    },
-                    child: SensorViewWidget(key: sensorWidgetGlobalKey),
+                    ],
                   ),
+                ),
               ],
-            );
-          },
+              if (!_sensorViewIsHidden)
+                InkWell(
+                  onTap: () {
+                    hideSensorView();
+                  },
+                  child: SensorViewWidget(key: sensorWidgetGlobalKey),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1450,7 +1522,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
         } else {
           // 応答する
           if (AppManager.selectUser!.id != data["info"]["udid"]) {
-            var address = context.read<AddressStore>().find(data["info"]["udid"])!;
+            var address =
+                context.read<AddressStore>().find(data["info"]["udid"])!;
             AppManager.selectUser = address;
             _address = address;
           }
@@ -1471,8 +1544,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
           });
         }
       }
-    }
-    else if (message == 'call_cancel') {
+    } else if (message == 'call_cancel') {
       if (data["udid"] == null) {
         return;
       }
@@ -1486,49 +1558,42 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
           _callingName = '';
         });
       }
-    }
-    else if (message == 'call_accept') {
+    } else if (message == 'call_accept') {
       if (data["udid"] == null) {
         return;
       }
       if (data["udid"] == AppManager.selectUser!.id) {}
-    }
-    else if (message == 'not_connect') {
+    } else if (message == 'not_connect') {
       if (data["info"] == null) {
         return;
       }
       _notConnect(data["info"]);
-    }
-    else if (message == 'call_reject') {
+    } else if (message == 'call_reject') {
       if (data["udid"] == null) {
         return;
       }
       if (AppManager.selectUser!.id == data["udid"]) {
         _callRejected();
       }
-    }
-    else if (message == 'call_not_auth') {
+    } else if (message == 'call_not_auth') {
       if (data["udid"] == null) {
         return;
       }
       if (AppManager.selectUser!.id == data["udid"]) {
         _callNotAuth();
       }
-    }
-    else if (message == 'talk_end') {
+    } else if (message == 'talk_end') {
       if (data["udid"] == null) {
         return;
       }
       _receiveHangup(data["udid"]);
-    }
-    else if (message == 'hold') {
+    } else if (message == 'hold') {
       print(data["udid"]);
       if (data["udid"] == null) {
         return;
       }
       _receiveHold(data["udid"]);
-    }
-    else if (message == 'hold_clear') {
+    } else if (message == 'hold_clear') {
       if (data["info"] == null) {
         return;
       }
@@ -1536,16 +1601,15 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
         return;
       }
       _receiveClearHold(data["info"]["udid"]);
-    }
-    else if (message == 'change_camera') {
+    } else if (message == 'change_camera') {
       if (data["udid"] == null) {
         return;
       }
-      if (AppManager.status == AppStatus.Talk && AppManager.talkId1 == data["udid"]) {
+      if (AppManager.status == AppStatus.Talk &&
+          AppManager.talkId1 == data["udid"]) {
         _changeCamera();
       }
-    }
-    else if (message == 'threeway') {
+    } else if (message == 'threeway') {
       if (data["info"] == null) {
         return;
       }
@@ -1554,9 +1618,9 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
           data["info"]["roomID"] == null) {
         return;
       }
-      _recvThreeway(data["info"]["talkID1"], data["info"]["talkID2"], data["info"]["roomID"]);
-    }
-    else if (message == 'threeway_response') {
+      _recvThreeway(data["info"]["talkID1"], data["info"]["talkID2"],
+          data["info"]["roomID"]);
+    } else if (message == 'threeway_response') {
       if (data["info"] == null) {
         return;
       }
@@ -1565,9 +1629,9 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
           data["info"]["roomID"] == null) {
         return;
       }
-      _recvThreeway(data["info"]["talkID1"], data["info"]["talkID2"], data["info"]["roomID"]);
-    }
-    else if (message == 'request_photo') {
+      _recvThreeway(data["info"]["talkID1"], data["info"]["talkID2"],
+          data["info"]["roomID"]);
+    } else if (message == 'request_photo') {
       if (data["info"] == null) {
         return;
       }
@@ -1578,26 +1642,21 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
           AppManager.talkId1 == data["info"]["udid"]) {
         _receiveRequestPhoto();
       }
-    }
-    else if (message == 'photo_request_error') {
+    } else if (message == 'photo_request_error') {
       AppManager.toast("画像取得に失敗しました。", gravity: ToastGravity.CENTER);
-    }
-    else if (message == 'close_drawview') {
+    } else if (message == 'close_drawview') {
       setState(() {
         _drawing = false;
       });
-    }
-    else if (message == 'safety_check_stop') {
+    } else if (message == 'safety_check_stop') {
       peer.close();
       _endSafetyCheck();
       AppManager.toast("操作されました。安全/安静目視を終了します");
-    }
-    else if (message == 'safety_check_error') {
+    } else if (message == 'safety_check_error') {
       peer.close();
       _endSafetyCheck();
       AppManager.toast("アプリが起動していないか操作中です。");
-    }
-    else if (message == 'request_record') {
+    } else if (message == 'request_record') {
       if (data['info'] == null) {
         return;
       }
@@ -1609,21 +1668,16 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
           AppManager.talkId1 == info['udid']) {
         _requestedRecord(info['udid'], info['recid']);
       }
-    }
-    else if (message == 'request_record_error') {
+    } else if (message == 'request_record_error') {
       AppManager.toast("録画開始できませんでした", gravity: ToastGravity.CENTER);
-    }
-    else if (message == 'request_record_reject') {
+    } else if (message == 'request_record_reject') {
       AppManager.toast("録画開始されませんでした", gravity: ToastGravity.CENTER);
-    }
-    else if (message == 'request_record_accept') {
+    } else if (message == 'request_record_accept') {
       if (AppManager.recordId.isNotEmpty) {
         _startRecord();
       }
-    }
-    else if (message == 'request_record_accept_error') {
-    }
-    else if (message == 'record_stop') {
+    } else if (message == 'request_record_accept_error') {
+    } else if (message == 'record_stop') {
       _onRecordEnd(message);
     }
     else if (message == 'force_hangup') {
@@ -1703,8 +1757,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
         };
         socketservice.io.emit("talk", [sendData]);
       }
-    }
-    else if (id2 == 'shareRecv') {
+    } else if (id2 == 'shareRecv') {
       if (data['frameW'] == null || data['frameH'] == null) {
         return;
       }
@@ -1716,8 +1769,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       _remoteCanvasHeight = double.parse(frameH);
 
       _showDrawView();
-    }
-    else if (id2 == 'draw') {
+    } else if (id2 == 'draw') {
       if (data['event'] == null || data['x'] == null || data['y'] == null) {
         return;
       }
@@ -1726,11 +1778,9 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       double y =
           double.parse(data['y']) * _localCanvasHeight / _remoteCanvasHeight;
       _controller.receiveDraw(data['event'], x, y);
-    }
-    else if (id2 == 'shareUndo') {
+    } else if (id2 == 'shareUndo') {
       _controller.receiveDraw('undo', 0.0, 0.0);
-    }
-    else if (id2 == 'shareEraseMode') {
+    } else if (id2 == 'shareEraseMode') {
       if (data['mode'] == null) {
         return;
       }
@@ -1739,8 +1789,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       } else {
         _controller.setIsClear2(false);
       }
-    }
-    else if (id2 == 'threewayToCall') {
+    } else if (id2 == 'threewayToCall') {
       if (data['from'] == null || data['to'] == null) {
         return;
       }
@@ -1749,9 +1798,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   }
 
   @override
-  void onConnect() {
-
-  }
+  void onConnect() {}
 
   @override
   void onDisConnect() {
@@ -1765,7 +1812,9 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     if (id == AppManager.recordConnectId &&
         state == RTCSignalingState.RTCSignalingStateStable) {
       if (socketioservice?.tag == 4) {
-        socketioservice!.io.emit("message", [{"id": "startRecording"}]);
+        socketioservice!.io.emit("message", [
+          {"id": "startRecording"}
+        ]);
         return;
       }
       // recsocket.send({"id": "startRecording"});
@@ -1937,26 +1986,19 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
 
     if (messageId == 'existingParticipants') {
       _onExistingParticipants(data);
-    }
-    else if (messageId == 'newParticipantArrived') {
+    } else if (messageId == 'newParticipantArrived') {
       _onNewParticipant(data);
-    }
-    else if (messageId == 'participantLeft') {
+    } else if (messageId == 'participantLeft') {
       _onParticipantLeft(data);
-    }
-    else if (messageId == 'receiveVideoAnswer') {
+    } else if (messageId == 'receiveVideoAnswer') {
       _onReceiveVideoAnswer(data);
-    }
-    else if (messageId == 'joinRoomResponse') {
+    } else if (messageId == 'joinRoomResponse') {
       _onJoinRoomResponse(data);
-    }
-    else if (messageId == 'recordResponse') {
+    } else if (messageId == 'recordResponse') {
       _onRecordResponse(data);
-    }
-    else if (messageId == 'recordEnd') {
+    } else if (messageId == 'recordEnd') {
       _onRecordEnd(data);
-    }
-    else if (messageId == 'iceCandidate') {
+    } else if (messageId == 'iceCandidate') {
       // print(data);
       if (data["name"] == null || data["candidate"] == null) {
         return;
