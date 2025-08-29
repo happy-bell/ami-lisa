@@ -102,7 +102,7 @@ class AppManager {
   }
 
   static dynamic initialAppSettings() {
-    return {"AUTO_RECEIVE": "0", "SLEEP_MODE": "0", "SLEEP_CLOCK": "0", "SLEEPMODEBRIGHTNESS": "0", "SENSOR0": "0", "SENSOR1": "0", "SENSOR2": "0", "SENSOR3": "0", "SENSOR4": "0", "SENSOR5": "0", "SENSOR8": "0", "SENSOR9": "0", "RINGTONE": "0", "CALLSCREENIMAGE": "0", "CALLSCREENIMAGEL": "0", "VOLUME_CALL": "0", "CLOCKDISP": "0", "DISPLAYNUM": "3", "CALLSTATUSDISP": "0"};
+    return {"AUTO_RECEIVE": "0", "SLEEP_MODE": "0", "SLEEP_CLOCK": "0", "SLEEPMODEBRIGHTNESS": "0", "SENSOR0": "0", "SENSOR1": "0", "SENSOR2": "0", "SENSOR3": "0", "SENSOR4": "0", "SENSOR5": "0", "SENSOR8": "0", "SENSOR9": "0", "RINGTONE": "0", "CALLSCREENIMAGE": "0", "CALLSCREENIMAGEL": "0", "VOLUME_CALL": "0", "CLOCKDISP": "0", "DISPLAYNUM": "3", "CALLSTATUSDISP": "0", "CALL_DELAY": "0"};
   }
 
   static Future<bool> loadSetting() async {
@@ -249,6 +249,15 @@ class AppManager {
       return 'アナログ';
     }
     return '';
+  }
+
+  static String callDelayText() {
+    var delay = AppManager.appsettings["CALL_DELAY"] ?? '0';
+    if (delay == '0') {
+      return '即座に応答';
+    } else {
+      return '${delay}秒後';
+    }
   }
 
   static String roomImageName(Size size) {

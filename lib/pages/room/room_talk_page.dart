@@ -104,8 +104,22 @@ class RoomTalkPageState extends State<RoomTalkPage>
         if (AppManager.appsettings["AUTO_RECEIVE"] == '1') {
           print(DateTime.now());
           print('[DEBUG PRINT]room talk 着信中 auto receive');
-          sleep(Duration(milliseconds: 500));
-          _response();
+          
+          // 設定された遅延時間を取得（秒単位）
+          int delaySeconds = int.tryParse(AppManager.appsettings["CALL_DELAY"] ?? '0') ?? 0;
+          
+          if (delaySeconds > 0) {
+            // 遅延時間がある場合はTimerを使用して遅延後に応答
+            Timer(Duration(seconds: delaySeconds), () {
+              if (_active && AppManager.selectUser?.call == 1) {
+                _response();
+              }
+            });
+          } else {
+            // 即座に応答する場合
+            sleep(Duration(milliseconds: 500));
+            _response();
+          }
           return;
         } else {
           if (AppManager.autoreceives[AppManager.selectUser!.id] == '1') {

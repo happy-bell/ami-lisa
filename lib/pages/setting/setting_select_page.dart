@@ -64,6 +64,17 @@ class SettingSelectPageState extends State<SettingSelectPage> {
         ['1', '普通'],
         ['2', '暗い']
       ];
+    } else if (_key == 'CALL_DELAY') {
+      title = '通話開始時間';
+      data = [
+        ['0', '即座に応答'],
+        ['5', '5秒後'],
+        ['10', '10秒後'],
+        ['15', '15秒後'],
+        ['20', '20秒後'],
+        ['25', '25秒後'],
+        ['30', '30秒後']
+      ];
     } else if (_key == 'RINGTONE') {
       title = '着信音';
       data = AppManager.ringtones;
@@ -189,6 +200,8 @@ class SettingSelectPageState extends State<SettingSelectPage> {
         } else if (_key == 'SLEEP_CLOCK' || _key == 'DISPLAYNUM') {
           AppManager.saveAppSetting(_key, _value);
         } else if (_key == 'SLEEPMODEBRIGHTNESS') {
+          AppManager.saveAppSetting(_key, _value);
+        } else if (_key == 'CALL_DELAY') {
           AppManager.saveAppSetting(_key, _value);
         } else if (_key == 'RINGTONE') {
           AppManager.saveAppSetting(_key, _value);
