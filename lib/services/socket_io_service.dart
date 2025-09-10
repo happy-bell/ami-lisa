@@ -105,6 +105,23 @@ class SocketIOService {
       delegate2?.onAppMessage(data);
     });
 
+    // カメラ映像要求
+    _socket!.on("called_check", (data) {
+      dynamic wrapped;
+      if (data is Map) {
+        try {
+          wrapped = Map<String, dynamic>.from(data);
+        } catch (_) {
+          wrapped = {'data': data};
+        }
+      } else {
+        wrapped = {'data': data};
+      }
+      wrapped['message'] = 'called_check';
+      delegate?.onAppMessage(wrapped);
+      delegate2?.onAppMessage(wrapped);
+    });
+
     _socket!.on("from_server", (data) {
 
     });

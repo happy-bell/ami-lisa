@@ -337,13 +337,12 @@ class _SettingPageState extends State<SettingPage> {
         });
       }),
       switchListContainer('自動応答', 'AUTO_RECEIVE'),
-      // 自動応答がオンの場合のみ通話開始時間設定を表示
-      if (AppManager.appsettings['AUTO_RECEIVE'] == '1')
+      if (dispType == '1')
         nextListContainer('通話開始時間', AppManager.callDelayText(), () async {
           var result = await Navigator.of(context).push(MaterialPageRoute(
               builder: (context) => SettingSelectPage(
                   keyName: 'CALL_DELAY',
-                  value: AppManager.appsettings['CALL_DELAY'])));
+                  value: AppManager.appsettings['CALL_DELAY'] ?? '0')));
           AppManager.appsettings['CALL_DELAY'] = result;
           setState(() {
             _savedSwitch = !_savedSwitch;
