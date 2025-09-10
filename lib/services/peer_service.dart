@@ -13,9 +13,11 @@ enum SignalingState {
   ConnectionError,
 }
 
-typedef SignalingStateCallback = void Function(String id, RTCSignalingState state);
+typedef SignalingStateCallback = void Function(
+    String id, RTCSignalingState state);
 typedef StreamStateCallback = void Function(MediaStream stream);
-typedef RemoteStreamStateCallback = void Function(String id, MediaStream stream);
+typedef RemoteStreamStateCallback = void Function(
+    String id, MediaStream stream);
 typedef IceCandidateCallback = void Function(String id, dynamic event);
 typedef OtherEventCallback = void Function(dynamic event);
 typedef DataChannelMessageCallback = void Function(
@@ -57,7 +59,7 @@ class Peer {
         'credential': 'change_to_real_secret'
       },
        */
-    ]
+    ],
   };
 
   final Map<String, dynamic> _config = {
@@ -126,9 +128,18 @@ class Peer {
 
   void switchCamera() async {
     if (_localStream != null) {
-      final videoTrack = _localStream!.getVideoTracks().firstWhere((track) => track.kind == 'video');
+      final videoTrack = _localStream!
+          .getVideoTracks()
+          .firstWhere((track) => track.kind == 'video');
       await Helper.switchCamera(videoTrack);
     }
+  }
+
+  void setLocalStream(MediaStream stream) {
+    _localStream = stream;
+    _peerConnections.forEach((_, pc) {
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+    });
   }
 
   void receiveOffer(String peerId, String sdp, [String media = 'video']) {
@@ -145,16 +156,15 @@ class Peer {
     _receiveAnswer(peerId, sdp);
   }
 
-  void receiveIceCandidate(String peerId, Map<String, dynamic> candidateMap) async {
+  void receiveIceCandidate(
+      String peerId, Map<String, dynamic> candidateMap) async {
     var pc = _peerConnections[peerId];
 
     print("receive ice $peerId");
     print(candidateMap);
 
-    RTCIceCandidate candidate = RTCIceCandidate(
-        candidateMap['candidate'],
-        candidateMap['sdpMid'],
-        candidateMap['sdpMLineIndex']);
+    RTCIceCandidate candidate = RTCIceCandidate(candidateMap['candidate'],
+        candidateMap['sdpMid'], candidateMap['sdpMLineIndex']);
     if (pc != null) {
       await pc.addCandidate(candidate);
     } else {
@@ -195,8 +205,8 @@ class Peer {
     var stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
     if (onLocalStream != null) onLocalStream!(stream);
 
-
-    print('***************      Turn on speaker phone(${stream.getAudioTracks()[0].muted})       ******************************');
+    print(
+        '***************      Turn on speaker phone(${stream.getAudioTracks()[0].muted})       ******************************');
     // final session = await AudioSession.instance;
     // await session.configure(AudioSessionConfiguration.music());
     try {
@@ -253,7 +263,8 @@ class Peer {
     }
   }
 
-  Future<RTCPeerConnection> _createPeerConnection(id, media, userScreen, {isHost = false}) async {
+  Future<RTCPeerConnection> _createPeerConnection(id, media, userScreen,
+      {isHost = false}) async {
     if (media != 'data' && media != 'recvonly' && _localStream == null) {
       _localStream = await createStream(media, userScreen);
 
@@ -292,7 +303,8 @@ class Peer {
         pc.onTrack = (RTCTrackEvent event) {
           print('onTrack: ' + id);
           if (event.track.kind == 'video') {
-            if (onAddRemoteStream != null) onAddRemoteStream!(id, event.streams[0]);
+            if (onAddRemoteStream != null)
+              onAddRemoteStream!(id, event.streams[0]);
             _remoteStreams.add(event.streams[0]);
           }
         };
@@ -369,10 +381,14 @@ class Peer {
     if (onDataChannel != null) onDataChannel!(channel);
   }
 
-  Future<void> _createOffer(String id, RTCPeerConnection pc, String media) async {
+  Future<void> _createOffer(
+      String id, RTCPeerConnection pc, String media) async {
     print('_createOffer');
     try {
-      RTCSessionDescription s = await pc.createOffer(media == 'video' || media == 'recvonly' ? _constraints : _dcConstraints);
+      RTCSessionDescription s = await pc.createOffer(
+          media == 'video' || media == 'recvonly'
+              ? _constraints
+              : _dcConstraints);
       await pc.setLocalDescription(s);
       var localDescription = await pc.getLocalDescription();
       if (onOffer != null) onOffer!({'sdp': localDescription!.sdp, 'id': id});
@@ -384,7 +400,8 @@ class Peer {
 
   Future<void> _createAnswer(String id, RTCPeerConnection pc, media) async {
     try {
-      RTCSessionDescription s = await pc.createAnswer(media == 'data' ? _dcConstraints : _constraints);
+      RTCSessionDescription s = await pc
+          .createAnswer(media == 'data' ? _dcConstraints : _constraints);
       pc.setLocalDescription(s);
 
       if (onAnswer != null) onAnswer!({'sdp': s.sdp, 'id': id});
@@ -393,9 +410,11 @@ class Peer {
     }
   }
 
-  Future<void> _receiveOffer(String id, RTCPeerConnection pc, String sdp) async {
+  Future<void> _receiveOffer(
+      String id, RTCPeerConnection pc, String sdp) async {
     print('peer _receiveOffer');
-    RTCSessionDescription description = RTCSessionDescription(sdp, 'offer');// {'sdp': sdp, 'type': 'offer'};
+    RTCSessionDescription description =
+        RTCSessionDescription(sdp, 'offer'); // {'sdp': sdp, 'type': 'offer'};
 
     await pc.setRemoteDescription(description);
     await _createAnswer(id, pc, 'video');

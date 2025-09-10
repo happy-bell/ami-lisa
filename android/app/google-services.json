@@ -2,7 +2,7 @@
   "project_info": {
     "project_number": "764771508054",
     "project_id": "ami-style",
-    "storage_bucket": "ami-style.appspot.com"
+    "storage_bucket": "ami-style.firebasestorage.app"
   },
   "client": [
     {
@@ -87,6 +87,42 @@
     },
     {
       "client_info": {
+        "mobilesdk_app_id": "1:764771508054:android:f1ea1e1e3cd25810b4c0f7",
+        "android_client_info": {
+          "package_name": "com.amipulse"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC4taodpKyludcxLWfA76ejVvWe7gTp3hY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "764771508054-1oim11eegovmoato4v3au9at59jhk2qh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "jp.amiapp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:764771508054:android:57d6d3e6d3dba6e1b4c0f7",
         "android_client_info": {
           "package_name": "jp.amiplus"
@@ -123,9 +159,81 @@
     },
     {
       "client_info": {
+        "mobilesdk_app_id": "1:764771508054:android:075ec27533317ac8b4c0f7",
+        "android_client_info": {
+          "package_name": "jp.amiplus.amiapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC4taodpKyludcxLWfA76ejVvWe7gTp3hY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "764771508054-1oim11eegovmoato4v3au9at59jhk2qh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "jp.amiapp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:764771508054:android:6f8fc1fb6b08ca72b4c0f7",
         "android_client_info": {
           "package_name": "jp.amiplus.mulch"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC4taodpKyludcxLWfA76ejVvWe7gTp3hY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "764771508054-ns6vl81siubelkfkt0g4vk5kvsu5khk1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "764771508054-1oim11eegovmoato4v3au9at59jhk2qh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "jp.amiapp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:764771508054:android:12558968959dffd6b4c0f7",
+        "android_client_info": {
+          "package_name": "jp.amipulse"
         }
       },
       "oauth_client": [
