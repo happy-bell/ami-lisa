@@ -47,6 +47,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
   AudioService audio = AudioService();
   bool _talking = false;
   Timer? _rusuTimer;
+  Timer? _softHangTimer;
   String _statusImage = '';
   bool _isrecording = false;
 
@@ -67,6 +68,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
   double _remoteCanvasHeight = 0;
   final PaintController _controller = PaintController();
   bool _drawClearMode = false;
+  bool _extendHangup = false;
 
   GlobalKey<StaffTalkMenuWidgetState> menuWidgetGlobalKey = GlobalKey();
 
@@ -107,6 +109,12 @@ class RoomTalkPageState extends State<RoomTalkPage>
           
           // 設定された遅延時間を取得（秒単位）
           int delaySeconds = int.tryParse(AppManager.appsettings["CALL_DELAY"] ?? '0') ?? 0;
+          // 発信側へ遅延応答のヒントを送信（最小限・一回のみ）
+          if (delaySeconds > 0) {
+            try {
+              socketservice.io.emit('called_check', [AppManager.selectUser!.id]);
+            } catch (_) {}
+          }
           
           if (delaySeconds > 0) {
             // 遅延時間がある場合はTimerを使用して遅延後に応答
@@ -200,6 +208,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
 
   void _close() {
     _stopRusuTimer();
+    _stopSoftHangTimer();
     audio.stopButtonCall();
     if (_isrecording) {
       // recording 終了
@@ -245,20 +254,32 @@ class RoomTalkPageState extends State<RoomTalkPage>
     setAppStatus(AppStatus.Call);
     await audio.call();
     socketservice.io.emit("call", [AppManager.selectUser!.id]);
-
-    _rusuTimer = Timer.periodic(const Duration(milliseconds: AppDefine.absenceSec1), (Timer timer) {
+    // 30秒時点で延長フラグが無ければ切断、あればスキップ
+    _extendHangup = false; // 初期化
+    _softHangTimer = Timer(const Duration(milliseconds: AppDefine.absenceSec1), () {
       if (!_active || AppManager.status == AppStatus.Talk) {
-        print('[DEBUG PRINT]  rusu timer in talk');
+        print('[DEBUG PRINT] soft hang timer: already talking');
+        return;
+      }
+      if (_extendHangup) {
+        print('[DEBUG PRINT] soft hang timer: extend to 35s');
+        return; // 35秒タイマーに委ねる
+      }
+      _cancelCall(isClose: false);
+      setState(() { _statusImage = ImageName.rusu; });
+      _rusuTimer = Timer(Duration(milliseconds: AppDefine.absenceSec2), () { _close(); });
+    });
+
+    // ハードタイマー（最大35秒で確実に切断）
+    const int extendedMs = 35 * 1000;
+    _rusuTimer = Timer(const Duration(milliseconds: extendedMs), () {
+      if (!_active || AppManager.status == AppStatus.Talk) {
+        print('[DEBUG PRINT] hard hang timer: already talking');
         return;
       }
       _cancelCall(isClose: false);
-      setState(() {
-        _statusImage = ImageName.rusu;
-      });
-
-      _rusuTimer = Timer.periodic(Duration(milliseconds: AppDefine.absenceSec2), (Timer timer) {
-        _close();
-      });
+      setState(() { _statusImage = ImageName.rusu; });
+      _rusuTimer = Timer(Duration(milliseconds: AppDefine.absenceSec2), () { _close(); });
     });
   }
 
@@ -276,8 +297,16 @@ class RoomTalkPageState extends State<RoomTalkPage>
     }
   }
 
+  void _stopSoftHangTimer() {
+    if (_softHangTimer != null) {
+      _softHangTimer!.cancel();
+      _softHangTimer = null;
+    }
+  }
+
   void _startTalk() {
     _stopRusuTimer();
+    _stopSoftHangTimer();
     // AppManager.talkId1 = AppManager.selectUser.id;
     AppManager.selectUser!.call = 0;
     _statusImage = '';
@@ -1124,6 +1153,11 @@ class RoomTalkPageState extends State<RoomTalkPage>
     if (message == 'call') {
 
     }
+    else if (message == 'called_check') {
+      // 着信側（AUTO_RECEIVE + CALL_DELAY > 0）が通知したヒント
+      // 30秒自動切断を延長するフラグを立てる
+      _extendHangup = true;
+    }
     else if (message == 'call_cancel') {
       if (data["udid"] == null) {
         return;
@@ -1295,6 +1329,8 @@ class RoomTalkPageState extends State<RoomTalkPage>
 
   @override
   void onCallResponse(to, sdp) {
+    // 応答交渉が始まったら延長扱い（30秒切断は回避）
+    _extendHangup = true;
     AppManager.talkId1 = to;
     peer.receiveOffer(to, sdp);
   }

@@ -50,6 +50,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   AudioService audio = AudioService();
   bool _talking = false;
   Timer? _rusuTimer;
+  Timer? _softHangTimer; // 30秒用（延長判定あり）
   String _statusImage = '';
   bool _isrecording = false;
 
@@ -66,6 +67,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   double _remoteCanvasHeight = 0;
   final PaintController _controller = PaintController();
   bool _drawClearMode = false;
+  bool _extendHangup = false; // called_check受信や交渉開始で延長
 
   GlobalKey<StaffTalkMenuWidgetState> menuWidgetGlobalKey = GlobalKey();
 
@@ -164,6 +166,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     _remote2Renderer.dispose();
     _blinkAnimationController?.dispose();
     _stopRusuTimer();
+    _stopSoftHangTimer();
     super.dispose();
   }
 
@@ -276,15 +279,29 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
 
     print("call to ${AppManager.selectUser!.id}");
 
-    _rusuTimer = Timer.periodic(Duration(milliseconds: AppDefine.absenceSec1), (Timer timer) {
+    // 30秒までは延長可、35秒は確実に終了
+    _extendHangup = false;
+    _softHangTimer = Timer(Duration(milliseconds: AppDefine.absenceSec1), () {
+      if (AppManager.status == AppStatus.Talk) {
+        return;
+      }
+      if (_extendHangup) {
+        // 35秒タイマーに委ねる
+        return;
+      }
       _cancelcall();
-      setState(() {
-        _statusImage = ImageName.rusu;
-      });
+      setState(() { _statusImage = ImageName.rusu; });
+      _rusuTimer = Timer(Duration(milliseconds: AppDefine.absenceSec2), () { _close(); });
+    });
 
-      _rusuTimer = Timer.periodic(Duration(milliseconds: AppDefine.absenceSec2), (Timer timer) {
-        _close();
-      });
+    const int extendedMs = 35 * 1000;
+    _rusuTimer = Timer(const Duration(milliseconds: extendedMs), () {
+      if (AppManager.status == AppStatus.Talk) {
+        return;
+      }
+      _cancelcall();
+      setState(() { _statusImage = ImageName.rusu; });
+      _rusuTimer = Timer(Duration(milliseconds: AppDefine.absenceSec2), () { _close(); });
     });
   }
 
@@ -302,8 +319,16 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     }
   }
 
+  void _stopSoftHangTimer() {
+    if (_softHangTimer != null) {
+      _softHangTimer!.cancel();
+      _softHangTimer = null;
+    }
+  }
+
   void _startTalk() {
     _stopRusuTimer();
+    _stopSoftHangTimer();
     // AppManager.talkId1 = AppManager.selectUser.id;
     _statusImage = '';
     context.read<AddressStore>().setCall(AppManager.selectUser!.id, 0);
@@ -317,6 +342,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
 
   void _cancelcall() {
     _stopRusuTimer();
+    _stopSoftHangTimer();
     audio.stopCall();
     setState(() {
       _statusImage = '';
@@ -1472,6 +1498,10 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
         }
       }
     }
+    else if (message == 'called_check') {
+      // 受信側が遅延応答準備中。30秒切断を一旦延長。
+      _extendHangup = true;
+    }
     else if (message == 'call_cancel') {
       if (data["udid"] == null) {
         return;
@@ -1641,6 +1671,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
 
   @override
   void onCallResponse(to, sdp) {
+    // 交渉開始 → 30秒切断は回避
+    _extendHangup = true;
     if (to != AppManager.safetyCheckId) {
       AppManager.talkId1 = AppManager.selectUser!.id;
     }

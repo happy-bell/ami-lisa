@@ -18,6 +18,7 @@ class AppDefine {
   static const companyURL = 'https://happybell.biz/service/index.html';
   static const licenseURL = 'https://happybell.biz/license/index.html';
 
+  // 呼び出し未応答の自動切断(ミリ秒)
   static const absenceSec1 = 30 * 1000;
   static const absenceSec2 = 10 * 1000;
 
