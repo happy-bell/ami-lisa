@@ -1073,11 +1073,34 @@ class _ManagerPageState extends State<ManagerPage>
       if (data["udid"] == null) {
         return;
       }
+
+      bool shouldPlayButtonCall = false;
+
       if (mounted) {
-        context.read<AddressStore>().setCall(data["udid"], 0);
-        context.read<AddressStore>().setCalled(data["udid"], 1);
+        final addressStore = context.read<AddressStore>();
+        final address = addressStore.find(data["udid"]);
+
+        if (address != null) {
+          final bool wasCallRinging = address.call == 1;
+          final bool alreadyCalled = address.called == 1;
+          if (!wasCallRinging && !alreadyCalled) {
+            if (AppManager.status != AppStatus.Call &&
+                AppManager.status != AppStatus.Talk &&
+                AppManager.status != AppStatus.Multi &&
+                AppManager.status != AppStatus.MultiToTalk) {
+              shouldPlayButtonCall = true;
+            }
+          }
+        }
+
+        addressStore.setCall(data["udid"], 0);
+        addressStore.setCalled(data["udid"], 1);
       }
+
       audio.stopRingtone();
+      if (shouldPlayButtonCall) {
+        audio.buttonCall();
+      }
       _openCallStatusPopup();
     }
   }
