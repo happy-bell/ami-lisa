@@ -202,7 +202,7 @@ class Peer {
     try {
       stream.getAudioTracks()[0].enableSpeakerphone(true);
     } catch (e) {
-      print(e.toString());
+      print('enableSpeakerphone failed: $e');
     }
     return stream;
   }
@@ -295,11 +295,26 @@ class Peer {
             if (onAddRemoteStream != null) onAddRemoteStream!(id, event.streams[0]);
             _remoteStreams.add(event.streams[0]);
           }
+          // リモートの音声トラック追加時に念のためスピーカーを再度有効化
+          if (event.track.kind == 'audio') {
+            try {
+              _localStream?.getAudioTracks().first.enableSpeakerphone(true);
+            } catch (e) {
+              print('re-enableSpeakerphone on onTrack failed: $e');
+            }
+          }
         };
         pc.onAddTrack = (MediaStream stream, MediaStreamTrack track) {
           if (track.kind == 'video') {
             if (onAddRemoteStream != null) onAddRemoteStream!(id, stream);
             _remoteStreams.add(stream);
+          }
+          if (track.kind == 'audio') {
+            try {
+              _localStream?.getAudioTracks().first.enableSpeakerphone(true);
+            } catch (e) {
+              print('re-enableSpeakerphone on onAddTrack failed: $e');
+            }
           }
         };
         pc.onRemoveTrack = (MediaStream stream, MediaStreamTrack track) {

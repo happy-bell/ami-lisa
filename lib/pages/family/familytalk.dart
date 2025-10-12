@@ -91,6 +91,10 @@ class _FamilyTalkPageState extends State<FamilyTalkPage> with SocketIOServiceDel
     _statusImage = '';
     _setAppStatus(AppStatus.Talk);
     audio.stopCall();
+    // 念のためマイクとスピーカーを明示的に有効化
+    try { peer.setAudioEnabled(true); } catch (_) {}
+    // 念のためスピーカーを有効化（iOS対策）
+    try { peer.enableSpeaker(true); } catch (_) {}
   }
 
   void _notConnect(String connectStatus) {
@@ -410,6 +414,8 @@ class _FamilyTalkPageState extends State<FamilyTalkPage> with SocketIOServiceDel
 
   void _onAddRemoteStream(id, stream) {
     print('onremote stream $id ${AppManager.talkId1}, ${AppManager.talkId2}');
+    // リモート音声受信時にもスピーカーを再度有効化
+    try { peer.enableSpeaker(true); } catch (_) {}
     if (id == AppManager.talkId1) {
       _remoteRenderer.srcObject = stream;
     }
