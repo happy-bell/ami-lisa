@@ -336,6 +336,8 @@ class _StaffPageState extends State<StaffPage>
       }
 
       addressStore.setCalled(targetId, 1);
+      // Ensure CALL STATUS popup reflects button-call events as well
+      _openCallStatusPopup();
     }
   }
 
@@ -742,7 +744,8 @@ class _StaffPageState extends State<StaffPage>
           continue;
         }
       }
-      if (address.call == 1) {
+      // Show popup when ringing or when a button-call is active
+      if (address.call == 1 || address.called == 1) {
         final managerName = addressStore.managerName(address.code);
         _callStatuses.add({'address': address, 'status': 'call', 'managerName': managerName});
       }
@@ -886,6 +889,8 @@ class _StaffPageState extends State<StaffPage>
       var address = addressStore.find(targetId)!;
       if (address.called == 1) {
         context.read<AddressStore>().setCalled(targetId, 0);
+        // Refresh CALL STATUS popup after clearing button-call state
+        _openCallStatusPopup();
         context.read<AddressStore>().setSupported(targetId, 1);
         await audio.stopButtonCall();
         return;
