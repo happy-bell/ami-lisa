@@ -564,7 +564,8 @@ class _ManagerPageState extends State<ManagerPage>
           continue;
         }
       }
-      if (address.call == 1) {
+      // Include ringing and button-call states
+      if (address.call == 1 || address.called == 1) {
         _callStatuses.add({'address': address, 'status': 'call'});
       }
     }
