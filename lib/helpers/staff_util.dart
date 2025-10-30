@@ -125,12 +125,19 @@ class StaffUtil {
             onTap: () {
               selectAddress(address);
             },
-            child: Container(
+          child: Container(
               color: const Color.fromARGB(255, 30, 30, 30),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
                   imageWidget,
+                  if (address.watching == 1)
+                    Positioned.fill(
+                      child: Image.asset(
+                        'assets/images/status/watching.png',
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   Positioned(
                       top: 0,
                       left: 2.0,

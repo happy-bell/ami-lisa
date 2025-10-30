@@ -117,6 +117,7 @@ class AddressStore with ChangeNotifier {
       addressList[i].status = -1;
       addressList[i].call = 0;
       addressList[i].called = 0;
+      addressList[i].watching = 0;
       addressList[i].liveimage = '';
       addressList[i].sensor = '';
     }
@@ -207,6 +208,15 @@ class AddressStore with ChangeNotifier {
 
     print('set supported $udid => $value');
     addressList[index].supported = value;
+    notifyListeners();
+  }
+
+  setWatching(udid, value) {
+    final index = _findAddress(udid);
+    if (index < 0) {
+      return;
+    }
+    addressList[index].watching = value;
     notifyListeners();
   }
 

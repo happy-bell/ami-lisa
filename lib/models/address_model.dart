@@ -8,6 +8,7 @@ class Address {
   int call;
   int called;
   int supported = 0;
+  int watching = 0;
   String userType;
   String photo = '';
   String liveimage = '';

@@ -235,6 +235,13 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       return;
     }
 
+    // 見守り中は接続不可
+    final watching = addressStore.find(AppManager.selectUser!.id)?.watching ?? 0;
+    if (watching == 1) {
+      AppManager.toast("見守り中のため接続できません", bgColor: Colors.blue);
+      return;
+    }
+
     if (AppManager.status == AppStatus.Call ||
         AppManager.status == AppStatus.Talk ||
         AppManager.status == AppStatus.Multi ||
@@ -1083,6 +1090,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     AppManager.isMute = true;
     AppManager.safetyCheckId = AppManager.selectUser!.id;
     socketservice.io.emit("safety_check", [AppManager.selectUser!.id]);
+    // 自端末の一覧にも即時反映
+    context.read<AddressStore>().setWatching(AppManager.selectUser!.id, 1);
     setState(() {});
   }
 
@@ -1093,6 +1102,8 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
   }
 
   void _endSafetyCheck() {
+    // 一覧の見守り表示を解除
+    context.read<AddressStore>().setWatching(AppManager.safetyCheckId, 0);
     AppManager.safetyCheckId = '';
     AppManager.isMute = false;
     _close();

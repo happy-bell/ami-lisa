@@ -56,6 +56,7 @@ class _RoomPageState extends State<RoomPage>
   bool _isVideoPlay = false;
 
   final _safetyCheckIds = [];
+  bool _watching = false;
 
   @override
   void initState() {
@@ -504,6 +505,13 @@ class _RoomPageState extends State<RoomPage>
                     width: statusImageSize,
                     child: Image.asset(_statusImage),
                   ),
+                if (_watching)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    height: 80,
+                    child: Image.asset('assets/images/status/watching.png'),
+                  ),
                 Positioned(
                   top: constraints.maxHeight - MediaQuery.of(context).padding.bottom - iconSize,
                   left: 8,
@@ -639,6 +647,22 @@ class _RoomPageState extends State<RoomPage>
       setState(() {
         _isconnect = true;
       });
+      // ステータスと見守り状態の初期同期
+      socketservice.io.emit("clients_status", [AppManager.settings['addressGroup']]);
+    }
+    else if (message == 'clients_status') {
+      var statuses = data['data'];
+      if (statuses is Map && statuses.containsKey(AppManager.myId)) {
+        final mine = statuses[AppManager.myId];
+        try {
+          final sc = mine['safetyCheck'];
+          if (sc is List && sc.isNotEmpty) {
+            setState(() { _watching = true; });
+          } else {
+            setState(() { _watching = false; });
+          }
+        } catch (_) {}
+      }
     }
     else if (message == 'call') {
       if (data["info"]["udid"] == null) {
@@ -661,6 +685,22 @@ class _RoomPageState extends State<RoomPage>
         return;
       }
       _receiveSafetyCheckEnd(data["udid"]);
+    }
+    else if (message == 'watching') {
+      if (data["udid"] == null) {
+        return;
+      }
+      if (data["udid"].toString() == AppManager.myId) {
+        setState(() { _watching = true; });
+      }
+    }
+    else if (message == 'watching_end') {
+      if (data["udid"] == null) {
+        return;
+      }
+      if (data["udid"].toString() == AppManager.myId) {
+        setState(() { _watching = false; });
+      }
     }
     else if (message == 'call_button') {
       _onCallButton();
