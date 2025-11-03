@@ -451,6 +451,13 @@ class _StaffPageState extends State<StaffPage>
                 fit: StackFit.expand,
                 children: [
                   imageWidget,
+                  if (address.watching == 1)
+                    Positioned.fill(
+                      child: Image.asset(
+                        'assets/images/status/watching.png',
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   Positioned(
                       top: 0,
                       left: 2.0,
@@ -786,6 +793,11 @@ class _StaffPageState extends State<StaffPage>
   }
 
   Future<void> _selectAddress(Address address) async {
+    // 見守り中は遷移せず、従来通りのトーストで通知
+    if (address.watching == 1) {
+      AppManager.toast("見守り中のため接続できません", bgColor: Colors.blue);
+      return;
+    }
     AppManager.selectUser = address;
     audio.stopButtonCall();
     _stopCheckAccountTimer();
@@ -1201,6 +1213,15 @@ class _StaffPageState extends State<StaffPage>
       var statuses = data['data'];
       statuses.forEach((udid, value) {
         _setAddressStatus(udid, value['status']);
+        // 初期同期時に見守り状態を復元
+        try {
+          final sc = value['safetyCheck'];
+          if (sc is List && sc.isNotEmpty) {
+            if (mounted) context.read<AddressStore>().setWatching(udid, 1);
+          } else {
+            if (mounted) context.read<AddressStore>().setWatching(udid, 0);
+          }
+        } catch (_) {}
       });
     }
     else if (message == 'login') {
@@ -1326,6 +1347,32 @@ class _StaffPageState extends State<StaffPage>
         audio.buttonCall();
       }
       _openCallStatusPopup();
+    }
+    else if (message == 'safety_check' || message == 'watching') {
+      if (data["udid"] == null) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      final udid = data["udid"].toString();
+      final addressStore = context.read<AddressStore>();
+      if (addressStore.find(udid) != null) {
+        addressStore.setWatching(udid, 1);
+      }
+    }
+    else if (message == 'safety_check_end' || message == 'safety_check_stop' || message == 'watching_end') {
+      if (data["udid"] == null) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      final udid = data["udid"].toString();
+      final addressStore = context.read<AddressStore>();
+      if (addressStore.find(udid) != null) {
+        addressStore.setWatching(udid, 0);
+      }
     }
     else if (message == 'called_check') {
       if (data["TO"] == null) {
