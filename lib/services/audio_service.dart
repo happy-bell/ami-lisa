@@ -60,6 +60,19 @@ class AudioService {
   }
 
   Future<void> ringtone() async {
+    // 自動応答が有効かつ「即座に応答（CALL_DELAY=0）」の場合は、
+    // 着信音を再生しない（最小限の影響で瞬間的な鳴動を抑止）
+    try {
+      final String autoReceive = AppManager.appsettings["AUTO_RECEIVE"] ?? '0';
+      final int delaySeconds = int.tryParse(AppManager.appsettings["CALL_DELAY"] ?? '0') ?? 0;
+      if (autoReceive == '1' && delaySeconds == 0) {
+        print('[DEBUG PRINT] skip ringtone: AUTO_RECEIVE=1 and CALL_DELAY=0');
+        return;
+      }
+    } catch (_) {
+      // 設定取得に失敗しても従来どおり着信音を再生する
+    }
+
     // 既に着信音が再生中の場合は何もしない
     if (_isRingtoneActive) {
       print('[DEBUG PRINT] ringtone already active, skipping');
