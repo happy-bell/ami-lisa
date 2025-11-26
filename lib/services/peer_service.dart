@@ -30,6 +30,10 @@ class Peer {
 
   MediaStream? _localStream;
   set localStream(value) => _localStream = value;
+  // 互換用: 旧コードが peer.setLocalStream(stream) を呼ぶ場合に備える
+  void setLocalStream(MediaStream stream) {
+    _localStream = stream;
+  }
   final List<MediaStream> _remoteStreams = [];
   SignalingStateCallback? onStateChange;
   StreamStateCallback? onLocalStream;
@@ -289,11 +293,23 @@ class Peer {
         };
         await pc.addStream(_localStream!);
       } else if (sdpSemantics == 'unified-plan') {
-        pc.onTrack = (RTCTrackEvent event) {
+        pc.onTrack = (RTCTrackEvent event) async {
           print('onTrack: ' + id);
           if (event.track.kind == 'video') {
-            if (onAddRemoteStream != null) onAddRemoteStream!(id, event.streams[0]);
-            _remoteStreams.add(event.streams[0]);
+            try {
+              if (event.streams.isNotEmpty) {
+                if (onAddRemoteStream != null) onAddRemoteStream!(id, event.streams[0]);
+                _remoteStreams.add(event.streams[0]);
+              } else {
+                // 一部の中華系SoCなどでstreamsが空のケースにフォールバック
+                final tmp = await createLocalMediaStream('remote-$id');
+                await tmp.addTrack(event.track);
+                if (onAddRemoteStream != null) onAddRemoteStream!(id, tmp);
+                _remoteStreams.add(tmp);
+              }
+            } catch (e) {
+              print('onTrack(video) handling failed: $e');
+            }
           }
           // リモートの音声トラック追加時に念のためスピーカーを再度有効化
           if (event.track.kind == 'audio') {
@@ -304,10 +320,21 @@ class Peer {
             }
           }
         };
-        pc.onAddTrack = (MediaStream stream, MediaStreamTrack track) {
+        pc.onAddTrack = (MediaStream stream, MediaStreamTrack track) async {
           if (track.kind == 'video') {
-            if (onAddRemoteStream != null) onAddRemoteStream!(id, stream);
-            _remoteStreams.add(stream);
+            try {
+              if (stream.id.isNotEmpty) {
+                if (onAddRemoteStream != null) onAddRemoteStream!(id, stream);
+                _remoteStreams.add(stream);
+              } else {
+                final tmp = await createLocalMediaStream('remote2-$id');
+                await tmp.addTrack(track);
+                if (onAddRemoteStream != null) onAddRemoteStream!(id, tmp);
+                _remoteStreams.add(tmp);
+              }
+            } catch (e) {
+              print('onAddTrack(video) handling failed: $e');
+            }
           }
           if (track.kind == 'audio') {
             try {
@@ -388,7 +415,9 @@ class Peer {
     print('_createOffer');
     try {
       RTCSessionDescription s = await pc.createOffer(media == 'video' || media == 'recvonly' ? _constraints : _dcConstraints);
-      await pc.setLocalDescription(s);
+      final munged = _mungeSdpForCompatibility(s.sdp ?? '');
+      final local = RTCSessionDescription(munged, 'offer');
+      await pc.setLocalDescription(local);
       var localDescription = await pc.getLocalDescription();
       if (onOffer != null) onOffer!({'sdp': localDescription!.sdp, 'id': id});
     } catch (e) {
@@ -400,9 +429,11 @@ class Peer {
   Future<void> _createAnswer(String id, RTCPeerConnection pc, media) async {
     try {
       RTCSessionDescription s = await pc.createAnswer(media == 'data' ? _dcConstraints : _constraints);
-      pc.setLocalDescription(s);
+      final munged = _mungeSdpForCompatibility(s.sdp ?? '');
+      final local = RTCSessionDescription(munged, 'answer');
+      await pc.setLocalDescription(local);
 
-      if (onAnswer != null) onAnswer!({'sdp': s.sdp, 'id': id});
+      if (onAnswer != null) onAnswer!({'sdp': local.sdp, 'id': id});
     } catch (e) {
       print(e.toString());
     }
@@ -433,6 +464,89 @@ class Peer {
       } catch (e) {
         print(e.toString());
       }
+    }
+  }
+
+  /// 端末間互換性を高めるためのSDP加工
+  /// - VP8を最優先
+  /// - H264を使う場合はBaseline相当に調整（profile-level-id=42e01f, packetization-mode=1）
+  String _mungeSdpForCompatibility(String sdp) {
+    try {
+      final lines = sdp.split('\n');
+      // rtpmapマッピング: PT -> codec名
+      final Map<String, String> ptCodec = {};
+      final RegExp rtpmap = RegExp(r'^a=rtpmap:(\d+)\s+([^/]+)/', multiLine: false);
+      for (final l in lines) {
+        final m = rtpmap.firstMatch(l.trim());
+        if (m != null) {
+          ptCodec[m.group(1)!] = m.group(2)!.toUpperCase();
+        }
+      }
+
+      int videoMLineIndex = -1;
+      for (int i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith('m=video')) {
+          videoMLineIndex = i;
+          break;
+        }
+      }
+
+      if (videoMLineIndex >= 0) {
+        final parts = lines[videoMLineIndex].trim().split(' ');
+        if (parts.length > 3) {
+          final header = parts.sublist(0, 3); // m=video <port> RTP/SAVPF
+          final payloads = parts.sublist(3);
+
+          final vp8 = <String>[];
+          final h264 = <String>[];
+          final others = <String>[];
+          for (final pt in payloads) {
+            final codec = ptCodec[pt] ?? '';
+            if (codec == 'VP8') {
+              vp8.add(pt);
+            } else if (codec == 'H264') {
+              h264.add(pt);
+            } else {
+              others.add(pt);
+            }
+          }
+          // VP8優先 → H264 → その他
+          final newPayloads = <String>[]..addAll(vp8)..addAll(h264)..addAll(others);
+          lines[videoMLineIndex] = (header + newPayloads).join(' ');
+
+          // H264のfmtpをBaseline相当に調整
+          if (h264.isNotEmpty) {
+            final h264Pts = Set<String>.from(h264);
+            final RegExp fmtpRe = RegExp(r'^a=fmtp:(\d+)\s+(.+)+?$', multiLine: false);
+            for (int i = 0; i < lines.length; i++) {
+              final l = lines[i].trim();
+              final m = fmtpRe.firstMatch(l);
+              if (m != null && h264Pts.contains(m.group(1)!)) {
+                // 既存パラメータを解析して安全側に上書き
+                final params = m.group(2)!.split(';').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+                final Map<String, String> kv = {};
+                for (final p in params) {
+                  final idx = p.indexOf('=');
+                  if (idx > 0) {
+                    kv[p.substring(0, idx)] = p.substring(idx + 1);
+                  } else {
+                    kv[p] = '';
+                  }
+                }
+                kv['profile-level-id'] = '42e01f';
+                kv['packetization-mode'] = '1';
+                kv['level-asymmetry-allowed'] = '1';
+                final rebuilt = kv.entries.map((e) => e.value.isEmpty ? e.key : '${e.key}=${e.value}').join(';');
+                lines[i] = 'a=fmtp:${m.group(1)} ' + rebuilt;
+              }
+            }
+          }
+        }
+      }
+      return lines.join('\n');
+    } catch (e) {
+      print('SDP munging failed: $e');
+      return sdp;
     }
   }
 }
