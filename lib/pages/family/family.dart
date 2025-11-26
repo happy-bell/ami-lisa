@@ -129,30 +129,30 @@ class _FamilyPageState extends State<FamilyPage> with WidgetsBindingObserver, So
       return null;
     });
 
-    if (data == null) {
-      _stopCheckAccountTimer();
-
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('確認'),
-            content: Text('ログイン情報が更新されました。再度ログインをお願いします。'),
-            actions: <Widget>[
-              TextButton(
-                child: const Text('OK'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          );
-        },
-      );
-      print('to logout');
-      _logout();
-    }
+    // if (data == null) {
+    //   _stopCheckAccountTimer();
+    //
+    //   await showDialog(
+    //     context: context,
+    //     barrierDismissible: false,
+    //     builder: (BuildContext context) {
+    //       return AlertDialog(
+    //         title: const Text('確認'),
+    //         content: Text('ログイン情報が更新されました。再度ログインをお願いします。'),
+    //         actions: <Widget>[
+    //           TextButton(
+    //             child: const Text('OK'),
+    //             onPressed: () {
+    //               Navigator.of(context).pop();
+    //             },
+    //           ),
+    //         ],
+    //       );
+    //     },
+    //   );
+    //   print('to logout');
+    //   _logout();
+    // }
     }
 
   void _loadAddress() {
