@@ -1,0 +1,2 @@
+/Users/happybell/ami3.3.27-9/android/app/.cxx/RelWithDebInfo/2c5k3f42/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/happybell/ami3.3.27-9/android/app/.cxx/RelWithDebInfo/2c5k3f42/armeabi-v7a/CMakeFiles/rebuild_cache.dir

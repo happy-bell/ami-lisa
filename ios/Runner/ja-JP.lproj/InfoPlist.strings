@@ -2,8 +2,8 @@
   InfoPlist.strings
   Runner
 
-  Created by Happy Bell Inc. on 2023/12/13.
+  Created by Happy Bell Inc. on 2025/11/26.
   
 */
 CFBundleDisplayName = "アミマルチ";
-NSHumanReadableCopyright = "2005-2023 Happy Bell Inc. All rights reserved.";
+NSHumanReadableCopyright = "©2015  Happy Bell Inc.";

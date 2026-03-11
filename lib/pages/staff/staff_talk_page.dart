@@ -1727,7 +1727,7 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     else if (message == 'force_hangup') {
       print('[DEBUG PRINT] force_hangup received from ${data["udid"]}, reason: ${data["reason"]}');
       // 相手が切断したら即座に自分も切断ボタンを押下
-      callEndButton();
+    // callEndButton();
     } else if (message == 'force_disconnect') {
     }
   }

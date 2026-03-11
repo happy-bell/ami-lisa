@@ -24,13 +24,13 @@ def flutterVersionName =  localProps["flutter.versionName"] ?: "1.0"
 android {
     namespace "jp.amiplus.mulch"
 
-    compileSdk 35
+    compileSdk 36
     ndkVersion flutter.ndkVersion
 
     defaultConfig {
         applicationId "jp.amiplus.mulch"
         minSdk 23
-        targetSdk 35
+        targetSdk 36
         versionCode flutterVersionCode
         versionName flutterVersionName
     }

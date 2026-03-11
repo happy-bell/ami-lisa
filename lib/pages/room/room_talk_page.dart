@@ -1298,7 +1298,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
     else if (message == 'force_hangup') {
       print('[DEBUG PRINT] force_hangup received from ${data["udid"]}, reason: ${data["reason"]}');
       // 相手が切断したら即座に自分も切断ボタンを押下
-      _callEndButton();
+    // _callEndButton();
     }
     else if (message == 'force_disconnect') {
     }
