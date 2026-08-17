@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sonix USB 2.0 Camera (TCLで確認した vendor/product) -->
+    <usb-device-filter vendor-id="1041" product-id="730" />
+    <!-- Logicool / Logitech C270n (VID 0x046D) -->
+    <usb-device-filter vendor-id="1133" />
+    <!-- EMEET (VID 0x328F) -->
+    <usb-device-filter vendor-id="12943" />
+    <!-- USB Audio Class -->
+    <usb-device-filter class="1" subclass="1" protocol="0" />
+    <usb-device-filter class="1" subclass="2" protocol="0" />
+    <!-- Video+Audio composite も拾うため UVC も許可対象に -->
+    <usb-device-filter class="14" subclass="1" protocol="0" />
+    <usb-device-filter class="14" subclass="2" protocol="0" />
+</resources>

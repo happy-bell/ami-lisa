@@ -33,6 +33,19 @@ android {
         targetSdk 36
         versionCode flutterVersionCode
         versionName flutterVersionName
+
+        externalNativeBuild {
+            cmake {
+                cppFlags "-fexceptions"
+                arguments "-DANDROID_STL=c++_static"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+        }
     }
 
     signingConfigs {
@@ -64,6 +77,10 @@ flutter { source "../.." }
 // android/app/build.gradle
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+
+    // flutter_webrtc の ExternalAudioProcessing にUSBマイクPCMを注入するため、
+    // プラグインと同じ libwebrtc をコンパイル時のみ参照 (実行時はプラグイン側を使用)
+    compileOnly 'io.github.webrtc-sdk:android:125.6422.03'
 
     configurations.all {
         exclude module: "assets_audio_player_web"

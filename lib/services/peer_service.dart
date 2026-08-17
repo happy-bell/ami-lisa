@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:amiapp/helpers/tv_util.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 enum SignalingState {
@@ -26,8 +29,10 @@ class Peer {
   RTCPeerConnection? peerConnection;
   RTCDataChannel? dataChannel;
   final _remoteCandidates = {};
+  final Map<String, bool> _iceStable = {};
   // var _turnCredential;
 
+  bool _emeetCapture = false;
   MediaStream? _localStream;
   set localStream(value) => _localStream = value;
   // 互換用: 旧コードが peer.setLocalStream(stream) を呼ぶ場合に備える
@@ -88,10 +93,14 @@ class Peer {
   };
 
   void close() {
+    if (TvUtil.isTelevision) {
+      TvUtil.usbMicStop();
+    }
     if (_localStream != null) {
       _localStream?.getTracks().forEach((track) => track.stop());
       _localStream!.dispose();
-      _localStream = null;
+    _emeetCapture = false;
+    _localStream = null;
     }
 
     if (peerConnection != null) {
@@ -105,6 +114,7 @@ class Peer {
     });
 
     _peerConnections.clear();
+    _iceStable.clear();
 
     // if (this.onStateChange != null) {
     //   this.onStateChange(SignalingState.CallStateBye);
@@ -119,12 +129,36 @@ class Peer {
       _peerConnections[id]!.dispose();
       _peerConnections.remove(id);
     }
+    _iceStable.remove(id);
+  }
+
+  void setAudioEnabled(bool value) {
+    if (_localStream == null) return;
+    final tracks = _localStream!.getAudioTracks();
+    if (tracks.isEmpty) {
+      print('setAudioEnabled($value): no audio tracks');
+      return;
+    }
+    for (final track in tracks) {
+      track.enabled = value;
+      print('setAudioEnabled($value) track=${track.id} enabled=${track.enabled}');
+    }
   }
 
   void enableSpeaker(bool val) {
-    if (_localStream != null) {
-      _localStream!.getAudioTracks()[0].enableSpeakerphone(val);
-      print(_localStream!.getAudioTracks()[0].muted);
+    if (_localStream == null) return;
+    final tracks = _localStream!.getAudioTracks();
+    if (tracks.isEmpty) return;
+    // TVではスピーカーフォン切替をスキップ（USBマイク送信に影響する場合がある）
+    if (TvUtil.isTelevision) {
+      print('enableSpeaker skipped on TV');
+      return;
+    }
+    try {
+      tracks[0].enableSpeakerphone(val);
+      print(tracks[0].muted);
+    } catch (e) {
+      print('enableSpeaker failed: $e');
     }
   }
 
@@ -150,6 +184,10 @@ class Peer {
   }
 
   void receiveIceCandidate(String peerId, Map<String, dynamic> candidateMap) async {
+    if (_iceStable[peerId] == true) {
+      print('ignore late ice $peerId');
+      return;
+    }
     var pc = _peerConnections[peerId];
 
     print("receive ice $peerId");
@@ -177,36 +215,314 @@ class Peer {
     });
   }
 
-  Future<MediaStream> createStream(media, userScreen) async {
-    final Map<String, dynamic> mediaConstraints = {
+  Future<String?> _preferUsbAudioDeviceId() async {
+    // flutter_webrtc の enumerateDevices は USB 入力を列挙しない。
+    // ネイティブ AudioManager から USB を取る。
+    final nativeId = await TvUtil.findUsbAudioDeviceId();
+    if (nativeId != null && nativeId.isNotEmpty) {
+      print('preferred audioinput (native USB): $nativeId');
+      return nativeId;
+    }
+    try {
+      final devices = await navigator.mediaDevices.enumerateDevices();
+      print('=== media devices (${devices.length}) ===');
+      MediaDeviceInfo? anyAudio;
+      for (final d in devices) {
+        print('device kind=${d.kind} label=${d.label} id=${d.deviceId}');
+        if (d.kind != 'audioinput') continue;
+        anyAudio ??= d;
+      }
+      if (anyAudio != null) {
+        print(
+            'preferred audioinput (fallback): ${anyAudio.label} (${anyAudio.deviceId})');
+        return anyAudio.deviceId;
+      }
+    } catch (e) {
+      print('enumerateDevices failed: $e');
+    }
+    return null;
+  }
+
+  Future<void> _tuneEmeetSender(RTCPeerConnection pc) async {
+    try {
+      final senders = await pc.getSenders();
+      for (final sender in senders) {
+        if (sender.track?.kind != 'video') continue;
+        final params = sender.parameters;
+        params.degradationPreference =
+            RTCDegradationPreference.MAINTAIN_RESOLUTION;
+        final encodings = params.encodings;
+        if (encodings != null) {
+          for (final enc in encodings) {
+            enc.maxFramerate = 30;
+            enc.maxBitrate = 3500000;
+            enc.minBitrate = 800000;
+            enc.scaleResolutionDownBy = 1.0;
+          }
+        }
+        await sender.setParameters(params);
+        print('EMEET sender tuned fps=30 maxBr=3500k maintainResolution');
+      }
+    } catch (e) {
+      print('EMEET sender tune failed: $e');
+    }
+  }
+
+  Future<void> _stopStream(MediaStream stream) async {
+    for (final t in stream.getTracks()) {
+      try {
+        await t.stop();
+      } catch (_) {}
+    }
+    try {
+      await stream.dispose();
+    } catch (_) {}
+  }
+
+  Map<String, dynamic> _emeetVideoConstraints(int w, int h, int fps) {
+    return {
+      'width': w,
+      'height': h,
+      'frameRate': fps,
+      'mandatory': {
+        'minWidth': '$w',
+        'minHeight': '$h',
+        'minFrameRate': '$fps',
+      },
+      'optional': [],
+    };
+  }
+
+  Future<MediaStream> _attachEmeetAudio(MediaStream video) async {
+    try {
+      final audio = await navigator.mediaDevices.getUserMedia({
+        'audio': true,
+        'video': false,
+      });
+      for (final track in audio.getAudioTracks()) {
+        await video.addTrack(track);
+      }
+      try {
+        await audio.dispose();
+      } catch (_) {}
+    } catch (e) {
+      print('EMEET audio attach failed: $e');
+    }
+    return video;
+  }
+
+  /// EMEET C960: ネイティブ 1080p30。640x360+PRIVATE は HAL ENOSYS。
+  /// 波うちの主因は 50Hz 既定の電源周波数。先に UVC で 60Hz を指定する。
+  /// 映像を先に開き、その後マイクを足して USB 同時ネゴを避ける。
+  Future<MediaStream> _openEmeetStream() async {
+    try {
+      final af = await TvUtil.setUvcAntiFlicker60();
+      print('EMEET uvc anti-flicker 60Hz: $af');
+    } catch (e) {
+      print('EMEET uvc anti-flicker failed: $e');
+    }
+    const attempts = <Map<String, int>>[
+      {'w': 1920, 'h': 1080, 'fps': 30},
+      {'w': 1280, 'h': 720, 'fps': 30},
+      {'w': 960, 'h': 720, 'fps': 30},
+      {'w': 800, 'h': 600, 'fps': 30},
+    ];
+    MediaStream? lastAudio;
+    for (final a in attempts) {
+      try {
+        print('EMEET getUserMedia video-only ${a['w']}x${a['h']}@${a['fps']}');
+        final stream = await navigator.mediaDevices.getUserMedia({
+          'audio': false,
+          'video': _emeetVideoConstraints(a['w']!, a['h']!, a['fps']!),
+        });
+        if (stream.getVideoTracks().isNotEmpty) {
+          print('EMEET video ok ${a['w']}x${a['h']}@${a['fps']}');
+          if (lastAudio != null) await _stopStream(lastAudio);
+          try {
+            final af2 = await TvUtil.setUvcAntiFlicker60();
+            print('EMEET uvc anti-flicker after open: $af2');
+          } catch (_) {}
+          return _attachEmeetAudio(stream);
+        }
+        lastAudio ??= stream;
+      } catch (e) {
+        print('EMEET getUserMedia ${a['w']}x${a['h']} failed: $e');
+      }
+    }
+    if (lastAudio != null) return lastAudio;
+    print('EMEET fallback audio-only');
+    return navigator.mediaDevices.getUserMedia({
       'audio': true,
-      'video': {
+      'video': false,
+    });
+  }
+
+  Future<MediaStream> createStream(media, userScreen) async {
+    // マイク権限を確実に取得（USBカメラ内蔵マイク含む）
+    try {
+      final mic = await Permission.microphone.request();
+      print('microphone permission: $mic');
+    } catch (e) {
+      print('microphone permission request failed: $e');
+    }
+
+    if (TvUtil.isTelevision) {
+      try {
+        const channel = MethodChannel('jp.amiplus.mulch/tv');
+        final usbPerm = await channel.invokeMethod('ensureUsbAudioPermission');
+        print('ensureUsbAudioPermission: $usbPerm');
+        // 権限ダイアログを新規表示した場合のみ、付与を待つ
+        final requested = usbPerm is Map && usbPerm['requested'] == true;
+        if (requested) {
+          await Future.delayed(const Duration(milliseconds: 1000));
+        }
+        final prepared =
+            await channel.invokeMethod('prepareCommunicationAudio');
+        print('prepareCommunicationAudio: $prepared');
+      } catch (e) {
+        print('prepareCommunicationAudio failed: $e');
+      }
+    }
+
+    // Google TV + USBカメラでは facingMode を付けると失敗しやすい。
+    // EMEET だけ専用経路。C270n / TZZ / その他は従来の 640x360@15。
+    final cam = TvUtil.isTelevision ? await TvUtil.getUsbCameraProfile() : null;
+    print('usb camera profile: $cam');
+    final camId = cam?['id']?.toString() ?? '';
+
+    String? audioDeviceId;
+    if (TvUtil.isTelevision) {
+      audioDeviceId = await _preferUsbAudioDeviceId();
+      if (audioDeviceId != null && audioDeviceId.isNotEmpty) {
+        try {
+          await Helper.selectAudioInput(audioDeviceId);
+          print('Helper.selectAudioInput($audioDeviceId) ok');
+        } catch (e) {
+          print('Helper.selectAudioInput failed: $e');
+        }
+      }
+    }
+
+    MediaStream stream;
+    _emeetCapture = TvUtil.isTelevision && camId == 'emeet';
+    if (_emeetCapture) {
+      stream = await _openEmeetStream();
+    } else {
+      final Map<String, dynamic> videoConstraints = {
         'mandatory': {
           'minWidth': '640',
           'minHeight': '360',
           'minFrameRate': '15',
         },
-        'facingMode': 'user',
         'optional': [],
+      };
+      if (!TvUtil.isTelevision) {
+        videoConstraints['facingMode'] = 'user';
       }
-    };
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          'audio': true,
+          'video': videoConstraints,
+        });
+      } catch (e) {
+        print('getUserMedia failed ($e), retry with simple constraints');
+        stream = await navigator.mediaDevices.getUserMedia({
+          'audio': true,
+          'video': true,
+        });
+      }
+    }
 
-    // MediaStream stream = userScreen
-    //     ? await MediaDevices.getUserMedia(
-    //     mediaConstraints) //navigator.getDisplayMedia(mediaConstraints)
-    //     : await MediaDevices.getUserMedia(mediaConstraints);
+    if (stream.getVideoTracks().isEmpty && camId != 'emeet') {
+      print('no video tracks; retry video-only getUserMedia');
+      try {
+        final videoOnly = await navigator.mediaDevices.getUserMedia({
+          'audio': false,
+          'video': true,
+        });
+        for (final track in videoOnly.getVideoTracks()) {
+          await stream.addTrack(track);
+        }
+      } catch (e) {
+        print('video-only getUserMedia failed: $e');
+      }
+    }
 
-    var stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+    for (final track in stream.getVideoTracks()) {
+      track.enabled = true;
+      print(
+          'local video track: id=${track.id} enabled=${track.enabled} muted=${track.muted} label=${track.label}');
+    }
+
+    // 映像は取れたが音声トラックが無い場合、音声だけ再取得して結合
+    if (stream.getAudioTracks().isEmpty) {
+      print('no audio tracks; retry audio-only getUserMedia');
+      try {
+        if (audioDeviceId != null && audioDeviceId.isNotEmpty) {
+          try {
+            await Helper.selectAudioInput(audioDeviceId);
+          } catch (_) {}
+        }
+        final audioOnly = await navigator.mediaDevices.getUserMedia({
+          'audio': true,
+          'video': false,
+        });
+        for (final track in audioOnly.getAudioTracks()) {
+          await stream.addTrack(track);
+        }
+      } catch (e) {
+        print('audio-only getUserMedia failed: $e');
+      }
+    }
+
+    for (final track in stream.getAudioTracks()) {
+      track.enabled = true;
+      print(
+          'local audio track: id=${track.id} enabled=${track.enabled} muted=${track.muted} label=${track.label}');
+      if (TvUtil.isTelevision) {
+        try {
+          // USBマイクはレベルが低いことがある
+          await Helper.setVolume(5.0, track);
+        } catch (e) {
+          print('setVolume failed: $e');
+        }
+        try {
+          await Helper.setMicrophoneMute(false, track);
+        } catch (_) {}
+      }
+    }
+
     if (onLocalStream != null) onLocalStream!(stream);
 
+    print(
+        '***************      Turn on speaker phone(${stream.getAudioTracks().isNotEmpty ? stream.getAudioTracks()[0].muted : "no-audio"})       ******************************');
+    if (!TvUtil.isTelevision) {
+      try {
+        await Helper.setSpeakerphoneOn(true);
+      } catch (e) {
+        print('setSpeakerphoneOn failed: $e');
+      }
+      try {
+        if (stream.getAudioTracks().isNotEmpty) {
+          stream.getAudioTracks()[0].enableSpeakerphone(true);
+        }
+      } catch (e) {
+        print('enableSpeakerphone failed: $e');
+      }
+    } else if (audioDeviceId != null && audioDeviceId.isNotEmpty) {
+      try {
+        await Helper.selectAudioInput(audioDeviceId);
+      } catch (_) {}
+    }
 
-    print('***************      Turn on speaker phone(${stream.getAudioTracks()[0].muted})       ******************************');
-    // final session = await AudioSession.instance;
-    // await session.configure(AudioSessionConfiguration.music());
-    try {
-      stream.getAudioTracks()[0].enableSpeakerphone(true);
-    } catch (e) {
-      print('enableSpeakerphone failed: $e');
+    if (TvUtil.isTelevision) {
+      // 送信開始前にUSBマイク注入を完了させる（非同期だと最初の数秒が途切れる）
+      try {
+        final res = await TvUtil.usbMicStart();
+        print('usbMicStart: $res');
+      } catch (e) {
+        print('usbMicStart failed: $e');
+      }
     }
     return stream;
   }
@@ -225,12 +541,6 @@ class Peer {
   void setVideoEnabled(bool value) {
     if (_localStream != null) {
       _localStream!.getVideoTracks()[0].enabled = value;
-    }
-  }
-
-  void setAudioEnabled(bool value) {
-    if (_localStream != null) {
-      _localStream!.getAudioTracks()[0].enabled = value;
     }
   }
 
@@ -274,9 +584,13 @@ class Peer {
     print('**************************************************************');
     var configuration = <String, dynamic>{
       'iceServers': [
-        {'url': 'stun:stun.l.google.com:19302'},
+        {'urls': 'stun:stun.l.google.com:19302'},
       ],
-      'sdpSemantics': sdpSemantics
+      'sdpSemantics': sdpSemantics,
+      'iceCandidatePoolSize': 4,
+      'bundlePolicy': 'max-bundle',
+      'rtcpMuxPolicy': 'require',
+      'continualGatheringPolicy': 'gather_once',
     };
     RTCPeerConnection pc = await createPeerConnection(configuration, _config);
     if (media != 'data' && media != 'sendonly') {
@@ -311,12 +625,17 @@ class Peer {
               print('onTrack(video) handling failed: $e');
             }
           }
-          // リモートの音声トラック追加時に念のためスピーカーを再度有効化
+          // リモートの音声トラック追加時にスピーカーを再度有効化（TV含む）
           if (event.track.kind == 'audio') {
             try {
-              _localStream?.getAudioTracks().first.enableSpeakerphone(true);
-            } catch (e) {
-              print('re-enableSpeakerphone on onTrack failed: $e');
+              event.track.enabled = true;
+            } catch (_) {}
+            if (!TvUtil.isTelevision) {
+              try {
+                await Helper.setSpeakerphoneOn(true);
+              } catch (e) {
+                print('re-setSpeakerphoneOn on onTrack failed: $e');
+              }
             }
           }
         };
@@ -338,9 +657,14 @@ class Peer {
           }
           if (track.kind == 'audio') {
             try {
-              _localStream?.getAudioTracks().first.enableSpeakerphone(true);
-            } catch (e) {
-              print('re-enableSpeakerphone on onAddTrack failed: $e');
+              track.enabled = true;
+            } catch (_) {}
+            if (!TvUtil.isTelevision) {
+              try {
+                await Helper.setSpeakerphoneOn(true);
+              } catch (e) {
+                print('re-setSpeakerphoneOn on onAddTrack failed: $e');
+              }
             }
           }
         };
@@ -358,8 +682,14 @@ class Peer {
       _localStream!.getTracks().forEach((track) {
         pc.addTrack(track, _localStream!);
       });
+      if (_emeetCapture) {
+        await _tuneEmeetSender(pc);
+      }
     }
     pc.onIceCandidate = (candidate) {
+      if (_iceStable[id] == true) {
+        return;
+      }
       final iceCandidate = {
         'sdpMLineIndex': candidate.sdpMLineIndex,
         'sdpMid': candidate.sdpMid,
@@ -371,10 +701,13 @@ class Peer {
     };
 
     pc.onIceConnectionState = (state) {
-      // print('onIceConnectionState $state');
-      if (state == RTCIceConnectionState.RTCIceConnectionStateClosed ||
-          state == RTCIceConnectionState.RTCIceConnectionStateFailed) {
-        // bye();
+      print('onIceConnectionState $id $state');
+      if (state == RTCIceConnectionState.RTCIceConnectionStateConnected ||
+          state == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
+        _iceStable[id] = true;
+      } else if (state == RTCIceConnectionState.RTCIceConnectionStateFailed ||
+          state == RTCIceConnectionState.RTCIceConnectionStateDisconnected) {
+        _iceStable[id] = false;
       }
     };
 
@@ -543,6 +876,91 @@ class Peer {
           }
         }
       }
+
+      // Opus: 開始直後の欠落に強くする（FEC ON / DTX OFF）
+      final opusPts = ptCodec.entries
+          .where((e) => e.value == 'OPUS')
+          .map((e) => e.key)
+          .toSet();
+      if (opusPts.isNotEmpty) {
+        final fmtpOpus = RegExp(r'^a=fmtp:(\d+)\s+(.*)$');
+        final haveFmtp = <String>{};
+        for (int i = 0; i < lines.length; i++) {
+          final m = fmtpOpus.firstMatch(lines[i].trim());
+          if (m == null || !opusPts.contains(m.group(1))) continue;
+          haveFmtp.add(m.group(1)!);
+          final params = m.group(2)!
+              .split(';')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
+          final kv = <String, String>{};
+          for (final p in params) {
+            final idx = p.indexOf('=');
+            if (idx > 0) {
+              kv[p.substring(0, idx)] = p.substring(idx + 1);
+            } else {
+              kv[p] = '';
+            }
+          }
+          kv['minptime'] = '10';
+          kv['useinbandfec'] = '1';
+          kv['usedtx'] = '0';
+          final rebuilt = kv.entries
+              .map((e) => e.value.isEmpty ? e.key : '${e.key}=${e.value}')
+              .join(';');
+          lines[i] = 'a=fmtp:${m.group(1)} $rebuilt';
+        }
+        for (int i = 0; i < lines.length; i++) {
+          final m = rtpmap.firstMatch(lines[i].trim());
+          if (m == null) continue;
+          final pt = m.group(1)!;
+          if (opusPts.contains(pt) && !haveFmtp.contains(pt)) {
+            lines.insert(
+              i + 1,
+              'a=fmtp:$pt minptime=10;useinbandfec=1;usedtx=0',
+            );
+            haveFmtp.add(pt);
+          }
+        }
+      }
+
+      // 映像の初期ビットレートを上げ、開始直後に音声が圧迫されないようにする
+      final vp8Pts = ptCodec.entries
+          .where((e) => e.value == 'VP8')
+          .map((e) => e.key)
+          .toSet();
+      if (vp8Pts.isNotEmpty) {
+        final fmtpVp8 = RegExp(r'^a=fmtp:(\d+)\s+(.*)$');
+        final haveFmtp = <String>{};
+        for (int i = 0; i < lines.length; i++) {
+          final m = fmtpVp8.firstMatch(lines[i].trim());
+          if (m == null || !vp8Pts.contains(m.group(1))) continue;
+          haveFmtp.add(m.group(1)!);
+          var rest = m.group(2)!;
+          if (!rest.contains('x-google-start-bitrate')) {
+            rest = _emeetCapture
+                ? '$rest;x-google-min-bitrate=800;x-google-start-bitrate=1800;x-google-max-bitrate=3500'
+                : '$rest;x-google-min-bitrate=150;x-google-start-bitrate=500;x-google-max-bitrate=1200';
+          }
+          lines[i] = 'a=fmtp:${m.group(1)} $rest';
+        }
+        for (int i = 0; i < lines.length; i++) {
+          final m = rtpmap.firstMatch(lines[i].trim());
+          if (m == null) continue;
+          final pt = m.group(1)!;
+          if (vp8Pts.contains(pt) && !haveFmtp.contains(pt)) {
+            lines.insert(
+              i + 1,
+              _emeetCapture
+                  ? 'a=fmtp:$pt x-google-min-bitrate=800;x-google-start-bitrate=1800;x-google-max-bitrate=3500'
+                  : 'a=fmtp:$pt x-google-min-bitrate=150;x-google-start-bitrate=500;x-google-max-bitrate=1200',
+            );
+            haveFmtp.add(pt);
+          }
+        }
+      }
+
       return lines.join('\n');
     } catch (e) {
       print('SDP munging failed: $e');
