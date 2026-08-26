@@ -22,6 +22,7 @@ import 'package:amiapp/pages/staff/staff_talk_page.dart';
 import 'package:amiapp/pages/setting/setting_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
 import 'package:amiapp/services/appmanager.dart';
+import 'package:amiapp/services/address_sync.dart';
 import 'package:amiapp/services/audio_service.dart';
 import 'package:amiapp/services/and_vital_service.dart';
 import 'package:amiapp/services/ble_exclusive.dart';
@@ -371,7 +372,19 @@ class _RoomPageState extends State<RoomPage>
     _tap();
   }
 
+  /// 保存済みの一覧を画面に載せたあと、サーバーから取り直す。
+  ///
+  /// まず手元のものを出すのは、通信を待たせないため。取り直せたら
+  /// 差し替える。設定を触らなくても最新の相手が出るようにする。
   void _loadAddress() {
+    _loadStoredAddress();
+    AddressSync.fetch().then((list) {
+      if (list == null || !mounted) return;
+      context.read<AddressStore>().setAddressList(list);
+    });
+  }
+
+  void _loadStoredAddress() {
     SharedPreferences.getInstance().then((prefs) {
       String? addressString = prefs.getString('address');
       // print(addressString);

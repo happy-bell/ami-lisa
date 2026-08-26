@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:amiapp/helpers/tv_util.dart';
 import 'package:amiapp/pages/setting/setting_info_photo_page.dart';
@@ -17,6 +16,7 @@ import 'package:amiapp/pages/setting/setting_multi_select_page.dart';
 import 'package:amiapp/pages/staff/staff_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
 import 'package:amiapp/services/appmanager.dart';
+import 'package:amiapp/services/address_sync.dart';
 
 import '../../helpers/widget_util.dart';
 import '../../widgets/and_vital_pair_dialog.dart';
@@ -105,68 +105,17 @@ class _SettingPageState extends State<SettingPage> {
     }
   }
 
+  /// 手動の「リスト更新」。中身は起動時の自動取得と同じ処理を使う。
+  /// 二か所に同じものを書くと、片方だけ直して食い違う。
   Future<void> _getAddress() async {
-    var response = await _requestAddress();
-    var prefs = await SharedPreferences.getInstance();
-    var addressKey = "ADDRESS";
-    if (AppDefine.amiApp) {
-      addressKey = "address";
-    }
-    await prefs.setString('address', json.encode(response[addressKey]));
-    _showDialog(1);
+    setState(() => _load = true);
+    final list = await AddressSync.fetch(force: true);
+    if (!mounted) return;
+    setState(() => _load = false);
+    _showDialog(list == null ? 3 : 1);
   }
 
-  String _getAddressURL() {
-    if (AppDefine.amiApp) {
-      if (AppManager.isManager) {
-        return "${AppDefine.baseURL}app/staff_address_list?code=${AppManager.settings['DELEGATORCODE']}&token=${AppManager.settings['api_token']}";
-      }
-      var mstId = AppManager.settings['MYID']
-          .replaceAll(AppManager.settings['DELEGATORCODE'] + "_", "");
-      return "${AppDefine.baseURL}app/address_list?code=${AppManager.settings['DELEGATORCODE']}&mst_id=$mstId&token=${AppManager.settings['api_token']}";
-    }
 
-    var token = AppDefine.getRMSToken();
-    var url = 'https://' +
-        AppManager.settings['MCSURL'] +
-        '/json/appaddresslist?gcd=' +
-        AppManager.settings['MCSGROUPCODE'] +
-        '&ccd=' +
-        AppManager.settings['MCSCLINICCODE'] +
-        '&group=' +
-        AppManager.settings['addressGroup'] +
-        '&id=' +
-        AppManager.settings['myId'] +
-        '&token=' +
-        token;
-    return url;
-  }
-
-  Future<dynamic> _requestAddress() async {
-    setState(() {
-      _load = true;
-    });
-    var url = _getAddressURL();
-    print(url);
-
-    final dio = Dio();
-    var data = await dio
-        .get(
-      url,
-    )
-        .then((response) {
-      print(response.data);
-      return response.data;
-    }).catchError((err) {
-      print(err);
-      return null;
-    });
-
-    setState(() {
-      _load = false;
-    });
-    return data;
-  }
 
   Future<void> _getRingtone() async {
     var response = await _requestRingtone();
@@ -857,6 +806,8 @@ class _SettingPageState extends State<SettingPage> {
       message = '住所録を取得しました。';
     } else if (type == 2) {
       message = '着信音情報を取得できません。';
+    } else if (type == 3) {
+      message = '住所録を取得できませんでした。\n通信の状態をご確認ください。';
     }
     var _ = await showDialog(
       context: context,
