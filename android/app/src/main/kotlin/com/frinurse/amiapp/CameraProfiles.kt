@@ -1,4 +1,4 @@
-package jp.amiplus.mulch
+package jp.amiplus.lisa
 
 import android.hardware.usb.UsbDevice
 import android.util.Log
@@ -48,6 +48,17 @@ object CameraProfiles {
                     videoFps = CameraTzzProfile.videoFps,
                     forceUacInjection = CameraTzzProfile.forceUacInjection,
                 )
+            CameraUsb20AProfile.matches(vendorId, productId, productName) ->
+                CameraProfileInfo(
+                    id = CameraUsb20AProfile.ID,
+                    mic = CameraUsb20AProfile.mic,
+                    videoMinWidth = CameraUsb20AProfile.videoMinWidth,
+                    videoMinHeight = CameraUsb20AProfile.videoMinHeight,
+                    videoMaxWidth = CameraUsb20AProfile.videoMaxWidth,
+                    videoMaxHeight = CameraUsb20AProfile.videoMaxHeight,
+                    videoFps = CameraUsb20AProfile.videoFps,
+                    forceUacInjection = CameraUsb20AProfile.forceUacInjection,
+                )
             CameraUsb20BProfile.matches(vendorId, productId, productName) ->
                 CameraProfileInfo(
                     id = CameraUsb20BProfile.ID,
@@ -87,6 +98,7 @@ object CameraProfiles {
         return CameraEmeetProfile.matches(device.vendorId, name) ||
             CameraC270nProfile.matches(device.vendorId, name) ||
             CameraTzzProfile.matches(device.vendorId, device.productId, name) ||
+            CameraUsb20AProfile.matches(device.vendorId, device.productId, name) ||
             CameraUsb20BProfile.matches(device.vendorId, device.productId, name) ||
             CameraTclUsbProfile.matches(device.vendorId, device.productId, name)
     }
@@ -96,13 +108,15 @@ object CameraProfiles {
         if (n.contains("camera") || n.contains("webcam") || n.contains("mic") ||
             n.contains("emeet") || n.contains("smartcam") || n.contains("c270") ||
             n.contains("logitech") || n.contains("logicool") || n.contains("sonix") ||
-            n.contains("tzz") || n.contains("usb20")
+            n.contains("tzz") || n.contains("usb20") ||
+            n.contains("buffalo") || n.contains("bsw")
         ) {
             return true
         }
         return CameraEmeetProfile.matches(vendorId, productName) ||
             CameraC270nProfile.matches(vendorId, productName) ||
             CameraTzzProfile.matches(vendorId, productId, productName) ||
+            CameraUsb20AProfile.matches(vendorId, productId, productName) ||
             CameraUsb20BProfile.matches(vendorId, productId, productName) ||
             CameraTclUsbProfile.matches(vendorId, productId, productName)
     }

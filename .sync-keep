@@ -1,0 +1,5 @@
+# ami3.29.2TV-1c 側で残すパス（1行1つ）。
+# 同期しても削除されないし、TV-1 から上書きもしない。
+# 例:
+# android/app/src/main/AndroidManifest.xml
+# android/app/build.gradle

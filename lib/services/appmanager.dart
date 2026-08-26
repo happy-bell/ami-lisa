@@ -29,7 +29,7 @@ enum AppStatus {
 class AppManager {
   static var settings = {};
   static bool isManager = false;
-  static dynamic appsettings = {"AUTO_RECEIVE": "0", "SLEEP_MODE": "0", "SLEEP_CLOCK": "0", "SLEEPMODEBRIGHTNESS": "0", "SENSOR0": "0", "SENSOR1": "0", "SENSOR2": "0", "SENSOR3": "0", "SENSOR4": "0", "SENSOR5": "0", "SENSOR8": "0", "SENSOR9": "0", "RINGTONE": "0", "CALLSCREENIMAGE": "0", "CALLSCREENIMAGEL": "0", "VOLUME_CALL": "0", "CLOCKDISP": "0", "DISPLAYNUM": "3", "CALLSTATUSDISP": "0"};
+  static dynamic appsettings = {"AUTO_RECEIVE": "0", "SLEEP_MODE": "0", "SLEEP_CLOCK": "0", "SLEEPMODEBRIGHTNESS": "0", "SENSOR0": "0", "SENSOR1": "0", "SENSOR2": "0", "SENSOR3": "0", "SENSOR4": "0", "SENSOR5": "0", "SENSOR8": "0", "SENSOR9": "0", "RINGTONE": "0", "CALLSCREENIMAGE": "0", "CALLSCREENIMAGEL": "0", "VOLUME_CALL": "0", "CLOCKDISP": "0", "DISPLAYNUM": "3", "CALLSTATUSDISP": "0", "TV_CALL_WAITING": "0"};
   static var autoreceives = {};
   static var authReceives = {};
   static List<List<String>> ringtones = [];
@@ -42,6 +42,191 @@ class AppManager {
   static String myId = '';
   static String delegatorCode = '';
 
+  /// ホーム画面: tcl=ami-LiSA / pi=ami-EX。アカウントごとに保存する。
+  static const tvLayoutTcl = 'tcl';
+  static const tvLayoutPi = 'pi';
+
+  static String get tvLayout {
+    final server = (settings['TVLAYOUT'] ?? settings['tvlayout'] ?? '')
+        .toString()
+        .toLowerCase();
+    if (server == 'pi' || server == 'raspi' || server == '3') {
+      return tvLayoutPi;
+    }
+    if (server == 'tcl' || server == '4') {
+      return tvLayoutTcl;
+    }
+    final local = appsettings['TV_LAYOUT']?.toString();
+    if (local == tvLayoutPi || local == tvLayoutTcl) return local!;
+    return tvLayoutTcl;
+  }
+
+  static bool get isPiTvLayout => tvLayout == tvLayoutPi;
+
+  static String tvLayoutLabel() =>
+      isPiTvLayout ? 'ami-EX' : 'ami-LiSA';
+
+  static String _accountTvLayoutKey() =>
+      'tv_layout_${delegatorCode}_$myId';
+
+  static Future<void> loadAccountTvLayout() async {
+    final prefs = await SharedPreferences.getInstance();
+    final v = prefs.getString(_accountTvLayoutKey());
+    if (v == tvLayoutPi || v == tvLayoutTcl) {
+      appsettings['TV_LAYOUT'] = v;
+    }
+  }
+
+  static Future<void> saveTvLayout(String layout) async {
+    await saveAppSetting('TV_LAYOUT', layout);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accountTvLayoutKey(), layout);
+  }
+
+  /// ラズパイ版の気象庁地域コード。TCLアミでは使わない。
+  static const defaultWeatherAreas = [
+    ['011000', '宗谷地方'],
+    ['012000', '上川・留萌地方'],
+    ['013000', '網走・北見・紋別地方'],
+    ['014030', '十勝地方'],
+    ['014100', '釧路・根室地方'],
+    ['015000', '胆振・日高地方'],
+    ['016000', '石狩・空知・後志地方'],
+    ['017000', '渡島・檜山地方'],
+    ['020000', '青森県'],
+    ['030000', '岩手県'],
+    ['040000', '宮城県'],
+    ['050000', '秋田県'],
+    ['060000', '山形県'],
+    ['070000', '福島県'],
+    ['080000', '茨城県'],
+    ['090000', '栃木県'],
+    ['100000', '群馬県'],
+    ['110000', '埼玉県'],
+    ['120000', '千葉県'],
+    ['130000', '東京都'],
+    ['140000', '神奈川県'],
+    ['150000', '新潟県'],
+    ['160000', '富山県'],
+    ['170000', '石川県'],
+    ['180000', '福井県'],
+    ['190000', '山梨県'],
+    ['200000', '長野県'],
+    ['210000', '岐阜県'],
+    ['220000', '静岡県'],
+    ['230000', '愛知県'],
+    ['240000', '三重県'],
+    ['250000', '滋賀県'],
+    ['260000', '京都府'],
+    ['270000', '大阪府'],
+    ['280000', '兵庫県'],
+    ['290000', '奈良県'],
+    ['300000', '和歌山県'],
+    ['310000', '鳥取県'],
+    ['320000', '島根県'],
+    ['330000', '岡山県'],
+    ['340000', '広島県'],
+    ['350000', '山口県'],
+    ['360000', '徳島県'],
+    ['370000', '香川県'],
+    ['380000', '愛媛県'],
+    ['390000', '高知県'],
+    ['400000', '福岡県'],
+    ['410000', '佐賀県'],
+    ['420000', '長崎県'],
+    ['430000', '熊本県'],
+    ['440000', '大分県'],
+    ['450000', '宮崎県'],
+    ['460100', '鹿児島県'],
+    ['471000', '沖縄本島地方'],
+    ['473000', '宮古島地方'],
+    ['474000', '八重山地方'],
+  ];
+
+  static String get weatherArea {
+    final server =
+        (settings['WEATHERAREA'] ?? settings['weatherarea'] ?? '').toString();
+    if (server.isNotEmpty && server != 'null') return server;
+    final local = appsettings['WEATHER_AREA']?.toString() ?? '';
+    if (local.isNotEmpty && local != 'null') return local;
+    return '';
+  }
+
+  static String weatherAreaLabel() {
+    final area = weatherArea;
+    if (area.isEmpty) return '未設定';
+    for (final item in weatherAreas.isEmpty ? defaultWeatherAreas : weatherAreas) {
+      if (item[0] == area) return item[1];
+    }
+    return area;
+  }
+
+  static String _accountWeatherKey() =>
+      'weather_area_${delegatorCode}_$myId';
+
+  static Future<void> loadAccountWeatherArea() async {
+    final prefs = await SharedPreferences.getInstance();
+    final v = prefs.getString(_accountWeatherKey());
+    if (v != null && v.isNotEmpty) {
+      appsettings['WEATHER_AREA'] = v;
+    }
+  }
+
+  static Future<void> saveWeatherArea(String area) async {
+    await saveAppSetting('WEATHER_AREA', area);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accountWeatherKey(), area);
+  }
+
+  /// ログイン時に入力したユーザーID（例: Doc00007 / tv000003）。
+  /// ドクター判定はこれで行う。myId（fBNWB6s1_TV007）では判定できない。
+  static String storedLoginId = '';
+
+  static const amiModeDoctor = 'doctor';
+  static const amiModePatient = 'patient';
+  static String _amiMode = amiModeDoctor;
+
+  static String get loginId {
+    if (storedLoginId.isNotEmpty) return storedLoginId;
+    final my = (settings['myId'] ?? myId).toString();
+    if (my.contains('_')) return my.split('_').last;
+    return my;
+  }
+
+  /// ログインIDが Doc 始まり（大小区別）ならドクターアカウント。
+  static bool get isDoctorAccount => loginId.startsWith('Doc');
+
+  /// 実効モード。患者アカウントは常に patient。
+  static String get amiMode {
+    if (!isDoctorAccount) return amiModePatient;
+    return _amiMode == amiModePatient ? amiModePatient : amiModeDoctor;
+  }
+
+  /// ラズパイ版かつドクターモードのときだけ true。TCLアミでは使わない。
+  static bool get isDoctorMode => isPiTvLayout && amiMode == amiModeDoctor;
+
+  static String amiModeLabel() =>
+      amiMode == amiModeDoctor ? 'ドクターモード' : '患者モード';
+
+  static String _accountAmiModeKey() => 'ami_mode_${delegatorCode}_$myId';
+
+  static Future<void> loadAccountAmiMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    storedLoginId = prefs.getString('login_id') ?? '';
+    final v = prefs.getString(_accountAmiModeKey());
+    if (v == amiModePatient || v == amiModeDoctor) {
+      _amiMode = v!;
+    } else {
+      _amiMode = amiModeDoctor;
+    }
+  }
+
+  static Future<void> saveAmiMode(String mode) async {
+    _amiMode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accountAmiModeKey(), mode);
+  }
+
   static String talkId1 = '';
   static String talkId2 = '';
   static String holdId = '';
@@ -49,6 +234,11 @@ class AppManager {
   static String threewayId = '';
   static String safetyCheckId = '';
   static String autoReceiveId = '';
+  /// TVオーバーレイ「はい」／電源オフ自動応答で、通話画面の再確認を飛ばす
+  static bool tvForceAccept = false;
+  /// 設定の再生から居室へ戻り、お知らせ動画を再生する
+  static bool pendingPlayInfoVideo = false;
+  static String pendingPlayInfoVideoPath = '';
 
   static String recordId = '';
   static String recordConnectId = '';
@@ -126,6 +316,12 @@ class AppManager {
           AppManager.appsettings[key] = val;
         }
       });
+      for (final key in ['AUTO_RECEIVE', 'TV_CALL_WAITING', 'TV_LAYOUT']) {
+        final v = AppManager.appsettings[key]?.toString();
+        if (v != null) {
+          await sharedPreferences.setString('tv_$key', v);
+        }
+      }
     }
 
     String? fcmtokenString = sharedPreferences.getString('fcmtoken');
@@ -134,6 +330,10 @@ class AppManager {
     }
     AppManager.myId = settings['myId'];
     AppManager.delegatorCode = settings['delegatorcode'];
+    await loadAccountTvLayout();
+    await sharedPreferences.setString('tv_TV_LAYOUT', tvLayout);
+    await loadAccountWeatherArea();
+    await loadAccountAmiMode();
     var socketservice = SocketIOService();
     socketservice.url = settings['server'];
 
@@ -166,6 +366,11 @@ class AppManager {
     storedSettings[key] = val;
     await sharedPreferences.setString('appsettings', json.encode(storedSettings));
     AppManager.appsettings = storedSettings;
+    if (key == 'AUTO_RECEIVE' ||
+        key == 'TV_CALL_WAITING' ||
+        key == 'TV_LAYOUT') {
+      await sharedPreferences.setString('tv_$key', val);
+    }
   }
 
   static loadAutoReceive() async {

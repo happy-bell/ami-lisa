@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:amiapp/appdefine.dart';
+import 'package:amiapp/helpers/tv_util.dart';
 import 'package:amiapp/helpers/widget_util.dart';
 import 'package:amiapp/services/appmanager.dart';
 import 'package:amiapp/services/audio_service.dart';
+import 'package:amiapp/widgets/tv_focusable.dart';
 
 class SettingSelectPage extends StatefulWidget {
   final String keyName;
@@ -74,6 +76,27 @@ class SettingSelectPageState extends State<SettingSelectPage> {
         ['20', '20秒後'],
         ['25', '25秒後'],
         ['30', '30秒後']
+      ];
+    } else if (_key == 'TV_LAYOUT') {
+      title = 'ホーム画面';
+      data = [
+        ['tcl', 'ami-LiSA'],
+        ['pi', 'ami-EX'],
+      ];
+    } else if (_key == 'WEATHER_AREA') {
+      title = '天気予報';
+      final areas = AppManager.weatherAreas.isEmpty
+          ? AppManager.defaultWeatherAreas
+          : AppManager.weatherAreas;
+      data = [
+        ['', '表示しない'],
+        ...areas,
+      ];
+    } else if (_key == 'AMI_MODE') {
+      title = 'Doc/Pat';
+      data = [
+        ['doctor', 'ドクターモード'],
+        ['patient', '患者モード'],
       ];
     } else if (_key == 'RINGTONE') {
       title = '着信音';
@@ -158,35 +181,37 @@ class SettingSelectPageState extends State<SettingSelectPage> {
     });
   }
 
-  Widget _listContainer(String title, String val) {
-    return GestureDetector(
-      onTap: () {
-        if (_key == 'RINGTONE') {
-          if (_playing) {
-            _playRingtone();
-          }
-          _downloadRingtone(val);
-          return;
+  Widget _listContainer(String title, String val, {bool autofocus = false}) {
+    void activate() {
+      if (_key == 'RINGTONE') {
+        if (_playing) {
+          _playRingtone();
         }
-        setState(() {
-          _value = val;
-        });
-      },
-      child: WidgetUtil.listItem(Container(
-        height: WidgetUtil.listHeight,
+        _downloadRingtone(val);
+        return;
+      }
+      setState(() {
+        _value = val;
+      });
+    }
+
+    final rowHeight = TvUtil.isTelevision ? 64.0 : WidgetUtil.listHeight;
+    final style = TextStyle(fontSize: TvUtil.isTelevision ? 22 : 14);
+
+    return TvSettingFocus(
+      autofocus: autofocus,
+      onActivate: activate,
+      child: Container(
+        height: rowHeight,
         padding: const EdgeInsets.all(10.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              title,
-              style: WidgetUtil.titleTextStyle1,
-            ),
-            if (_value == val)
-              WidgetUtil.listCheckIcon,
+            Text(title, style: style),
+            if (_value == val) WidgetUtil.listCheckIcon,
           ],
         ),
-      )),
+      ),
     );
   }
 
@@ -217,11 +242,18 @@ class SettingSelectPageState extends State<SettingSelectPage> {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            ListView.builder(
-              itemBuilder: (BuildContext context, int index) {
-                return _listContainer(data[index][1], data[index][0]);
-              },
-              itemCount: data.length,
+            FocusTraversalGroup(
+              child: ListView.builder(
+                itemBuilder: (BuildContext context, int index) {
+                  final selected = data[index][0] == _value;
+                  return _listContainer(
+                    data[index][1],
+                    data[index][0],
+                    autofocus: TvUtil.isTelevision && (selected || (index == 0 && _value.isEmpty)),
+                  );
+                },
+                itemCount: data.length,
+              ),
             ),
             if (_load)
               WidgetUtil.loadingIndicator,

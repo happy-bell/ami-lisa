@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:amiapp/services/appmanager.dart';
 import 'package:flutter/foundation.dart';
@@ -10,13 +11,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 class TvUtil {
   TvUtil._();
 
-  static const MethodChannel _channel = MethodChannel('jp.amiplus.mulch/tv');
+  static const MethodChannel _channel = MethodChannel('jp.amiplus.lisa/tv');
 
   static bool _resolved = false;
   static bool _isTelevision = false;
   static bool _navSoundAttached = false;
   static FocusNode? _lastNavFocus;
   static DateTime? _lastNavAt;
+  static bool _navMuted = false;
+  static Timer? _navMuteTimer;
+  static DateTime? _navQuietUntil;
 
   /// [init] 後に同期参照できる。未初期化時は false。
   static bool get isTelevision => _isTelevision;
@@ -95,7 +99,9 @@ class TvUtil {
             name.contains('c270') ||
             name.contains('logitech') ||
             name.contains('logicool') ||
-            name.contains('tzz');
+            name.contains('tzz') ||
+            name.contains('buffalo') ||
+            name.contains('bsw');
         if (isUsb || looksUsb) {
           usbId = id;
           if (isUsb) break;
@@ -121,7 +127,7 @@ class TvUtil {
     return null;
   }
 
-  /// 接続中USBカメラのプロファイル (c270n / emeet / tzz / usb20b / tcl_usb / generic)。
+  /// 接続中USBカメラのプロファイル (c270n / emeet / tzz / usb20a / usb20b / tcl_usb / generic)。
   static Future<Map<String, dynamic>?> getUsbCameraProfile() async {
     if (!_isTelevision) return null;
     try {
@@ -190,10 +196,9 @@ class TvUtil {
     return {'granted': false, 'needAdb': true};
   }
 
-  /// TCL居室TVは着信待機を常時ON。Piレイアウト・スタッフ端末は対象外。
+  /// Google TV（ami-LiSA / ami-EX）は着信待機を常時ON。スタッフ端末は対象外。
   static bool get isTclCallWaitingAlwaysOn {
     if (!_isTelevision) return false;
-    if (AppManager.isPiTvLayout) return false;
     if ((AppManager.settings['MCSTYPE'] ?? '').toString() == '5') {
       return false;
     }
@@ -205,7 +210,7 @@ class TvUtil {
     return AppManager.appsettings['TV_CALL_WAITING'] == '1';
   }
 
-  /// TCL起動時に着信待機を有効化し、未許可ならオーバーレイ権限を一度だけ求める。
+  /// 起動時に着信待機を有効化し、未許可ならオーバーレイ権限を一度だけ求める。
   static Future<void> ensureTclCallWaiting() async {
     if (!isTclCallWaitingAlwaysOn) return;
     await AppManager.saveAppSetting('TV_CALL_WAITING', '1');
@@ -227,6 +232,36 @@ class TvUtil {
     FocusManager.instance.addListener(_onPrimaryFocusChanged);
   }
 
+  /// 設定などから戻るあいだは移動音を止める。ホームへフォーカスしてから [unmuteNavSound] する。
+  static void muteNavSound() {
+    if (!_isTelevision) return;
+    _navMuted = true;
+    _navMuteTimer?.cancel();
+    _navMuteTimer = Timer(const Duration(milliseconds: 1500), () {
+      _navMuted = false;
+      _navMuteTimer = null;
+    });
+  }
+
+  static void unmuteNavSound({bool playOnce = false}) {
+    if (!_isTelevision) return;
+    _navMuteTimer?.cancel();
+    _navMuteTimer = null;
+    final wasMuted = _navMuted;
+    _navMuted = false;
+    _navQuietUntil =
+        DateTime.now().add(const Duration(milliseconds: 700));
+    if (playOnce && wasMuted) {
+      _lastNavAt = DateTime.now();
+      playNavClick();
+    }
+  }
+
+  /// 設定などから戻るときのフォーカス復旧は、移動音を止めてから呼び側が1回だけ鳴らす。
+  static void markRouteFocusSettle() {
+    muteNavSound();
+  }
+
   static void _onPrimaryFocusChanged() {
     if (!_isTelevision) return;
     final node = FocusManager.instance.primaryFocus;
@@ -234,6 +269,11 @@ class TvUtil {
     if (identical(node, _lastNavFocus)) return;
     final prev = _lastNavFocus;
     _lastNavFocus = node;
+    if (_navMuted) return;
+    if (_navQuietUntil != null &&
+        DateTime.now().isBefore(_navQuietUntil!)) {
+      return;
+    }
     if (prev == null) return;
     final now = DateTime.now();
     if (_lastNavAt != null &&
@@ -255,7 +295,9 @@ class TvUtil {
 
   static Future<void> startCallWaiting() async {
     if (!_isTelevision) return;
-    await _channel.invokeMethod('startCallWaiting');
+    await _channel.invokeMethod('startCallWaiting', {
+      'piLayout': AppManager.isPiTvLayout,
+    });
   }
 
   static Future<void> stopCallWaiting() async {
@@ -276,12 +318,43 @@ class TvUtil {
     }
   }
 
+  static int _sdkInt = 0;
+
+  /// Android の API レベル。取得できないときは 0。
+  /// BLE権限の出し分けに使う（SDK31未満は BLUETOOTH_SCAN が存在せず、
+  /// 要求すると位置情報の許可を求められてしまう）。
+  static Future<int> getSdkInt() async {
+    if (kIsWeb || !Platform.isAndroid) return 0;
+    if (_sdkInt > 0) return _sdkInt;
+    try {
+      _sdkInt = await _channel.invokeMethod<int>('getSdkInt') ?? 0;
+    } catch (e) {
+      debugPrint('getSdkInt failed: $e');
+      _sdkInt = 0;
+    }
+    return _sdkInt;
+  }
+
   static Future<bool> isScreenOn() async {
     if (!_isTelevision) return true;
     try {
       return await _channel.invokeMethod<bool>('isScreenOn') == true;
     } catch (_) {
       return true;
+    }
+  }
+
+  /// TVが待機（電源オフ／TCLスクリーンレス）かどうか。
+  ///
+  /// Android 12 の TCL は電源オフでも `isInteractive` が true のままなので、
+  /// [isScreenOn] だけでは電源オフ着信を判定できない。ネイティブ側で
+  /// sys.tcl.screen / powerstatus と Display.state も見る。
+  static Future<bool> isTvStandby() async {
+    if (!_isTelevision) return false;
+    try {
+      return await _channel.invokeMethod<bool>('isTvStandby') == true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -294,12 +367,23 @@ class TvUtil {
     }
   }
 
+  /// 着信で全面化する前に、地デジ／他アプリを記録する。
+  static Future<void> captureForegroundApp() async {
+    if (!_isTelevision) return;
+    try {
+      await _channel.invokeMethod('captureForegroundApp');
+    } catch (e) {
+      debugPrint('captureForegroundApp failed: $e');
+    }
+  }
+
   /// 視聴中・スクリーンレス待機のどちらでも着信枠を出し、画面を起こす。
   static Future<void> showIncomingCallOverlay({
     required String callerId,
     String callerName = '着信',
   }) async {
     if (!_isTelevision) return;
+    await captureForegroundApp();
     await wakeScreen();
     await _channel.invokeMethod('showIncomingCallOverlay', {
       'callerId': callerId,
@@ -313,6 +397,7 @@ class TvUtil {
     String callerName = '着信',
   }) async {
     if (!_isTelevision) return;
+    await captureForegroundApp();
     await wakeScreen();
     await _channel.invokeMethod('acceptIncomingCall', {
       'callerId': callerId,
@@ -331,17 +416,61 @@ class TvUtil {
     }
   }
 
-  /// 視聴中・待機中の着信: 自動応答なら確認なし、オフならはい／いいえ。
+  /// 視聴中・待機中の着信。
+  /// ami-EX / ami-LiSA とも自動応答ONなら確認なし。OFFならはい／いいえ。
   static Future<void> handleWatchingIncoming({
     required String callerId,
     String callerName = '着信',
   }) async {
     if (!_isTelevision) return;
     final auto = AppManager.appsettings['AUTO_RECEIVE'] == '1';
+    if (AppManager.isPiTvLayout) {
+      if (auto) {
+        await acceptIncomingCall(callerId: callerId, callerName: callerName);
+      } else {
+        await showIncomingCallOverlay(callerId: callerId, callerName: callerName);
+      }
+      return;
+    }
     if (auto) {
       await acceptIncomingCall(callerId: callerId, callerName: callerName);
     } else {
       await showIncomingCallOverlay(callerId: callerId, callerName: callerName);
+    }
+  }
+
+  /// 着信ごとに、その時点の画面オフ状態を正確に記録する（上書き）。
+  /// Socket着信で wake する前に、信頼できる screenOn 値を使って呼ぶこと。
+  static Future<void> setScreenOffAtCall(bool wasOff) async {
+    if (!_isTelevision) return;
+    try {
+      await _channel.invokeMethod('setScreenOffAtCall', {'wasOff': wasOff});
+    } catch (e) {
+      debugPrint('setScreenOffAtCall failed: $e');
+    }
+  }
+
+  /// 着信到達時に画面オフ（TV電源オフ）だったか。
+  static Future<bool> wasScreenOffAtCall() async {
+    if (!_isTelevision) return false;
+    try {
+      final ok = await _channel.invokeMethod<bool>('wasScreenOffAtCall');
+      return ok == true;
+    } catch (e) {
+      debugPrint('wasScreenOffAtCall failed: $e');
+      return false;
+    }
+  }
+
+  /// 画面をオフ（ロック）してTV電源オフ状態へ戻す。TV005かつデバイス管理有効時のみ成功しtrue。
+  static Future<bool> lockScreenForStandby() async {
+    if (!_isTelevision) return false;
+    try {
+      final ok = await _channel.invokeMethod<bool>('lockScreenForStandby');
+      return ok == true;
+    } catch (e) {
+      debugPrint('lockScreenForStandby failed: \$e');
+      return false;
     }
   }
 
@@ -386,5 +515,22 @@ class TvUtil {
         }
       }
     });
+  }
+}
+
+/// 遷移アニメなし。pop 開始時点で移動音を止め、ホーム側で1回だけ鳴らす。
+class TvInstantRoute<T> extends PageRouteBuilder<T> {
+  TvInstantRoute({required WidgetBuilder builder})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              builder(context),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+        );
+
+  @override
+  bool didPop(T? result) {
+    TvUtil.markRouteFocusSettle();
+    return super.didPop(result);
   }
 }

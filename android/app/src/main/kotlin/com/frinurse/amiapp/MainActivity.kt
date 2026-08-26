@@ -1,4 +1,4 @@
-package jp.amiplus.mulch
+package jp.amiplus.lisa
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -17,10 +17,16 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
+import android.view.KeyEvent
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.plugin.common.MethodChannel
 import java.lang.ref.WeakReference
 import kotlin.math.abs
@@ -28,7 +34,14 @@ import kotlin.math.sqrt
 
 class MainActivity : FlutterActivity() {
     companion object {
+        private const val ENGINE_ID = "ami_tv_engine"
         private var current: WeakReference<MainActivity>? = null
+        @Volatile
+        private var resumed = false
+
+        fun isInForeground(): Boolean = resumed && current?.get() != null
+
+        fun currentActivity(): MainActivity? = current?.get()
 
         fun dispatchIncomingAction(
             action: String,
@@ -47,9 +60,9 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private val channelName = "jp.amiplus.mulch/tv"
+    private val channelName = "jp.amiplus.lisa/tv"
     private val tag = "AmiTvAudio"
-    private val actionUsbPermission = "jp.amiplus.mulch.USB_PERMISSION"
+    private val actionUsbPermission = "jp.amiplus.lisa.USB_PERMISSION"
     private var probedOnce = false
     private var methodChannel: MethodChannel? = null
 
@@ -74,6 +87,26 @@ class MainActivity : FlutterActivity() {
                 }.start()
             }
         }
+    }
+
+    override fun provideFlutterEngine(context: Context): FlutterEngine? {
+        if (!isTelevisionDevice()) return null
+        val cache = FlutterEngineCache.getInstance()
+        cache.get(ENGINE_ID)?.let { return it }
+        return try {
+            val engine = FlutterEngine(context.applicationContext)
+            cache.put(ENGINE_ID, engine)
+            Log.i(tag, "cached FlutterEngine $ENGINE_ID")
+            engine
+        } catch (e: Exception) {
+            Log.e(tag, "provideFlutterEngine failed", e)
+            null
+        }
+    }
+
+    override fun shouldDestroyEngineWithHost(): Boolean {
+        // YouTube 復帰で Activity が破棄されても、着信待機と WebRTC を残す。
+        return !isTelevisionDevice()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -169,7 +202,13 @@ class MainActivity : FlutterActivity() {
                     result.success(requestOverlayPermission())
                 }
                 "startCallWaiting" -> {
-                    IncomingCallOverlayService.startWaiting(this)
+                    IncomingCallOverlayService.startWaiting(
+                        this,
+                        call.argument<Boolean>("piLayout")
+                    )
+                    // 通話終了後に電源オフへ戻すには lockNow が要る。
+                    // 未許可なら着信待機の開始時に一度だけ許可画面を出す。
+                    IncomingCallOverlayService.requestDeviceAdminIfNeeded(this)
                     result.success(true)
                 }
                 "stopCallWaiting" -> {
@@ -188,6 +227,10 @@ class MainActivity : FlutterActivity() {
                     IncomingCallOverlayService.acceptIncoming(this, callerId, callerName)
                     result.success(true)
                 }
+                "captureForegroundApp" -> {
+                    IncomingCallOverlayService.captureForegroundApp(this)
+                    result.success(true)
+                }
                 "bringToFront" -> {
                     IncomingCallOverlayService.bringToFront(this)
                     result.success(true)
@@ -201,6 +244,9 @@ class MainActivity : FlutterActivity() {
                 }
                 "isScreenOn" ->
                     result.success(IncomingCallOverlayService.isScreenOn(this))
+                // Android のAPIレベル。BLE権限の出し分けに使う
+                // (SDK31未満は BLUETOOTH_SCAN が無く、要求すると位置情報を求められる)。
+                "getSdkInt" -> result.success(Build.VERSION.SDK_INT)
                 "getAndroidId" -> {
                     val id = try {
                         android.provider.Settings.Secure.getString(
@@ -222,6 +268,28 @@ class MainActivity : FlutterActivity() {
                 }
                 "returnToPreviousApp" -> {
                     result.success(IncomingCallOverlayService.returnToPreviousApp(this))
+                }
+                // 通話終了後、TV電源オフ状態へ戻す（TV005のみ / Device Admin lockNow）
+                "setScreenOffAtCall" -> {
+                    val wasOff = call.argument<Boolean>("wasOff") ?: false
+                    IncomingCallOverlayService.setScreenOffAtCall(this, wasOff)
+                    result.success(true)
+                }
+                "wasScreenOffAtCall" -> {
+                    result.success(IncomingCallOverlayService.wasScreenOffAtCall(this))
+                }
+                "lockScreenForStandby" -> {
+                    // 端末を限定せず、電源オフ発の着信かどうかだけで判断する。
+                    // Android 11(TV005) は lockNow、Android 12(TV007) は
+                    // goToSleep/スリープキーも併用する（サービス側で吸収）。
+                    result.success(IncomingCallOverlayService.lockScreenForStandby(this))
+                }
+                "isTvStandby" -> {
+                    result.success(IncomingCallOverlayService.isTvStandby(this))
+                }
+                "isStandbyTargetDevice" -> {
+                    // 旧API。端末限定をやめたので常に true を返す。
+                    result.success(true)
                 }
                 else -> result.notImplemented()
             }
@@ -326,7 +394,19 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun hasCompletedFirstLaunch(): Boolean {
+        return try {
+            getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
+                .getBoolean("flutter.isInitialized", false)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        if (hasCompletedFirstLaunch()) {
+            setTheme(R.style.LaunchThemeNoSplash)
+        }
         super.onCreate(savedInstanceState)
         current = WeakReference(this)
         try {
@@ -370,26 +450,82 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
+        resumed = true
         if (!probedOnce && isTelevisionDevice()) {
             probedOnce = true
-            Thread {
+            Handler(Looper.getMainLooper()).post {
+                if (!resumed) return@post
                 try {
-                    // 起動時にUSB権限ダイアログを済ませておく(通話時に出さない)
+                    val pm = getSystemService(POWER_SERVICE) as PowerManager
+                    if (!pm.isInteractive) return@post
                     val perm = ensureUsbAudioPermission()
                     logPersistent("ensureUsbAudioPermission=$perm")
                 } catch (e: Exception) {
                     Log.e(tag, "onResume usb permission failed", e)
                     logPersistent("onResume usb permission failed: ${e.message}")
                 }
-            }.start()
+            }
         }
+    }
+
+    override fun onPause() {
+        resumed = false
+        if (isTelevisionDevice()) {
+            releaseScreenKeepOn()
+            markRestoreIfScreenOff()
+        }
+        super.onPause()
     }
 
     override fun onDestroy() {
         if (current?.get() === this) {
             current = null
         }
-        super.onDestroy()
+        try {
+            super.onDestroy()
+        } catch (t: Throwable) {
+            Log.w("AmiMain", "onDestroy: ${t.message}")
+        }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isTelevisionDevice() && event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_POWER,
+                KeyEvent.KEYCODE_SLEEP,
+                KeyEvent.KEYCODE_TV_POWER,
+                KeyEvent.KEYCODE_STB_POWER -> {
+                    releaseScreenKeepOn()
+                    markRestoreOnScreenOn()
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun releaseScreenKeepOn() {
+        try {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun markRestoreIfScreenOff() {
+        if (!isTelevisionDevice()) return
+        try {
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            if (!pm.isInteractive) {
+                markRestoreOnScreenOn()
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun markRestoreOnScreenOn() {
+        getSharedPreferences(IncomingCallOverlayService.PREFS, MODE_PRIVATE)
+            .edit()
+            .putBoolean(IncomingCallOverlayService.KEY_RESTORE_ON_SCREEN_ON, true)
+            .apply()
     }
 
     private fun isTelevisionDevice(): Boolean {
@@ -414,7 +550,8 @@ class MainActivity : FlutterActivity() {
 
         var requested = false
         var alreadyGranted = false
-        for (device in candidates.ifEmpty { devices }) {
+        for (device in candidates) {
+            if (!shouldRequestUsbPermission(usbManager, device)) continue
             if (usbManager.hasPermission(device)) {
                 alreadyGranted = true
                 continue
@@ -424,10 +561,14 @@ class MainActivity : FlutterActivity() {
             } else {
                 PendingIntent.FLAG_UPDATE_CURRENT
             }
-            val pi = PendingIntent.getBroadcast(this, 0, Intent(actionUsbPermission), flags)
+            val intent = Intent(actionUsbPermission).apply {
+                setPackage(packageName)
+                putExtra(UsbManager.EXTRA_DEVICE, device)
+            }
+            val pi = PendingIntent.getBroadcast(this, device.deviceId, intent, flags)
             usbManager.requestPermission(device, pi)
             requested = true
-            Log.i(tag, "requestPermission for ${device.productName}")
+            Log.i(tag, "requestPermission for ${device.productName} vid=${device.vendorId} pid=${device.productId}")
         }
         return mapOf(
             "deviceCount" to devices.size,
@@ -444,6 +585,25 @@ class MainActivity : FlutterActivity() {
                 )
             }
         )
+    }
+
+    private fun shouldRequestUsbPermission(usbManager: UsbManager, device: UsbDevice): Boolean {
+        if (usbManager.hasPermission(device)) return false
+        if (CameraProfiles.looksLikeCamera(device.vendorId, device.productId, device.productName) ||
+            CameraProfiles.matchesKnown(device)
+        ) {
+            return true
+        }
+        // 製品名なしは内部USB。システムダイアログが「null」になり、起動のたびに出る。
+        if (device.productName.isNullOrBlank()) return false
+        var hasAudio = false
+        var hasVideo = false
+        for (i in 0 until device.interfaceCount) {
+            val intf = device.getInterface(i)
+            if (intf.interfaceClass == UsbConstants.USB_CLASS_AUDIO) hasAudio = true
+            if (intf.interfaceClass == UsbConstants.USB_CLASS_VIDEO) hasVideo = true
+        }
+        return hasAudio && hasVideo
     }
 
     private fun deviceLikelyHasMic(device: UsbDevice): Boolean {
@@ -536,7 +696,7 @@ class MainActivity : FlutterActivity() {
             n.contains("camera") || n.contains("usb") || n.contains("sonix") ||
                 n.contains("webcam") || n.contains("emeet") || n.contains("smartcam") ||
                 n.contains("c270") || n.contains("logitech") || n.contains("logicool") ||
-                n.contains("tzz")
+                n.contains("tzz") || n.contains("buffalo") || n.contains("bsw")
         }
     }
 

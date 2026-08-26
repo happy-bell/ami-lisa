@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>ami Mulch</string>
+	<string>LiSA</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -39,6 +39,10 @@
 	<string>映像会話時に必要です</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>画像登録に使用します</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Checkme Ringの測定データを取得するためにBluetoothを使用します</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Checkme Ringの測定データを取得するためにBluetoothを使用します</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

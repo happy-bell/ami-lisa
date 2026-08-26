@@ -11,7 +11,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>jp.amiplus.mulch</string>
+	<string>jp.amiplus.lisa</string>
 	<key>PROJECT_ID</key>
 	<string>ami-style</string>
 	<key>STORAGE_BUCKET</key>
@@ -27,6 +27,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:764771508054:ios:d31d4fe01d2be377b4c0f7</string>
+	<string>1:764771508054:ios:292e4f57d0c5ed7fb4c0f7</string>
 </dict>
 </plist>

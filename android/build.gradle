@@ -23,6 +23,22 @@ subprojects { p ->
     /* ---------------- 出力ディレクトリ統一 ---------------- */
     p.buildDir = "${rootProject.buildDir}/${p.name}"
 
+    /* プラグインの native .so も 16 KB ページに揃える */
+    p.afterEvaluate {
+        def androidExt = p.extensions.findByName("android")
+        if (androidExt == null) return
+        try {
+            def cmake = androidExt.defaultConfig.externalNativeBuild.cmake
+            if (cmake != null) {
+                def args = cmake.arguments
+                if (args != null && !args.contains("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")) {
+                    args.add("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
     /* ---------------- namespace & BuildConfig ------------- */
     p.plugins.withId("com.android.library") {
 

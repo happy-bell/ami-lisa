@@ -157,16 +157,16 @@ class WidgetUtil {
     );
   }
 
-  static Widget basicTextField2(TextEditingController controller, String? errText, {String? hintText, int maxLines = 1, TextInputType? keyboardType, bool obscureText = false, Widget? suffixIcon, Function(String)? onSubmitted}) {
+  static Widget basicTextField2(TextEditingController controller, String? errText, {String? hintText, int maxLines = 1, TextInputType? keyboardType, bool obscureText = false, Widget? suffixIcon, Function(String)? onSubmitted, double fontSize = 14}) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
       obscureText: obscureText,
       onSubmitted: onSubmitted,
-      style: const TextStyle(
+      style: TextStyle(
         color: Colors.black,
-        fontSize: 14,
+        fontSize: fontSize,
       ),
       decoration: InputDecoration(
         fillColor: const Color.fromARGB(255, 255, 255, 255),
@@ -285,16 +285,40 @@ class WidgetUtil {
     );
   }
 
-  static void showSimpleDialog(BuildContext context, String message) {
-    showDialog(
+  /// 確認ダイアログ。閉じられるまで待てるよう Future を返す。
+  ///
+  /// テレビではリモコンで操作するため、OKボタンに必ずフォーカスを当てる。
+  /// autofocus が無いと、どのボタンも選ばれておらず決定ボタンが効かない。
+  static Future<void> showSimpleDialog(
+      BuildContext context, String message) async {
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('確認'),
-          content: Text(message),
+          content: Text(message, style: const TextStyle(fontSize: 18)),
           actions: <Widget>[
             TextButton(
+              autofocus: true,
+              style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                textStyle:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ).copyWith(
+                // フォーカス中は背景を付け、どこが選ばれているか分かるようにする。
+                backgroundColor: WidgetStateProperty.resolveWith((states) {
+                  return states.contains(WidgetState.focused)
+                      ? const Color(0xFF6B70BE)
+                      : null;
+                }),
+                foregroundColor: WidgetStateProperty.resolveWith((states) {
+                  return states.contains(WidgetState.focused)
+                      ? Colors.white
+                      : null;
+                }),
+              ),
               child: const Text('OK'),
               onPressed: () {
                 Navigator.of(context).pop();

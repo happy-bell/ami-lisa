@@ -33,6 +33,7 @@ class Peer {
   // var _turnCredential;
 
   bool _emeetCapture = false;
+  bool _closed = false;
   MediaStream? _localStream;
   set localStream(value) => _localStream = value;
   // 互換用: 旧コードが peer.setLocalStream(stream) を呼ぶ場合に備える
@@ -52,6 +53,60 @@ class Peer {
   DataChannelMessageCallback? onDataChannelMessage;
   DataChannelCallback? onDataChannel;
   final Map<String, RTCPeerConnection> _peerConnections = {};
+  static Future<void>? _tvWarmup;
+
+  /// 起動直後の USB カメラ初回オープン失敗を避ける。
+  /// TCL では映像を開きっぱなしにすると WebRTC ネイティブが落ちる／ANR になるため、
+  /// 開いてすぐ閉じ、通話時に開き直す。
+  static Future<void> warmupTvCamera() {
+    _tvWarmup ??= _warmupTvCameraOnce();
+    return _tvWarmup!;
+  }
+
+  static Future<void> _warmupTvCameraOnce() async {
+    if (!TvUtil.isTelevision) return;
+    try {
+      print('[TV] camera warmup start');
+      await navigator.mediaDevices.enumerateDevices();
+      final stream = await navigator.mediaDevices.getUserMedia({
+        'audio': false,
+        'video': true,
+      });
+      for (final t in stream.getTracks()) {
+        try {
+          t.stop();
+        } catch (_) {}
+      }
+      try {
+        await stream.dispose();
+      } catch (_) {}
+      print('[TV] camera warmup done');
+    } catch (e) {
+      print('[TV] camera warmup: $e');
+    }
+  }
+
+  static Future<void> _waitForLocalVideoLive(MediaStream stream) async {
+    final tracks = stream.getVideoTracks();
+    if (tracks.isEmpty) return;
+    final track = tracks.first;
+    try {
+      track.enabled = true;
+    } catch (_) {}
+    final deadline = DateTime.now().add(const Duration(milliseconds: 1500));
+    while (DateTime.now().isBefore(deadline)) {
+      try {
+        final settings = track.getSettings();
+        final w = settings['width'];
+        if (w is num && w.toDouble() > 0) {
+          print('[TV] local video live ${w}x${settings['height']}');
+          return;
+        }
+      } catch (_) {}
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    print('[TV] local video live wait timed out (continue)');
+  }
 
   String get sdpSemantics => 'unified-plan';
   // String get sdpSemantics => 'plan-b';
@@ -92,15 +147,38 @@ class Peer {
     'optional': [],
   };
 
+  /// close() で立てた旗を下ろし、また接続できるようにする。
+  ///
+  /// close() は通話が終わったあとに紛れ込む接続要求を弾くためのもので、
+  /// テレビでUSBカメラが開きっぱなしになるのを防いでいる。
+  /// ただし**保留は通話の終わりではない**。保留から戻るときや
+  /// 三者通話へ移るときは、ここを通してから繋ぎ直す必要がある。
+  void reopen() {
+    if (!_closed) return;
+    print('peer reopen');
+    _closed = false;
+  }
+
   void close() {
+    _closed = true;
     if (TvUtil.isTelevision) {
       TvUtil.usbMicStop();
     }
-    if (_localStream != null) {
-      _localStream?.getTracks().forEach((track) => track.stop());
-      _localStream!.dispose();
-    _emeetCapture = false;
+    final stream = _localStream;
     _localStream = null;
+    _emeetCapture = false;
+    if (stream != null) {
+      for (final track in stream.getTracks()) {
+        try {
+          track.enabled = false;
+        } catch (_) {}
+        try {
+          track.stop();
+        } catch (_) {}
+      }
+      try {
+        stream.dispose();
+      } catch (_) {}
     }
 
     if (peerConnection != null) {
@@ -119,6 +197,24 @@ class Peer {
     // if (this.onStateChange != null) {
     //   this.onStateChange(SignalingState.CallStateBye);
     // }
+    _remoteCandidates.clear();
+  }
+
+  /// 張ってある接続をすべて閉じる。カメラとマイクは止めない。
+  ///
+  /// 三者通話から二者通話へ戻るときに使う。閉じずに残すと、
+  /// ICEの状態が「確立済み」のまま居座り、次に繋ぎ直したときの
+  /// 通信候補がすべて `ignore late ice` で捨てられて映像が固まる。
+  void closeAllConnections() {
+    print('peer closeAllConnections (${_peerConnections.length})');
+    _peerConnections.forEach((key, pc) {
+      try {
+        pc.close();
+        pc.dispose();
+      } catch (_) {}
+    });
+    _peerConnections.clear();
+    _iceStable.clear();
     _remoteCandidates.clear();
   }
 
@@ -209,9 +305,22 @@ class Peer {
   }
 
   void invite(String peerId, String media, useScreen) {
+    if (AppManager.isPiTvLayout && _closed) {
+      print('peer invite skipped (closed)');
+      return;
+    }
     _createPeerConnection(peerId, media, useScreen, isHost: true).then((pc) {
+      if (AppManager.isPiTvLayout && _closed) {
+        try {
+          pc.close();
+          pc.dispose();
+        } catch (_) {}
+        return;
+      }
       _peerConnections[peerId] = pc;
       _createOffer(peerId, pc, media);
+    }).catchError((e) {
+      print('peer invite failed: $e');
     });
   }
 
@@ -358,6 +467,15 @@ class Peer {
   }
 
   Future<MediaStream> createStream(media, userScreen) async {
+    if (AppManager.isPiTvLayout && _closed) {
+      throw StateError('peer closed');
+    }
+    if (TvUtil.isTelevision) {
+      try {
+        await warmupTvCamera();
+      } catch (_) {}
+    }
+
     // マイク権限を確実に取得（USBカメラ内蔵マイク含む）
     try {
       final mic = await Permission.microphone.request();
@@ -368,7 +486,7 @@ class Peer {
 
     if (TvUtil.isTelevision) {
       try {
-        const channel = MethodChannel('jp.amiplus.mulch/tv');
+        const channel = MethodChannel('jp.amiplus.lisa/tv');
         final usbPerm = await channel.invokeMethod('ensureUsbAudioPermission');
         print('ensureUsbAudioPermission: $usbPerm');
         // 権限ダイアログを新規表示した場合のみ、付与を待つ
@@ -431,6 +549,26 @@ class Peer {
           'video': true,
         });
       }
+      if (TvUtil.isTelevision && stream.getVideoTracks().isEmpty) {
+        for (var i = 0; i < 3; i++) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * (i + 1)));
+          print('TV camera retry ${i + 1}');
+          try {
+            final retry = await navigator.mediaDevices.getUserMedia({
+              'audio': true,
+              'video': true,
+            });
+            if (retry.getVideoTracks().isNotEmpty) {
+              await _stopStream(stream);
+              stream = retry;
+              break;
+            }
+            await _stopStream(retry);
+          } catch (e) {
+            print('TV camera retry failed: $e');
+          }
+        }
+      }
     }
 
     if (stream.getVideoTracks().isEmpty && camId != 'emeet') {
@@ -486,9 +624,21 @@ class Peer {
         } catch (e) {
           print('setVolume failed: $e');
         }
-        try {
-          await Helper.setMicrophoneMute(false, track);
-        } catch (_) {}
+      }
+      try {
+        await Helper.setMicrophoneMute(false, track);
+      } catch (_) {}
+    }
+
+    if (AppManager.isPiTvLayout) {
+      if (_closed) {
+        await _stopStream(stream);
+        throw StateError('peer closed after getUserMedia');
+      }
+      await _waitForLocalVideoLive(stream);
+      if (_closed) {
+        await _stopStream(stream);
+        throw StateError('peer closed after video wait');
       }
     }
 

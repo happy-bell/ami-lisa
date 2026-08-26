@@ -42,7 +42,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyC4taodpKyludcxLWfA76ejVvWe7gTp3hY',
-    appId: '1:764771508054:android:075ec27533317ac8b4c0f7',
+    appId: '1:764771508054:android:1e184fd5acbc3dddb4c0f7',
     messagingSenderId: '764771508054',
     projectId: 'ami-style',
     storageBucket: 'ami-style.firebasestorage.app',
@@ -50,12 +50,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAo04zrgYfi2dF1lsbaZu-QA9GfP_yhhYs',
-    appId: '1:764771508054:ios:d31d4fe01d2be377b4c0f7',
+    appId: '1:764771508054:ios:292e4f57d0c5ed7fb4c0f7',
     messagingSenderId: '764771508054',
     projectId: 'ami-style',
     storageBucket: 'ami-style.firebasestorage.app',
     androidClientId: '764771508054-66k1jkb73opgdempo8jm5lj0ft17uc26.apps.googleusercontent.com',
-    iosBundleId: 'jp.amiplus.mulch',
+    iosBundleId: 'jp.amiplus.lisa',
   );
 
   static const FirebaseOptions web = FirebaseOptions(

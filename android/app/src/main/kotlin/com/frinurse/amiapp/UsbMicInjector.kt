@@ -1,4 +1,4 @@
-package jp.amiplus.mulch
+package jp.amiplus.lisa
 
 import android.content.Context
 import android.util.Log
@@ -149,8 +149,9 @@ class UsbMicInjector(private val profile: MicProfile) :
         // 遅延制御: 上限を超えたら目標量まで捨てる（音が映像より遅れるのを防ぐ）
         val maxKeep = srcRate * ch * profile.uacMaxKeepMs / 1000
         val availableNow = UsbAudioCapture.available()
-        val warming = startedAtMs == 0L ||
-            System.currentTimeMillis() - startedAtMs < profile.uacWarmupMs
+        val warming = profile.uacWarmupMs > 0 &&
+            (startedAtMs == 0L ||
+                System.currentTimeMillis() - startedAtMs < profile.uacWarmupMs)
         if (!warming && availableNow > maxKeep) {
             val keep = (srcRate * ch * profile.uacTargetMs / 1000).coerceAtLeast(1)
             UsbAudioCapture.trim(keep)

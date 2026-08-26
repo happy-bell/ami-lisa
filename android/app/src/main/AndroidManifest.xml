@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="jp.amiplus.mulch">
+    package="jp.amiplus.lisa">
 
     <!-- Phone + Google TV: hardware not required on TV -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -12,6 +12,11 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <!-- ACCESS_FINE_LOCATION があると Play が GPS を暗黙的に必須扱いにし、
+         GPS非搭載の Android TV が配信対象から外れる。明示的に不要と宣言する。 -->
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.location.network" android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -28,6 +33,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
@@ -40,10 +46,12 @@
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Play 審査用。依存ライブラリが付けても落とす。 -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
+        tools:node="remove" />
 
+    <!-- 通話終了後に戻す視聴アプリ。QUERY_ALL_PACKAGES の代わり。 -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -53,6 +61,56 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- 地デジ / BS / 110°CS（メーカー別チューナー） -->
+        <package android:name="com.tcl.tv" />
+        <package android:name="com.dragontec.grefplus.dtv" />
+        <package android:name="com.droidlogic.android.tv" />
+        <package android:name="com.mediatek.wwtv.tvcenter" />
+        <package android:name="com.google.android.tv" />
+        <package android:name="com.android.tv" />
+        <package android:name="com.sony.dtv.tvx" />
+        <package android:name="com.sony.dtv.osat.tv" />
+        <package android:name="jp.co.sharp.android.iwin.tv" />
+        <package android:name="com.mstar.android.tv" />
+        <!-- Netflix -->
+        <package android:name="com.netflix.ninja" />
+        <package android:name="com.netflix.mediaclient" />
+        <!-- YouTube -->
+        <package android:name="com.google.android.youtube.tv" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.google.android.youtube.tvunplugged" />
+        <package android:name="com.google.android.youtube.tvmusic" />
+        <!-- Prime Video -->
+        <package android:name="com.amazon.amazonvideo.livingroom" />
+        <package android:name="com.amazon.avod.thirdpartyclient" />
+        <package android:name="com.amazon.avod" />
+        <!-- U-NEXT -->
+        <package android:name="jp.unext.tv.player" />
+        <package android:name="jp.unext.mediaplayer" />
+        <!-- ABEMA -->
+        <package android:name="tv.abema" />
+        <!-- TVer -->
+        <package android:name="jp.co.tver.tvapp" />
+        <package android:name="jp.altplus.tver" />
+        <!-- Disney+ -->
+        <package android:name="com.disney.disneyplus" />
+        <!-- Hulu（日本 / 海外TV） -->
+        <package android:name="jp.happyon.android" />
+        <package android:name="com.hulu.plus" />
+        <package android:name="com.hulu.livingroomplus" />
+        <!-- Apple TV -->
+        <package android:name="com.apple.atve.androidtv.appletv" />
+        <package android:name="com.apple.atve.sony.appletv" />
+        <package android:name="com.apple.atve.androidphone.appletv" />
+        <!-- DAZN -->
+        <package android:name="com.dazn" />
+        <!-- その他よく使う配信 -->
+        <package android:name="jp.or.nhk.plus" />
+        <package android:name="jp.lemino.app" />
+        <package android:name="jp.co.nttdocomo.lemino.android" />
+        <package android:name="com.dmm.tv" />
+        <package android:name="jp.wowow.on_demand" />
+        <package android:name="jp.telasa.app" />
     </queries>
 
    <application
@@ -76,6 +134,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
+            android:alwaysRetainTaskState="true"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:theme="@style/LaunchTheme"
@@ -116,13 +175,74 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <activity
+            android:name=".IncomingCallActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:finishOnTaskLaunch="false"
+            android:launchMode="singleTop"
+            android:noHistory="false"
+            android:showWhenLocked="true"
+            android:taskAffinity="jp.amiplus.lisa.incoming"
+            android:theme="@style/IncomingCallTheme"
+            android:turnScreenOn="true"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" />
+
         <service
             android:name=".IncomingCallOverlayService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="incoming_call_waiting_overlay" />
         </service>
+
+        <service
+            android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService"
+            tools:node="remove" />
+        <service
+            android:name=".AmiFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".AmiIncomingFcmReceiver"
+            android:exported="true"
+            android:permission="com.google.android.c2dm.permission.SEND">
+            <intent-filter android:priority="999">
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+            </intent-filter>
+        </receiver>
+        <!-- 端末起動後・アプリ更新後にアミを自動復帰させる。
+             これが無いと更新直後にオフラインのままになり着信を受けられない。 -->
+        <receiver
+            android:name=".AmiAutoStartReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 通話終了後にTV電源オフ状態へ戻すためのデバイス管理(lockNow)。
+             Android 11(TV005)・Android 12(TV007) 共通で使用する。 -->
+        <receiver
+            android:name=".AmiDeviceAdminReceiver"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/ami_device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

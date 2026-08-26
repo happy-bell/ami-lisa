@@ -22,23 +22,35 @@ def flutterVersionName =  localProps["flutter.versionName"] ?: "1.0"
 
 /* ───────── Android 設定 ──────── */
 android {
-    namespace "jp.amiplus.mulch"
+    namespace "jp.amiplus.lisa"
 
     compileSdk 36
     ndkVersion flutter.ndkVersion
 
     defaultConfig {
-        applicationId "jp.amiplus.mulch"
+        applicationId "jp.amiplus.lisa"
         minSdk 23
         targetSdk 36
         versionCode flutterVersionCode
         versionName flutterVersionName
 
+        // TV005/TV007 は 32bit 専用。Play の 16KB は 64bit のみ対象。
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
+        }
+
         externalNativeBuild {
             cmake {
                 cppFlags "-fexceptions"
-                arguments "-DANDROID_STL=c++_static"
+                arguments "-DANDROID_STL=c++_static",
+                        "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
             }
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
         }
     }
 
@@ -77,6 +89,7 @@ flutter { source "../.." }
 // android/app/build.gradle
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    implementation "com.google.firebase:firebase-messaging"
 
     // flutter_webrtc の ExternalAudioProcessing にUSBマイクPCMを注入するため、
     // プラグインと同じ libwebrtc をコンパイル時のみ参照 (実行時はプラグイン側を使用)

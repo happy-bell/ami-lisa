@@ -1,4 +1,4 @@
-package jp.amiplus.mulch
+package jp.amiplus.lisa
 
 /**
  * USB2.0-B。権限ダイアログの名称は「USB 2.0 Camera」。

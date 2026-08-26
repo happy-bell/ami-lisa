@@ -7,7 +7,7 @@ class AppDefine {
   static const amiURL = 'https://fun-talk.net/amiapp/';
   static final mcsaURL = 'https://mcs-a.com/frinurse/';
   static String get baseURL => _amiApp ? amiURL : mcsaURL;
-  static const appLabel = 'このアプリ';
+  static const appLabel = 'テレビ電話ａｍｉシリーズ LiSA';
   static const elanApp = false;
   static const _amiApp = true;
   static bool get amiApp => _amiApp;

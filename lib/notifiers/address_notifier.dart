@@ -26,6 +26,7 @@ class AddressStore with ChangeNotifier {
   void setAddressList(addressJson) {
     var storedAddressList = Address.fromJsonList(addressJson);
     addressList = [...storedAddressList];
+    notifyListeners();
   }
 
   List<Address> managerList() {

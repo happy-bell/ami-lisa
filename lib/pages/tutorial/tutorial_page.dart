@@ -1,4 +1,7 @@
+import 'package:amiapp/helpers/tv_util.dart';
+import 'package:amiapp/pages/lisa/lisa_activation_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
+import 'package:amiapp/widgets/tv_focusable.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,17 +11,39 @@ import 'package:amiapp/pages/common/webview_page.dart';
 class TutorialPage extends StatelessWidget {
   const TutorialPage({super.key});
 
+  Future<void> _agree(BuildContext context) async {
+    var prefs = await SharedPreferences.getInstance();
+    await prefs.setBool("isInitialized", true);
+
+    await Navigator.of(context, rootNavigator: true).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (BuildContext context, Animation<double> animation1,
+            Animation<double> animation2) {
+          // テレビは6桁の番号で登録する。リモコンで英数字を打たせない。
+          if (TvUtil.isTelevision) {
+            return const LisaActivationPage();
+          }
+          return SignInPage();
+        },
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final Size size = MediaQuery.of(context).size;
-    final double fontSize = 20;//14
+    final double fontSize = TvUtil.isTelevision ? 24 : 20;
 
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          var bgImage = constraints.maxWidth > 500 ? 'assets/images/tutorial/first_iPad.png' : 'assets/images/tutorial/first_iPhone.png';
-          var douiImage = constraints.maxWidth > 500 ? 'assets/images/tutorial/doui_Pad.png' : 'assets/images/tutorial/doui_iPhone.png';
+          var bgImage = constraints.maxWidth > 500
+              ? 'assets/images/tutorial/first_iPad.png'
+              : 'assets/images/tutorial/first_iPhone.png';
+          var douiImage = constraints.maxWidth > 500
+              ? 'assets/images/tutorial/doui_Pad.png'
+              : 'assets/images/tutorial/doui_iPhone.png';
           var douiWidth = constraints.maxWidth > 600 ? 300.0 : 190.0;
           var douiHeight = douiWidth / 88 * 29;
 
@@ -34,34 +59,24 @@ class TutorialPage extends StatelessWidget {
                 ),
               ),
               Positioned(
-                top: constraints.maxHeight / 2 -20,
+                top: constraints.maxHeight / 2 - 20,
                 left: 20,
                 width: constraints.maxWidth - 40,
                 child: IntrinsicWidth(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      GestureDetector(
-                        child: Image.asset(
-                          douiImage,
-                          width: douiWidth,
-                          height: douiHeight,
+                      TvFocusable(
+                        autofocus: TvUtil.isTelevision,
+                        onPressed: () => _agree(context),
+                        child: GestureDetector(
+                          child: Image.asset(
+                            douiImage,
+                            width: douiWidth,
+                            height: douiHeight,
+                          ),
+                          onTap: () => _agree(context),
                         ),
-                        onTap: () async {
-                          var prefs = await SharedPreferences.getInstance();
-                          await prefs.setBool("isInitialized", true);
-
-                          await Navigator.of(context, rootNavigator: true)
-                              .pushReplacement(
-                              PageRouteBuilder(
-                                pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-                                  return SignInPage();
-                                },
-                                transitionDuration: Duration.zero,
-                                reverseTransitionDuration: Duration.zero,
-                              )
-                          );
-                        }
                       ),
                     ],
                   ),
@@ -87,14 +102,15 @@ class TutorialPage extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.teal,
                           ),
-                          recognizer: TapGestureRecognizer()..onTap = () {
-                            print('"利用規約" がタップされました');
-
-                            Navigator.of(context, rootNavigator: true)
-                                .push(MaterialPageRoute(
-                                builder: (context) => WebviewPage(title: '利用規約', url: AppDefine.kiyakuURL),
-                                fullscreenDialog: true));
-                          },
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Navigator.of(context, rootNavigator: true).push(
+                                  MaterialPageRoute(
+                                      builder: (context) => WebviewPage(
+                                          title: '利用規約',
+                                          url: AppDefine.kiyakuURL),
+                                      fullscreenDialog: true));
+                            },
                         ),
                         const TextSpan(
                           text: 'および',
@@ -104,14 +120,15 @@ class TutorialPage extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.teal,
                           ),
-                          recognizer: TapGestureRecognizer()..onTap = () {
-                            print('"個人情報保護方針" がタップされました');
-
-                            Navigator.of(context, rootNavigator: true)
-                                .push(MaterialPageRoute(
-                                builder: (context) => WebviewPage(title: '個人情報保護方針', url: AppDefine.policyURL),
-                                fullscreenDialog: true));
-                          },
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Navigator.of(context, rootNavigator: true).push(
+                                  MaterialPageRoute(
+                                      builder: (context) => WebviewPage(
+                                          title: '個人情報保護方針',
+                                          url: AppDefine.policyURL),
+                                      fullscreenDialog: true));
+                            },
                         ),
                         const TextSpan(
                           text: 'への同意が必要です。',
@@ -125,17 +142,17 @@ class TutorialPage extends StatelessWidget {
                 bottom: 200,
                 left: 40,
                 width: constraints.maxWidth - 80,
-                child: const Center(
+                child: Center(
                   child: Text(
-                      'サービス事業者より申し込みを行ってください。',
-                    style: TextStyle(fontSize: 20),
+                    'サービス事業者より申し込みを行ってください。',
+                    style: TextStyle(fontSize: fontSize),
                     textAlign: TextAlign.center,
                   ),
                 ),
               ),
             ],
           );
-        }
+        },
       ),
     );
   }

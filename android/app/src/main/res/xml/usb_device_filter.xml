@@ -6,10 +6,7 @@
     <usb-device-filter vendor-id="1133" />
     <!-- TZZ / Sonix USB 2.0 Camera (VID 0x0C45 PID 0x636B) -->
     <usb-device-filter vendor-id="3141" product-id="25451" />
-    <!-- USB Audio Class -->
-    <usb-device-filter class="1" subclass="1" protocol="0" />
-    <usb-device-filter class="1" subclass="2" protocol="0" />
-    <!-- Video+Audio composite も拾うため UVC も許可対象に -->
-    <usb-device-filter class="14" subclass="1" protocol="0" />
-    <usb-device-filter class="14" subclass="2" protocol="0" />
+    <!-- class=1 (Audio) / class=14 (UVC) は載せない。
+         アイリス内部USB（製品名なし）がマッチし、起動時に
+         「null へのアクセスを許可しますか？」が出る。 -->
 </resources>

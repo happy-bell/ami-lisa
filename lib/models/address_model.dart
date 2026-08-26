@@ -43,22 +43,24 @@ class Address {
     }
 
     return Address(
-      id: id,
-      name: name,
+      id: id.toString(),
+      name: name.toString(),
       code: code,
-      type: type,
-      status: int.parse(json['status']),
-      call: int.parse(json['call']),
-      called: int.parse(json['called']),
-      userType: json['userType'],
-      photo: photo
+      type: (type ?? '').toString(),
+      status: int.tryParse((json['status'] ?? '0').toString()) ?? 0,
+      call: int.tryParse((json['call'] ?? '0').toString()) ?? 0,
+      called: int.tryParse((json['called'] ?? '0').toString()) ?? 0,
+      userType: (json['userType'] ?? json['USER_TYPE'] ?? type ?? '').toString(),
+      photo: (photo ?? '').toString(),
     );
   }
 
   static List<Address> fromJsonList(List<dynamic> json) {
     var list = <Address>[];
     for (var i = 0; i < json.length; i++) {
-      var address = Address.fromJson(json[i]);
+      final item = json[i];
+      if (item is! Map) continue;
+      var address = Address.fromJson(Map<String, dynamic>.from(item));
       list.add(address);
     }
     return list;

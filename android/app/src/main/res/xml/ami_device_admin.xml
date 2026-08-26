@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  デバイス管理ポリシー。画面ロック(=画面オフ)のみ許可。
+  通話終了後に TV005 を電源オフ状態へ戻すための force-lock だけを使う。
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>

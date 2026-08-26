@@ -1,4 +1,4 @@
-package jp.amiplus.mulch
+package jp.amiplus.lisa
 
 /**
  * EMEET C960 専用。2026-08-17 凍結。

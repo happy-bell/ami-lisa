@@ -47,3 +47,8 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+# 作業中の控え（実体は残すが履歴には入れない）
+*.bak
+*.bak_*
+_backup/
+.cursor/

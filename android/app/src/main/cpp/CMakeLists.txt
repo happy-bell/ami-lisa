@@ -4,6 +4,11 @@ project(ami_usb_audio LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Google Play / Android 15+: 16 KB page size
+if(ANDROID)
+    add_link_options("-Wl,-z,max-page-size=16384")
+endif()
+
 # ---- libusb (static) ----
 set(LIBUSB_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(LIBUSB_BUILD_TESTING OFF CACHE BOOL "" FORCE)

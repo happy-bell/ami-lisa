@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:amiapp/pages/setting/setting_info_message_page.dart';
+import 'package:amiapp/helpers/tv_util.dart';
 import 'package:amiapp/pages/setting/setting_info_photo_page.dart';
 import 'package:amiapp/pages/staff/manager_page.dart';
 import 'package:flutter/cupertino.dart';
@@ -10,13 +10,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/pages/setting/setting_about_page.dart';
 import 'package:amiapp/pages/setting/setting_input_page.dart';
+import 'package:amiapp/pages/setting/setting_message_page.dart';
 import 'package:amiapp/pages/setting/setting_select_page.dart';
+import 'package:amiapp/services/tv_message_schedule.dart';
 import 'package:amiapp/pages/setting/setting_multi_select_page.dart';
 import 'package:amiapp/pages/staff/staff_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
 import 'package:amiapp/services/appmanager.dart';
 
 import '../../helpers/widget_util.dart';
+import '../../widgets/and_vital_pair_dialog.dart';
+import '../../widgets/tv_focusable.dart';
 import '../elan/setting/elan_setting_info_video_page.dart';
 import '../live/live_page.dart';
 import '../room/room_page.dart';
@@ -31,13 +35,9 @@ class SettingPage extends StatefulWidget {
 class _SettingPageState extends State<SettingPage> {
   bool _load = false;
   bool _savedSwitch = false;
+  String _androidId = '';
 
   final _listHeight = 44.0;
-  final TextStyle _titleTextStyle1 = const TextStyle(
-    fontSize: 14,
-  );
-  final TextStyle _titleTextStyle2 =
-      const TextStyle(fontSize: 14, color: Colors.blue);
 
   @override
   void initState() {
@@ -49,6 +49,11 @@ class _SettingPageState extends State<SettingPage> {
     AppManager.talkId2 = '';
     AppManager.holdId = '';
     AppManager.holdedId = '';
+    if (Platform.isAndroid) {
+      TvUtil.getAndroidId().then((id) {
+        if (mounted) setState(() => _androidId = id);
+      });
+    }
   }
 
   @override
@@ -65,17 +70,14 @@ class _SettingPageState extends State<SettingPage> {
         title: const Text('確認'),
         content: const Text('ログアウトしますか？'),
         actions: <Widget>[
-          SimpleDialogOption(
-            child: const Text('はい'),
-            onPressed: () {
-              Navigator.pop(context, "1");
-            },
+          TvDialogAction(
+            autofocus: TvUtil.isTelevision,
+            label: 'はい',
+            onPressed: () => Navigator.pop(context, "1"),
           ),
-          SimpleDialogOption(
-            child: const Text('いいえ'),
-            onPressed: () {
-              Navigator.pop(context, "0");
-            },
+          TvDialogAction(
+            label: 'いいえ',
+            onPressed: () => Navigator.pop(context, "0"),
           ),
         ],
       ),
@@ -228,9 +230,28 @@ class _SettingPageState extends State<SettingPage> {
   Future<void> _toInfoVideoPage() async {
     var result = await Navigator.of(context).push(
         MaterialPageRoute(builder: (context) => ElanSettingInfoVideoPage()));
+    if (result == 'play' && mounted) {
+      _leaveToHome();
+      return;
+    }
     setState(() {
       _savedSwitch = !_savedSwitch;
     });
+  }
+
+  void _leaveToHome() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (BuildContext context, Animation<double> animation1,
+            Animation<double> animation2) {
+          return RoomPage();
+        },
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+      (route) => false,
+    );
   }
 
   Future<void> _toInfoPhotoPage() async {
@@ -261,7 +282,7 @@ class _SettingPageState extends State<SettingPage> {
       tapListContainer('ログアウト', () {
         print('logout');
         _logout();
-      }),
+      }, autofocus: TvUtil.isTelevision),
     ];
 
     if (AppManager.settings['MCSTYPE'] == '4') {
@@ -273,6 +294,8 @@ class _SettingPageState extends State<SettingPage> {
       listContainers.addAll([
         _separator(),
         dispListContainer('自分のID', AppManager.settings['myId']),
+        if (TvUtil.isTelevision && _androidId.isNotEmpty)
+          dispListContainer('テレビシリアル', _androidId),
         tapListContainer('リスト更新', () {
           _getAddress();
         }),
@@ -313,30 +336,40 @@ class _SettingPageState extends State<SettingPage> {
 
     var dispType = AppManager.settings['DISPTYPE'];
     var anminModeFlg = AppManager.settings['ANMINMODEFLG'];
+    // TCLアミ: 表示は居室固定。項目は残すがTVでは出さない（復活用）。
+    if (TvUtil.isTelevision && dispType != '1') {
+      dispType = '1';
+      AppManager.settings['DISPTYPE'] = '1';
+      AppManager.saveSetting('DISPTYPE', '1');
+    }
     listContainers.addAll([
       _separator(),
-      nextListContainer('表示', AppManager.dispType(dispType), () async {
-        var result = await Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => SettingSelectPage(
-                keyName: 'DISPTYPE', value: AppManager.settings['DISPTYPE'])));
-        AppManager.settings['DISPTYPE'] = result;
-        setState(() {
-          _savedSwitch = !_savedSwitch;
-        });
-      }),
-      nextListContainer(
-          '表示数', AppManager.displyNumber(AppManager.appsettings['DISPLAYNUM']),
-          () async {
-        var result = await Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => SettingSelectPage(
-                keyName: 'DISPLAYNUM',
-                value: AppManager.appsettings['DISPLAYNUM'])));
-        AppManager.appsettings['DISPLAYNUM'] = result;
-        setState(() {
-          _savedSwitch = !_savedSwitch;
-        });
-      }),
-      switchListContainer('自動応答', 'AUTO_RECEIVE'),
+      if (!TvUtil.isTelevision)
+        nextListContainer('表示', AppManager.dispType(dispType), () async {
+          var result = await Navigator.of(context).push(MaterialPageRoute(
+              builder: (context) => SettingSelectPage(
+                  keyName: 'DISPTYPE', value: AppManager.settings['DISPTYPE'])));
+          AppManager.settings['DISPTYPE'] = result;
+          setState(() {
+            _savedSwitch = !_savedSwitch;
+          });
+        }),
+      if (!TvUtil.isTelevision)
+        nextListContainer(
+            '表示数', AppManager.displyNumber(AppManager.appsettings['DISPLAYNUM']),
+            () async {
+          var result = await Navigator.of(context).push(MaterialPageRoute(
+              builder: (context) => SettingSelectPage(
+                  keyName: 'DISPLAYNUM',
+                  value: AppManager.appsettings['DISPLAYNUM'])));
+          AppManager.appsettings['DISPLAYNUM'] = result;
+          setState(() {
+            _savedSwitch = !_savedSwitch;
+          });
+        }),
+      switchListContainer(
+          TvUtil.isTelevision ? '自動応答（視聴中も確認なし）' : '自動応答',
+          'AUTO_RECEIVE'),
       if (dispType == '1')
         nextListContainer('通話開始時間', AppManager.callDelayText(), () async {
           var result = await Navigator.of(context).push(MaterialPageRoute(
@@ -360,7 +393,7 @@ class _SettingPageState extends State<SettingPage> {
       );
     }
 
-    if (dispType == '1') {
+    if (dispType == '1' && !TvUtil.isTelevision) {
       listContainers.add(
           nextListContainer('明るさ', AppManager.sleepModeBrightness(), () async {
         var result = await Navigator.of(context).push(MaterialPageRoute(
@@ -373,7 +406,9 @@ class _SettingPageState extends State<SettingPage> {
         });
       }));
     }
-    if (dispType == '1' || dispType == '2') {
+    // EX の時計は下の「時計」（時間帯＋デジタル／デジタル日付）に統合する。
+    if ((dispType == '1' || dispType == '2') &&
+        !(TvUtil.isTelevision && AppManager.isPiTvLayout)) {
       listContainers
           .add(nextListContainer('時計', AppManager.clockMode(), () async {
         var result = await Navigator.of(context).push(MaterialPageRoute(
@@ -426,23 +461,126 @@ class _SettingPageState extends State<SettingPage> {
     } else {
       listContainers.add(_separator());
     }
-    if (dispType == '1') {
+    if (dispType == '1' && !TvUtil.isTelevision) {
       listContainers.add(
         switchListContainer('ホーム画面の時計', 'CLOCKDISP'),
       );
     }
 
     if (AppDefine.amiApp) {
-      listContainers.add(switchListContainer('表示設定', 'CALLSTATUSDISP'));
-      if (mode == 'user') {
+      if (!TvUtil.isTelevision) {
+        listContainers.add(switchListContainer('表示設定', 'CALLSTATUSDISP'));
+      }
+      if (mode == 'user' &&
+          !(TvUtil.isTelevision && !AppManager.isPiTvLayout)) {
         listContainers.addAll([
-          nextListContainer('お知らせ動画', '', _toInfoVideoPage),
+          nextListContainer(
+            TvUtil.isTelevision ? 'ビデオ' : 'お知らせ動画',
+            '',
+            _toInfoVideoPage,
+          ),
           nextListContainer('スライドショー', '', _toInfoPhotoPage),
-          nextListContainer('メッセージ配信', '', () async {
-            await Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => SettingInfoMessagePage()));
-          }),
         ]);
+      }
+      if (TvUtil.isTelevision && mode == 'user') {
+        listContainers.add(
+          nextListContainer('ホーム画面', AppManager.tvLayoutLabel(), () async {
+            var result = await Navigator.of(context).push(MaterialPageRoute(
+              builder: (context) => SettingSelectPage(
+                keyName: 'TV_LAYOUT',
+                value: AppManager.tvLayout,
+              ),
+            ));
+            if (result != null) {
+              await AppManager.saveTvLayout(result);
+              if (mounted) {
+                TvUtil.markRouteFocusSettle();
+                Navigator.of(context).pop();
+                return;
+              }
+            }
+            setState(() {
+              _savedSwitch = !_savedSwitch;
+            });
+          }),
+        );
+        listContainers.add(
+          nextListContainer('メッセージ', TvMessageSchedule.summaryLabel(), () async {
+            await Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => const SettingMessagePage(),
+            ));
+            setState(() {
+              _savedSwitch = !_savedSwitch;
+            });
+          }),
+        );
+        listContainers.add(
+          nextListContainer(
+            '時計',
+            TvMessageSchedule.summaryLabel(key: TvMessageSchedule.clockKey),
+            () async {
+              await Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const SettingMessagePage(
+                  title: '時計',
+                  settingKey: TvMessageSchedule.clockKey,
+                  colorTitle: '日付の明るさ',
+                ),
+              ));
+              setState(() {
+                _savedSwitch = !_savedSwitch;
+              });
+            },
+          ),
+        );
+        if (AppManager.isPiTvLayout) {
+          listContainers.add(
+            nextListContainer('天気予報', AppManager.weatherAreaLabel(), () async {
+              if (AppManager.weatherAreas.isEmpty) {
+                AppManager.weatherAreas =
+                    List<List<String>>.from(AppManager.defaultWeatherAreas);
+              }
+              var result = await Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => SettingSelectPage(
+                  keyName: 'WEATHER_AREA',
+                  value: AppManager.weatherArea,
+                ),
+              ));
+              if (result != null) {
+                await AppManager.saveWeatherArea(result);
+              }
+              setState(() {
+                _savedSwitch = !_savedSwitch;
+              });
+            }),
+          );
+        }
+        if (AppManager.isPiTvLayout && AppManager.isDoctorAccount) {
+          listContainers.add(
+            nextListContainer('Doc/Pat', AppManager.amiModeLabel(), () async {
+              var result = await Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => SettingSelectPage(
+                  keyName: 'AMI_MODE',
+                  value: AppManager.amiMode,
+                ),
+              ));
+              if (result != null) {
+                await AppManager.saveAmiMode(result);
+              }
+              setState(() {
+                _savedSwitch = !_savedSwitch;
+              });
+            }),
+          );
+        }
+        listContainers.add(
+          nextListContainer('BLE ペアリング', '', () {
+            showDialog<void>(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => const AndVitalPairDialog(),
+            );
+          }),
+        );
       }
     }
 
@@ -457,6 +595,13 @@ class _SettingPageState extends State<SettingPage> {
 
     return WillPopScope(
       onWillPop: () async {
+        // TVの設定はホームから push されているので、そのまま pop する。
+        // 新しい RoomPage を積み直すとフォーカスが二重になり移動音が2回鳴る。
+        if (TvUtil.isTelevision &&
+            AppManager.settings['DISPTYPE'] == '1') {
+          TvUtil.markRouteFocusSettle();
+          return true;
+        }
         if (AppManager.settings['MCSTYPE'] == '4') {
           AppManager.setStatusBarHidden(false);
           return Future.value(true);
@@ -465,24 +610,7 @@ class _SettingPageState extends State<SettingPage> {
         var nextpage = '/staff';
         if (AppManager.settings['DISPTYPE'] == '1') {
           nextpage = '/room';
-          // room
-          // Navigator.pushAndRemoveUntil(
-          //   context,
-          //   MaterialPageRoute(builder: (context) => RoomPage(),),
-          //       (route) => false,
-          // );
-          Navigator.pushAndRemoveUntil(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (BuildContext context, Animation<double> animation1,
-                  Animation<double> animation2) {
-                return RoomPage();
-              },
-              transitionDuration: Duration.zero,
-              reverseTransitionDuration: Duration.zero,
-            ),
-            (route) => false,
-          );
+          _leaveToHome();
         } else if (AppManager.settings['DISPTYPE'] == '2') {
           nextpage = '/live';
           // live
@@ -550,8 +678,10 @@ class _SettingPageState extends State<SettingPage> {
           children: <Widget>[
             Container(
               color: const Color.fromARGB(255, 240, 240, 240),
-              child: ListView(
-                children: listContainers,
+              child: FocusTraversalGroup(
+                child: ListView(
+                  children: listContainers,
+                ),
               ),
             ),
             if (_load)
@@ -573,6 +703,29 @@ class _SettingPageState extends State<SettingPage> {
 
   Widget _separator() => const SizedBox(height: 20);
 
+  double get _rowHeight => TvUtil.isTelevision ? 64.0 : _listHeight;
+
+  TextStyle get _rowTitleStyle => TextStyle(
+        fontSize: TvUtil.isTelevision ? 22 : 14,
+      );
+
+  TextStyle get _rowLinkStyle => TextStyle(
+        fontSize: TvUtil.isTelevision ? 22 : 14,
+        color: Colors.blue,
+      );
+
+  Widget _tvFocusWrap({
+    required Widget child,
+    required VoidCallback onActivate,
+    bool autofocus = false,
+  }) {
+    return TvSettingFocus(
+      autofocus: autofocus,
+      onActivate: onActivate,
+      child: child,
+    );
+  }
+
   Widget dispListContainer(String title, String subtitle) {
     return Container(
       decoration: const BoxDecoration(
@@ -581,81 +734,48 @@ class _SettingPageState extends State<SettingPage> {
           bottom: BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
         ),
       ),
-      height: _listHeight,
-      // margin: const EdgeInsets.all(0.0),
+      height: _rowHeight,
       padding: const EdgeInsets.all(10.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: _titleTextStyle1,
-          ),
-          Text(
-            subtitle,
-            style: _titleTextStyle1,
-          ),
+          Text(title, style: _rowTitleStyle),
+          Text(subtitle, style: _rowTitleStyle),
         ],
       ),
     );
   }
 
-  Widget tapListContainer(String title, Function ontap) {
-    return InkWell(
-      onTap: () {
-        ontap();
-      },
+  Widget tapListContainer(String title, Function ontap, {bool autofocus = false}) {
+    return _tvFocusWrap(
+      autofocus: autofocus,
+      onActivate: () => ontap(),
       child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            bottom: BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
-          ),
-        ),
-        height: _listHeight,
+        height: _rowHeight,
         padding: const EdgeInsets.all(10.0),
-        child: Text(
-          title,
-          style: _titleTextStyle2,
-        ),
+        alignment: Alignment.centerLeft,
+        child: Text(title, style: _rowLinkStyle),
       ),
     );
   }
 
-  Widget nextListContainer(String title, String subtitle, Function ontap) {
-    return InkWell(
-      onTap: () {
-        ontap();
-      },
+  Widget nextListContainer(String title, String subtitle, Function ontap,
+      {bool autofocus = false}) {
+    return _tvFocusWrap(
+      autofocus: autofocus,
+      onActivate: () => ontap(),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            bottom: BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
-          ),
-        ),
-        height: _listHeight,
-        // margin: const EdgeInsets.all(0.0),
+        height: _rowHeight,
         padding: const EdgeInsets.all(10.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              title,
-              style: _titleTextStyle1,
-            ),
+            Text(title, style: _rowTitleStyle),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(
-                  subtitle,
-                  style: _titleTextStyle1,
-                ),
-                const Icon(
-                  Icons.arrow_forward_ios,
-                  color: Colors.grey,
-                  size: 18.0,
-                )
+                Text(subtitle, style: _rowTitleStyle),
+                const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 18.0),
               ],
             ),
           ],
@@ -666,7 +786,9 @@ class _SettingPageState extends State<SettingPage> {
 
   Widget switchListContainer(String title, String key) {
     var isSwtich = false;
-    if (key == 'AUTO_RECEIVE' || key == 'VOLUME_CALL' || key == 'CLOCKDISP') {
+    if (key == 'AUTO_RECEIVE' ||
+        key == 'VOLUME_CALL' ||
+        key == 'CLOCKDISP') {
       if (AppManager.appsettings[key] == '1') {
         isSwtich = true;
       }
@@ -681,47 +803,43 @@ class _SettingPageState extends State<SettingPage> {
         }
       }
     }
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
-        ),
-      ),
-      height: _listHeight,
-      padding: const EdgeInsets.all(10.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: _titleTextStyle1,
-          ),
-          CupertinoSwitch(
-            value: isSwtich,
-            onChanged: (value) {
-              print(value);
-              String val = '0';
-              if (value) {
-                val = '1';
-              }
-              if (key == 'AUTO_RECEIVE' ||
-                  key == 'VOLUME_CALL' ||
-                  key == 'CLOCKDISP') {
-                AppManager.saveAppSetting(key, val);
-              } else if (key == 'SLEEP_MODE' || key == 'CALLSTATUSDISP') {
-                AppManager.saveAppSetting(key, val);
-              } else if (key == 'AUTH_RECEIVE') {
-                AppManager.saveAuthReceives(val);
-              }
 
-              setState(() {
-                _savedSwitch = !_savedSwitch;
-              });
-            },
-            activeTrackColor: Colors.red,
-          ),
-        ],
+    Future<void> toggle([bool? value]) async {
+      final next = value ?? !isSwtich;
+      final val = next ? '1' : '0';
+      if (key == 'AUTO_RECEIVE' ||
+          key == 'VOLUME_CALL' ||
+          key == 'CLOCKDISP') {
+        await AppManager.saveAppSetting(key, val);
+      } else if (key == 'SLEEP_MODE' || key == 'CALLSTATUSDISP') {
+        await AppManager.saveAppSetting(key, val);
+      } else if (key == 'AUTH_RECEIVE') {
+        AppManager.saveAuthReceives(val);
+      }
+
+      setState(() {
+        _savedSwitch = !_savedSwitch;
+      });
+    }
+
+    return _tvFocusWrap(
+      onActivate: () => toggle(),
+      child: Container(
+        height: _rowHeight,
+        padding: const EdgeInsets.all(10.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: Text(title, style: _rowTitleStyle)),
+            ExcludeFocus(
+              child: CupertinoSwitch(
+                value: isSwtich,
+                onChanged: (value) => toggle(value),
+                activeTrackColor: Colors.red,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -747,11 +865,10 @@ class _SettingPageState extends State<SettingPage> {
           title: const Text('確認'),
           content: Text(message),
           actions: <Widget>[
-            SimpleDialogOption(
-              child: Text('OK'),
-              onPressed: () {
-                Navigator.pop(context);
-              },
+            TvDialogAction(
+              autofocus: TvUtil.isTelevision,
+              label: 'OK',
+              onPressed: () => Navigator.pop(context),
             ),
           ],
         );

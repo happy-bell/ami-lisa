@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:amiapp/pages/staff/staff_album_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:path_provider/path_provider.dart';
@@ -20,8 +21,12 @@ import 'package:amiapp/services/peer_service.dart';
 import 'package:amiapp/widgets/staff_talk_menu_widget.dart';
 
 import '../../helpers/paint_helper.dart';
+import '../../helpers/tv_util.dart';
 import '../../helpers/widget_util.dart';
 import '../../services/socket_service.dart';
+import '../../widgets/tv_focusable.dart';
+import '../../widgets/tv_pi_talk_side.dart';
+import '../../services/tv_pi_talk_vital_sync.dart';
 
 class RoomTalkPage extends StatefulWidget {
   const RoomTalkPage({super.key});
@@ -41,6 +46,11 @@ class RoomTalkPageState extends State<RoomTalkPage>
   final _remote2Renderer = RTCVideoRenderer();
   bool _hasRemoteVideo = false;
   bool _hasRemote2Video = false;
+
+  /// 相手の映像の縦横比（幅÷高さ）。1未満なら相手は縦向き。
+  /// 三者通話の並べ方を、相手の持ち方に合わせて変えるために使う。
+  double _remoteRatio = 16 / 9;
+  double _remote2Ratio = 16 / 9;
   final double _remoteMargin = 0;
   SocketIOService socketservice = SocketIOService();
   SocketService? socketioservice;
@@ -71,6 +81,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
   bool _extendHangup = false;
 
   GlobalKey<StaffTalkMenuWidgetState> menuWidgetGlobalKey = GlobalKey();
+  final Completer<void> _renderersReady = Completer<void>();
 
   @override
   void initState() {
@@ -87,6 +98,9 @@ class RoomTalkPageState extends State<RoomTalkPage>
     peer.onIceCandidate = _onIceCandidate;
     _controller.delegate = this;
     _initRenderers();
+    if (AppManager.isPiTvLayout) {
+      TvPiTalkVitalSync.instance.start();
+    }
   }
 
   @override
@@ -99,32 +113,43 @@ class RoomTalkPageState extends State<RoomTalkPage>
       _init = false;
       AppManager.setStatusBarHidden(false);
 
+      try {
+        await _renderersReady.future;
+      } catch (_) {}
+
       if (AppManager.selectUser!.call == 1) {
-        await audio.ringtone();
-        print('[DEBUG PRINT]着信中 ${AppManager.selectUser!.id}');
+        final forceAccept = AppManager.tvForceAccept;
+        AppManager.tvForceAccept = false;
+        print('[DEBUG PRINT]着信中 ${AppManager.selectUser!.id} force=$forceAccept');
         _statusImage = ImageName.addrCall;
-        if (AppManager.appsettings["AUTO_RECEIVE"] == '1') {
+        // オーバーレイ「はい」後は着信音を鳴らさない（確認済みのため）
+        if (!forceAccept) {
+          await audio.ringtone();
+        }
+        if (forceAccept || AppManager.appsettings["AUTO_RECEIVE"] == '1') {
           print(DateTime.now());
-          print('[DEBUG PRINT]room talk 着信中 auto receive');
-          
-          // 設定された遅延時間を取得（秒単位）
+          print('[DEBUG PRINT]room talk 着信中 auto receive force=$forceAccept');
+
+          if (forceAccept) {
+            if (AppManager.isPiTvLayout) {
+              await Future<void>.delayed(const Duration(milliseconds: 500));
+              if (!mounted || !_active) return;
+            }
+            _response();
+            return;
+          }
+
           int delaySeconds = int.tryParse(AppManager.appsettings["CALL_DELAY"] ?? '0') ?? 0;
-          // 発信側へ遅延応答のヒントを送信（最小限・一回のみ）
           if (delaySeconds > 0) {
             try {
               socketservice.io.emit('called_check', [AppManager.selectUser!.id]);
             } catch (_) {}
-          }
-          
-          if (delaySeconds > 0) {
-            // 遅延時間がある場合はTimerを使用して遅延後に応答
             Timer(Duration(seconds: delaySeconds), () {
               if (_active && AppManager.selectUser?.call == 1) {
                 _response();
               }
             });
           } else {
-            // 即座に応答する場合
             sleep(Duration(milliseconds: 500));
             _response();
           }
@@ -137,7 +162,6 @@ class RoomTalkPageState extends State<RoomTalkPage>
         }
       } else if (AppManager.status == AppStatus.Call) {
         print('発信中 ${AppManager.selectUser!.id}');
-        _callendIsEnabled = false;
         _call();
       }
     }
@@ -152,6 +176,11 @@ class RoomTalkPageState extends State<RoomTalkPage>
     if (state == AppLifecycleState.resumed) {
 
     } else if (state == AppLifecycleState.paused) {
+      // TVは電源オフ／前面化の途中で pause が来るため、ここで切らない
+      if (TvUtil.isTelevision) {
+        print('room talk pause ignored on TV');
+        return;
+      }
       if (AppManager.status == AppStatus.Call) {
         _cancelCall();
       } else {
@@ -175,17 +204,80 @@ class RoomTalkPageState extends State<RoomTalkPage>
   void dispose() {
     print('roomtalk dispose');
     WidgetsBinding.instance.removeObserver(this);
-    _localRenderer.dispose();
-    _remoteRenderer.dispose();
-    _remote2Renderer.dispose();
+    try {
+      _localRenderer.dispose();
+    } catch (_) {}
+    try {
+      _remoteRenderer.dispose();
+    } catch (_) {}
+    try {
+      _remote2Renderer.dispose();
+    } catch (_) {}
     _stopRusuTimer();
+    if (AppManager.isPiTvLayout) {
+      TvPiTalkVitalSync.instance.stop();
+    }
     super.dispose();
   }
 
   Future<void> _initRenderers() async {
-    await _localRenderer.initialize();
-    await _remoteRenderer.initialize();
-    await _remote2Renderer.initialize();
+    try {
+      await _localRenderer.initialize();
+      await _remoteRenderer.initialize();
+      await _remote2Renderer.initialize();
+      _remoteRenderer.onResize = () => _updateRatio(_remoteRenderer, false);
+      _remote2Renderer.onResize = () => _updateRatio(_remote2Renderer, true);
+      if (!_renderersReady.isCompleted) {
+        _renderersReady.complete();
+      }
+    } catch (e) {
+      if (!_renderersReady.isCompleted) {
+        _renderersReady.completeError(e);
+      }
+    }
+  }
+
+  /// 映像の大きさが分かったら縦横比を覚える。
+  /// 相手がスマホを回すとここが呼ばれ、並べ方が切り替わる。
+  void _updateRatio(RTCVideoRenderer r, bool isSecond) {
+    final w = r.videoWidth;
+    final h = r.videoHeight;
+    if (w <= 0 || h <= 0) return;
+    final ratio = w / h;
+    final current = isSecond ? _remote2Ratio : _remoteRatio;
+    if ((ratio - current).abs() < 0.01) return;
+    if (!mounted) return;
+    setState(() {
+      if (isSecond) {
+        _remote2Ratio = ratio;
+      } else {
+        _remoteRatio = ratio;
+      }
+    });
+  }
+
+  /// 三者通話で相手ひとりぶんの枠。
+  ///
+  /// 相手が**縦向き**なら上下を切って画面いっぱいに広げる。縦の映像を
+  /// そのまま収めると左右に大きな黒帯が出て、顔が小さくなってしまう。
+  /// **横向き**なら 16:9 の枠を上下中央に置く。切らずにそのまま映せる。
+  Widget _multiHalf(RTCVideoRenderer renderer, double ratio, bool right,
+      BoxConstraints c) {
+    final halfWidth = c.maxWidth / 2;
+    final isPortrait = ratio < 1.0;
+    final height = isPortrait ? c.maxHeight : halfWidth * 9 / 16;
+    return Positioned(
+      top: isPortrait ? 0 : (c.maxHeight - height) / 2,
+      left: right ? halfWidth : 0,
+      width: halfWidth,
+      height: height,
+      child: RTCVideoView(
+        renderer,
+        // 相手の映像なので反転させない。鏡像にすると文字が読めない。
+        mirror: false,
+        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+      ),
+    );
   }
 
   void setAppStatus(newstatus) {
@@ -202,6 +294,10 @@ class RoomTalkPageState extends State<RoomTalkPage>
     setState(() {
       _talking = talking;
     });
+
+    if (AppManager.isPiTvLayout && talking) {
+      TvPiTalkVitalSync.instance.start();
+    }
 
     menuWidgetGlobalKey.currentState?.setState(() {});
   }
@@ -284,8 +380,10 @@ class RoomTalkPageState extends State<RoomTalkPage>
   }
 
   Future<void> _response() async {
+    try {
+      await _renderersReady.future;
+    } catch (_) {}
     await audio.stopRingtone();
-    // sleep(Duration(milliseconds: 300));
     AppManager.talkId1 = AppManager.selectUser!.id;
     peer.invite(AppManager.selectUser!.id, 'video', true);
   }
@@ -308,15 +406,23 @@ class RoomTalkPageState extends State<RoomTalkPage>
     _stopRusuTimer();
     _stopSoftHangTimer();
     // AppManager.talkId1 = AppManager.selectUser.id;
+    if (AppManager.isPiTvLayout &&
+        AppManager.talkId1.isEmpty &&
+        AppManager.selectUser != null) {
+      AppManager.talkId1 = AppManager.selectUser!.id;
+    }
     AppManager.selectUser!.call = 0;
     _statusImage = '';
     _callendIsEnabled = true;
     setAppStatus(AppStatus.Talk);
     audio.stopCall();
     audio.stopRingtone(); // 通話開始時に必ず着信音を停止
-    // 念のためマイクとスピーカーを明示的に有効化
-    try { peer.setAudioEnabled(true); } catch (_) {}
-    // 念のためスピーカーを有効化（iOS対策）
+    // 念のためマイクを明示的に有効化（TVのUSBマイク含む）
+    try {
+      AppManager.isMute = false;
+      peer.setAudioEnabled(true);
+    } catch (_) {}
+    // 念のためスピーカーを有効化（iOS/スマホ対策。TVでは内部でスキップ）
     try { peer.enableSpeaker(true); } catch (_) {}
   }
 
@@ -514,6 +620,9 @@ class RoomTalkPageState extends State<RoomTalkPage>
 
   void _recvThreeway(String talkId1, String talkId2, String roomId) async {
     print('recv threeway $talkId1 , $talkId2 , $roomId');
+    print('[3way] 指示うけとり me=${AppManager.myId} status=${AppManager.status} '
+        'talkId1=${AppManager.talkId1} holdedId=${AppManager.holdedId} '
+        'holdId=${AppManager.holdId} → 受信した talkID1=$talkId1 talkID2=$talkId2');
     print(AppManager.talkId1);
     print(AppManager.holdedId);
     if (AppManager.status == AppStatus.Holded) {
@@ -522,6 +631,10 @@ class RoomTalkPageState extends State<RoomTalkPage>
         AppManager.talkId2 = talkId2;
         AppManager.holdedId = '';
         AppManager.threewayId = roomId;
+
+        // 保留のときに peer.close() で止めている。ここで解除しないと
+        // 部屋に入れても接続を1本も張れず、誰の映像も出ない。
+        peer.reopen();
 
         _statusImage = '';
         setAppStatus(AppStatus.Multi);
@@ -534,6 +647,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
         AppManager.talkId2 = talkId1;
       }
       peer.closeOne(AppManager.talkId1);
+      peer.reopen();
       AppManager.threewayId = roomId;
       _statusImage = '';
       setAppStatus(AppStatus.Multi);
@@ -551,11 +665,17 @@ class RoomTalkPageState extends State<RoomTalkPage>
       }
       AppManager.talkId2 = '';
       _hasRemote2Video = false;
+      // 部屋で張った接続をすべて閉じる。残すとICEの状態が居座り、
+      // 二者へ戻ったときの通信候補が捨てられて映像が固まる。
+      peer.closeAllConnections();
+      // 2人目の映像も消しておく。古い映像が残ったままになる。
+      try { _remote2Renderer.srcObject = null; } catch (_) {}
       if (AppManager.myId == from) {
         print("_threewayToCall myId = from");
         AppManager.talkId1 = to;
         setAppStatus(AppStatus.MultiToTalk);
         await Future.delayed(Duration(seconds: 1));
+        peer.reopen();
         peer.invite(to, 'video', true);
       } else if (AppManager.myId == to) {
         print("_threewayToCall myId = to");
@@ -575,7 +695,11 @@ class RoomTalkPageState extends State<RoomTalkPage>
   }
 
   void _connectRoom() {
-    // print(url.substring(0, 2));
+    final room = AppManager.settings['MEDIASERVER3'];
+    print('[3way] 部屋サーバー MEDIASERVER3="$room" roomId=${AppManager.threewayId}');
+    if (room == null || room.toString().isEmpty) {
+      print('[3way] ★MEDIASERVER3 が空。部屋に入れないため3人目は出ません');
+    }
     socketioservice = SocketService();
     socketioservice!.url = AppManager.settings['MEDIASERVER3'];
     socketioservice!.roomDelegate = this;
@@ -604,6 +728,8 @@ class RoomTalkPageState extends State<RoomTalkPage>
     }
     AppManager.holdedId = '';
     _statusImage = '';
+    // 保留中に止めているので、戻すときも解除が要る。
+    peer.reopen();
     peer.invite(from, 'video', true);
   }
 
@@ -963,34 +1089,37 @@ class RoomTalkPageState extends State<RoomTalkPage>
             fit: StackFit.expand,
             children: <Widget>[
               const Material(color: Colors.white),
-              if (_hasRemote2Video)
-                Positioned(
-                  top: constraints.maxHeight / 2,
-                  left: 0,
-                  height: constraints.maxHeight / 2,
-                  width: constraints.maxWidth,
-                  child: RTCVideoView(
-                    _remote2Renderer,
-                    mirror: true,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                  ),
-                ),
-              if (_hasRemoteVideo)
+              // 三者通話は左右に並べる。ラズパイ版と同じ見え方に揃えている。
+              //
+              // 左右は必ず同じ大きさにする。相手の機種でカメラの縦横比が
+              // 違っても、枠の大きさは変えない。片方だけ小さいと不自然に見える。
+              // 幅は画面の半分ちょうど。高さは 16:9 で決め、上下中央に置く。
+              // 隙間ができないよう、枠いっぱいに映す。
+              if (_hasRemote2Video) ...[
+                _multiHalf(_remoteRenderer, _remoteRatio, false, constraints),
+                _multiHalf(_remote2Renderer, _remote2Ratio, true, constraints),
+              ] else if (_hasRemoteVideo)
                 Positioned(
                   top: 0,
                   left: 0,
-                  height: AppManager.status == AppStatus.Multi
-                      ? constraints.maxHeight / 2
-                      : constraints.maxHeight,
+                  height: constraints.maxHeight,
                   width: constraints.maxWidth,
-                  child: RTCVideoView(_remoteRenderer, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,),
+                  child: RTCVideoView(
+                    _remoteRenderer,
+                    mirror: false,
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                  ),
                 ),
-              if (_talking && AppManager.safetyCheckId.isEmpty)
+              // 自分の映像は中央上。相手の顔にかぶらず、位置も覚えやすい。
+              // 右下だと三者通話のとき片方の相手の顔に重なってしまう。
+              if (_talking &&
+                  _hasRemote2Video &&
+                  AppManager.safetyCheckId.isEmpty)
                 Positioned(
-                  bottom: 20,
-                  right: 0,
-                  height: constraints.maxHeight / 4,
-                  width: constraints.maxHeight / 4 / 3 * 2,
+                  top: 0,
+                  left: (constraints.maxWidth - constraints.maxWidth * 0.19) / 2,
+                  width: constraints.maxWidth * 0.19,
+                  height: constraints.maxWidth * 0.19 * 3 / 4,
                   child: RTCVideoView(
                     _localRenderer,
                     mirror: true,
@@ -998,25 +1127,41 @@ class RoomTalkPageState extends State<RoomTalkPage>
                   ),
                 ),
               if (!_talking)
-                InkWell(
-                  onTap: () {
-                    _tap();
+                Focus(
+                  autofocus: TvUtil.isTelevision && !_callendIsEnabled,
+                  onKeyEvent: (node, event) {
+                    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+                    if (event.logicalKey == LogicalKeyboardKey.select ||
+                        event.logicalKey == LogicalKeyboardKey.enter ||
+                        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+                      _tap();
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
                   },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      image: DecorationImage(
-                        image: AssetImage(AppManager.roomImageName(size)),
-                        fit: BoxFit.cover,
+                  child: ExcludeFocus(
+                    child: InkWell(
+                      onTap: () {
+                        _tap();
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          image: DecorationImage(
+                            image: AssetImage(AppManager.roomImageName(size)),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              if (_talking)
+              if (_talking && !AppManager.isPiTvLayout)
                 Positioned(
                   top: 40,
                   left: 0,
-                  width: constraints.maxWidth,
-                  height: 60,
+                  width: AppManager.isPiTvLayout
+                      ? smallButtonSize + 16
+                      : constraints.maxWidth,
                   // right: constraints.maxWidth,
                   child: Padding(
                     padding: EdgeInsets.all(8.0),
@@ -1037,7 +1182,21 @@ class RoomTalkPageState extends State<RoomTalkPage>
                     ),
                   ),
                 ),
-              if (_callendIsEnabled)
+              if (_callendIsEnabled &&
+                  !AppManager.isPiTvLayout &&
+                  TvUtil.isTelevision)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  width: constraints.maxWidth * 0.15,
+                  child: _LisaTalkEndButton(
+                    autofocus: true,
+                    onPressed: _callEndButton,
+                  ),
+                ),
+              if (_callendIsEnabled &&
+                  !AppManager.isPiTvLayout &&
+                  !TvUtil.isTelevision)
                 Positioned(
                   bottom: (_showSubmenu ? button1FrameHeight : 0.0) + 16.0,
                   left: 0,
@@ -1045,18 +1204,44 @@ class RoomTalkPageState extends State<RoomTalkPage>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      GestureDetector(
-                        child: Image.asset(
-                          'assets/images/talk/btn-callend.png',
-                          width: button1Width,
-                          height: button1Height,
+                      TvFocusable(
+                        autofocus: false,
+                        onPressed: _callendIsEnabled ? _callEndButton : null,
+                        child: GestureDetector(
+                          onTap: () {
+                            _callEndButton();
+                          },
+                          child: Image.asset(
+                            'assets/images/talk/btn-callend.png',
+                            width: button1Width,
+                            height: button1Height,
+                          ),
                         ),
-                        onTap: () {
-                          _callEndButton();
-                        },
                       ),
                     ],
                   ),
+                ),
+              if (AppManager.isPiTvLayout && _callendIsEnabled)
+                Positioned(
+                  // 右上に置き、高さは中身のぶんだけ。画面の端から端まで
+                  // 伸ばすと、三者通話で右側の相手の顔が隠れてしまう。
+                  top: 8,
+                  right: 8,
+                  width: constraints.maxWidth * 0.15,
+                  child: TvPiTalkSide(
+                    localRenderer: _localRenderer,
+                    // 三者通話では中央上に出すので、この列には出さない。
+                    showLocal: !_hasRemote2Video &&
+                        AppManager.safetyCheckId.isEmpty,
+                    talking: _talking,
+                    isRecording: _isrecording,
+                    videoMute: AppManager.isVideoMute,
+                    onHangup: _callEndButton,
+                  ),
+                ),
+              if (AppManager.isPiTvLayout && _talking)
+                Positioned.fill(
+                  child: TvPiTalkMeasureOverlays(screenSize: size),
                 ),
               if (_statusImage.isNotEmpty)
                 Positioned(
@@ -1367,6 +1552,9 @@ class RoomTalkPageState extends State<RoomTalkPage>
   void onTalkMessage(data) {
     String id2 = data['id2'];
     print('talk message $id2');
+    if (AppManager.isPiTvLayout) {
+      TvPiTalkVitalSync.instance.handleTalk(data);
+    }
     if (id2 == 'shareimage') {
       String frameW = data['frameW'];
       String frameH = data['frameH'];
@@ -1475,15 +1663,17 @@ class RoomTalkPageState extends State<RoomTalkPage>
   }
 
   Future<void> _setLocalStream(stream) async {
-    // if (_localRenderer == null) {
-    //   _localRenderer = RTCVideoRenderer();
-    //   await _localRenderer!.initialize();
-    // }
+    try {
+      await _renderersReady.future;
+    } catch (_) {}
     _localRenderer.srcObject = stream;
   }
 
   void _onAddRemoteStream(id, stream) {
     print('======================================= onremote stream $id ==============================================================================');
+    print('[3way] 映像到着 from=$id / me=${AppManager.myId} '
+        'talkId1=${AppManager.talkId1} talkId2=${AppManager.talkId2} '
+        'status=${AppManager.status}');
     // リモート音声受信時にもスピーカーを再度有効化
     try { peer.enableSpeaker(true); } catch (_) {}
     if (id == AppManager.talkId1) {
@@ -1492,14 +1682,18 @@ class RoomTalkPageState extends State<RoomTalkPage>
       _setRemote2Stream(stream);
     } else if (id == AppManager.safetyCheckId) {
       _setRemoteStream(stream);
+    } else {
+      // ここに来たら3人目は映らない。どのIDとも一致しなかった。
+      print('[3way] ★映像を捨てた from=$id '
+          '（talkId1=${AppManager.talkId1} talkId2=${AppManager.talkId2} '
+          'safety=${AppManager.safetyCheckId} とも一致せず）');
     }
   }
 
   Future<void> _setRemoteStream(stream) async {
-    // if (_remoteRenderer == null) {
-    //   _remoteRenderer = RTCVideoRenderer();
-    //   await _remoteRenderer!.initialize();
-    // }
+    try {
+      await _renderersReady.future;
+    } catch (_) {}
     _remoteRenderer.srcObject = stream;
 
     setState(() {
@@ -1508,10 +1702,11 @@ class RoomTalkPageState extends State<RoomTalkPage>
   }
 
   Future<void> _setRemote2Stream(stream) async {
-    // if (_remote2Renderer == null) {
-    //   _remote2Renderer = RTCVideoRenderer();
-    //   await _remote2Renderer!.initialize();
-    // }
+    // 他の映像と同じく初期化を待つ。待たずに差し込むと、
+    // 準備前に届いた映像が黙って捨てられ、黒いままになる。
+    try {
+      await _renderersReady.future;
+    } catch (_) {}
     _remote2Renderer.srcObject = stream;
 
     setState(() {
@@ -1671,6 +1866,7 @@ class RoomTalkPageState extends State<RoomTalkPage>
 
   void _onParticipant(String name) {
     print('on participant $name');
+    print('[3way] 参加者 $name を受信側として登録');
     peer.invite(name, 'recvonly', true);
   }
 
@@ -1692,5 +1888,71 @@ class RoomTalkPageState extends State<RoomTalkPage>
 
     var sendData = {"id2": "draw", "event": event, "x": x, "y": y};
     socketservice.io.emit("talk", [sendData]);
+  }
+}
+
+/// LiSA 通話中の右上「通話終了」。ホーム右メニューと同じ塗り（黒 60% / フォーカス RGB(80,82,147)）。
+class _LisaTalkEndButton extends StatefulWidget {
+  const _LisaTalkEndButton({
+    required this.onPressed,
+    this.autofocus = false,
+  });
+
+  final VoidCallback onPressed;
+  final bool autofocus;
+
+  @override
+  State<_LisaTalkEndButton> createState() => _LisaTalkEndButtonState();
+}
+
+class _LisaTalkEndButtonState extends State<_LisaTalkEndButton> {
+  bool _focused = false;
+  static const _focusColor = Color.fromARGB(255, 80, 82, 147);
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: (_focused ? _focusColor : Colors.black).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '通話終了',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.6),
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+
+    if (!TvUtil.isTelevision) {
+      return GestureDetector(onTap: widget.onPressed, child: child);
+    }
+
+    return Focus(
+      autofocus: widget.autofocus,
+      onFocusChange: (hasFocus) {
+        if (_focused != hasFocus) {
+          setState(() => _focused = hasFocus);
+        }
+      },
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.select ||
+                event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+                event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onPressed();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(onTap: widget.onPressed, child: child),
+    );
   }
 }
