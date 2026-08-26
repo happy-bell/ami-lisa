@@ -778,6 +778,11 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
       }
       AppManager.talkId2 = '';
       _hasRemote2Video = false;
+      // 部屋で張った接続をすべて閉じる。残すとICEの状態が「確立済み」の
+      // まま居座り、二者へ繋ぎ直したときの通信候補が
+      // ignore late ice で全部捨てられて映像が固まる。
+      peer.closeAllConnections();
+      try { _remote2Renderer.srcObject = null; } catch (_) {}
       if (AppManager.myId == from) {
         print("_threewayToCall myId = from");
         AppManager.talkId1 = to;
