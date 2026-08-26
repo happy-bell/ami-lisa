@@ -280,7 +280,10 @@ class Peer {
   }
 
   void receiveIceCandidate(String peerId, Map<String, dynamic> candidateMap) async {
-    if (_iceStable[peerId] == true) {
+    // 繋がったあとに届く候補を捨てるのは**テレビだけ**。
+    // 元アプリ(ami3.3.27-11)にこの仕組みは無く、スマホで捨てると
+    // 繋ぎ直しの候補まで消えて映像が来なくなる。
+    if (TvUtil.isTelevision && _iceStable[peerId] == true) {
       print('ignore late ice $peerId');
       return;
     }
@@ -732,16 +735,29 @@ class Peer {
     print('**************************************************************');
     print('_createPeerConnection 2');
     print('**************************************************************');
-    var configuration = <String, dynamic>{
-      'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'},
-      ],
-      'sdpSemantics': sdpSemantics,
-      'iceCandidatePoolSize': 4,
-      'bundlePolicy': 'max-bundle',
-      'rtcpMuxPolicy': 'require',
-      'continualGatheringPolicy': 'gather_once',
-    };
+    // 接続の設定。**テレビだけ**調整版を使う。
+    //
+    // 下の4項目はテレビの通話を安定させるために足したもの。とくに
+    // gather_once は通信経路を一度しか探さないため、繋ぎ直しのときに
+    // 新しい経路を見つけられない。スマホでは元アプリ(ami3.3.27-11)と
+    // 同じ素の設定に戻す。三者通話から二者へ戻ると固まるのはこれが原因。
+    var configuration = TvUtil.isTelevision
+        ? <String, dynamic>{
+            'iceServers': [
+              {'urls': 'stun:stun.l.google.com:19302'},
+            ],
+            'sdpSemantics': sdpSemantics,
+            'iceCandidatePoolSize': 4,
+            'bundlePolicy': 'max-bundle',
+            'rtcpMuxPolicy': 'require',
+            'continualGatheringPolicy': 'gather_once',
+          }
+        : <String, dynamic>{
+            'iceServers': [
+              {'url': 'stun:stun.l.google.com:19302'},
+            ],
+            'sdpSemantics': sdpSemantics,
+          };
     RTCPeerConnection pc = await createPeerConnection(configuration, _config);
     if (media != 'data' && media != 'sendonly') {
       if (sdpSemantics == 'plan-b') {
@@ -837,7 +853,8 @@ class Peer {
       }
     }
     pc.onIceCandidate = (candidate) {
-      if (_iceStable[id] == true) {
+      // 送るのを止めるのもテレビだけ。スマホは元アプリと同じく送り続ける。
+      if (TvUtil.isTelevision && _iceStable[id] == true) {
         return;
       }
       final iceCandidate = {
