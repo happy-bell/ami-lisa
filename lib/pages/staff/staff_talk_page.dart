@@ -767,6 +767,9 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
     }
   }
 
+  /// 画面が横長か。三者通話の並べ方を決めるのに使う。
+  bool _isLandscape(BoxConstraints c) => c.maxWidth > c.maxHeight;
+
   void _threewayToCall(String from, String to) async {
     print("_threewayToCall from:$from to:$to, status:${AppManager.status}");
 
@@ -1287,15 +1290,28 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
                     ),
                   ),
                 ),
+              // 三者通話の並べ方は画面の向きで変える。
+              //   縦向き … 上下に分ける（横に並べると顔が細くなる）
+              //   横向き … 左右に分ける（上下に分けると顔が潰れる）
+              // どちらも枠いっぱいに映し、はみ出した分は切る。
               if (_hasRemote2Video)
                 Positioned(
-                  top: constraints.maxHeight / 2,
-                  left: 0,
-                  height: constraints.maxHeight / 2,
-                  width: constraints.maxWidth,
+                  top: _isLandscape(constraints)
+                      ? 0
+                      : constraints.maxHeight / 2,
+                  left: _isLandscape(constraints)
+                      ? constraints.maxWidth / 2
+                      : 0,
+                  height: _isLandscape(constraints)
+                      ? constraints.maxHeight
+                      : constraints.maxHeight / 2,
+                  width: _isLandscape(constraints)
+                      ? constraints.maxWidth / 2
+                      : constraints.maxWidth,
                   child: RTCVideoView(
                     _remote2Renderer,
-                    mirror: true,
+                    // 相手の映像なので反転させない。鏡像だと文字が読めない。
+                    mirror: false,
                     objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                   ),
                 ),
@@ -1303,10 +1319,12 @@ class StaffTalkViewPageState extends State<StaffTalkViewPage>
                 Positioned(
                   top: 0,
                   left: 0,
-                  height: AppManager.status == AppStatus.Multi
+                  height: (_hasRemote2Video && !_isLandscape(constraints))
                       ? size.height / 2
                       : size.height,
-                  width: size.width - _remoteMargin,
+                  width: (_hasRemote2Video && _isLandscape(constraints))
+                      ? constraints.maxWidth / 2
+                      : size.width - _remoteMargin,
                   child: RTCVideoView(
                     _remoteRenderer,
                     mirror: false,
