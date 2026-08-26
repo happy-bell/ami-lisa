@@ -735,29 +735,25 @@ class Peer {
     print('**************************************************************');
     print('_createPeerConnection 2');
     print('**************************************************************');
-    // 接続の設定。**テレビだけ**調整版を使う。
+    // 接続の設定。**テレビもスマホも同じにする。**
     //
-    // 下の4項目はテレビの通話を安定させるために足したもの。とくに
-    // gather_once は通信経路を一度しか探さないため、繋ぎ直しのときに
-    // 新しい経路を見つけられない。スマホでは元アプリ(ami3.3.27-11)と
-    // 同じ素の設定に戻す。三者通話から二者へ戻ると固まるのはこれが原因。
-    var configuration = TvUtil.isTelevision
-        ? <String, dynamic>{
-            'iceServers': [
-              {'urls': 'stun:stun.l.google.com:19302'},
-            ],
-            'sdpSemantics': sdpSemantics,
-            'iceCandidatePoolSize': 4,
-            'bundlePolicy': 'max-bundle',
-            'rtcpMuxPolicy': 'require',
-            'continualGatheringPolicy': 'gather_once',
-          }
-        : <String, dynamic>{
-            'iceServers': [
-              {'url': 'stun:stun.l.google.com:19302'},
-            ],
-            'sdpSemantics': sdpSemantics,
-          };
+    // bundlePolicy と rtcpMuxPolicy は、音声と映像を1本にまとめるか
+    // どうかの取り決め。**片方だけ変えると噛み合わず、音声が通らない。**
+    // 一度スマホだけ素の設定に戻したところ、テレビとの間で音が出なく
+    // なった。以後、両者で必ず揃えること。
+    //
+    // gather_once（通信経路を一度しか探さない）だけは外す。
+    // 三者通話から二者へ戻るときに新しい経路を見つけられず、
+    // 映像が固まる原因になる。
+    var configuration = <String, dynamic>{
+      'iceServers': [
+        {'urls': 'stun:stun.l.google.com:19302'},
+      ],
+      'sdpSemantics': sdpSemantics,
+      'iceCandidatePoolSize': 4,
+      'bundlePolicy': 'max-bundle',
+      'rtcpMuxPolicy': 'require',
+    };
     RTCPeerConnection pc = await createPeerConnection(configuration, _config);
     if (media != 'data' && media != 'sendonly') {
       if (sdpSemantics == 'plan-b') {
