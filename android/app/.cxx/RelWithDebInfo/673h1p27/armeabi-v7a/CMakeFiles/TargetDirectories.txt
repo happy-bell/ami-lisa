@@ -1,7 +1,0 @@
-/Users/happybell/StudioProjects/ami_tvc/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/673h1p27/armeabi-v7a/CMakeFiles/uac.dir
-/Users/happybell/StudioProjects/ami_tvc/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/673h1p27/armeabi-v7a/CMakeFiles/ami_usb_audio.dir
-/Users/happybell/StudioProjects/ami_tvc/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/673h1p27/armeabi-v7a/CMakeFiles/edit_cache.dir
-/Users/happybell/StudioProjects/ami_tvc/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/673h1p27/armeabi-v7a/CMakeFiles/rebuild_cache.dir
-/Users/happybell/StudioProjects/ami_tvc/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/673h1p27/armeabi-v7a/third_party/libusb-cmake/CMakeFiles/usb-1.0.dir
-/Users/happybell/StudioProjects/ami_tvc/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/673h1p27/armeabi-v7a/third_party/libusb-cmake/CMakeFiles/edit_cache.dir
-/Users/happybell/StudioProjects/ami_tvc/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/673h1p27/armeabi-v7a/third_party/libusb-cmake/CMakeFiles/rebuild_cache.dir

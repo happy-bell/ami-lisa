@@ -52,3 +52,6 @@ app.*.map.json
 *.bak_*
 _backup/
 .cursor/
+
+# ビルドの中間ファイル。過去に誤って登録されていた
+.cxx/
