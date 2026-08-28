@@ -17,7 +17,10 @@ object CameraC270nProfile {
         gateAttack = 0.05f,      // サブms
         gateRelease = 0.0006f,   // 約35ms
         lpCoeff = 0.70f,         // fc≈8kHz@48kHz
-        duckGain = 0.02f,        // 約-34dB
+        // 2026-08-26 干渉対策を少し緩めた。0.02(-34dB)では相手が話している間
+        // こちらの声がほぼ消え、同時に話すと会話が成立しなかった。
+        // ハウリングが出るようなら 0.05 → 0.02 と戻す。
+        duckGain = 0.10f,        // 約-20dB
         duckAttack = 0.012f,     // 約2ms
         duckRelease = 0.00015f,  // 約140ms
         inputGain = 1f,

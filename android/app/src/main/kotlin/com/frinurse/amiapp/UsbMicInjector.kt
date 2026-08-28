@@ -12,8 +12,11 @@ import java.nio.ByteOrder
  * TVスピーカーから相手の声が出ている間を検出し、エコーサプレッサの制御に使う。
  */
 object FarEndMonitor : AudioProcessingAdapter.ExternalAudioFrameProcessing {
-    private const val ACTIVE_LEVEL = 220f   // 小さめの再生音でもダッキングを開始
-    private const val HOLD_MS = 1100L       // TVスピーカー遅延+部屋の残響
+    // 2026-08-26 干渉対策を少し緩めた。
+    // 220/1100 では小さな物音でもマイクが絞られ、相手が話し終えてからも
+    // 1.1秒はこちらの声が届かなかった。ハウリングが出るようなら戻す。
+    private const val ACTIVE_LEVEL = 300f   // これ未満の再生音では絞らない
+    private const val HOLD_MS = 700L        // TVスピーカー遅延+部屋の残響
 
     @Volatile
     private var activeUntilMs = 0L
