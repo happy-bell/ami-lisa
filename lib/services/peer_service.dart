@@ -735,25 +735,32 @@ class Peer {
     print('**************************************************************');
     print('_createPeerConnection 2');
     print('**************************************************************');
-    // 接続の設定。**テレビもスマホも同じにする。**
+    // 接続の設定。**テレビとスマホで分ける。**
     //
-    // bundlePolicy と rtcpMuxPolicy は、音声と映像を1本にまとめるか
-    // どうかの取り決め。**片方だけ変えると噛み合わず、音声が通らない。**
-    // 一度スマホだけ素の設定に戻したところ、テレビとの間で音が出なく
-    // なった。以後、両者で必ず揃えること。
+    // テレビ側の4項目は通話を安定させるために足したもの。とくに
+    // gather_once は経路を一度しか探さないため、スマホに適用すると
+    // 三者通話から二者へ戻るときに新しい経路を見つけられず固まる。
     //
-    // gather_once（通信経路を一度しか探さない）だけは外す。
-    // 三者通話から二者へ戻るときに新しい経路を見つけられず、
-    // 映像が固まる原因になる。
-    var configuration = <String, dynamic>{
-      'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'},
-      ],
-      'sdpSemantics': sdpSemantics,
-      'iceCandidatePoolSize': 4,
-      'bundlePolicy': 'max-bundle',
-      'rtcpMuxPolicy': 'require',
-    };
+    // 2026-08-26 追記: 一度これを「両者で統一」してしまい、三者通話が
+    // 繋がらなくなった。音が出なかったのは C++ の関数名の食い違いが
+    // 原因で、この設定とは無関係だった。**安易に統一しないこと。**
+    var configuration = TvUtil.isTelevision
+        ? <String, dynamic>{
+            'iceServers': [
+              {'urls': 'stun:stun.l.google.com:19302'},
+            ],
+            'sdpSemantics': sdpSemantics,
+            'iceCandidatePoolSize': 4,
+            'bundlePolicy': 'max-bundle',
+            'rtcpMuxPolicy': 'require',
+            'continualGatheringPolicy': 'gather_once',
+          }
+        : <String, dynamic>{
+            'iceServers': [
+              {'url': 'stun:stun.l.google.com:19302'},
+            ],
+            'sdpSemantics': sdpSemantics,
+          };
     RTCPeerConnection pc = await createPeerConnection(configuration, _config);
     if (media != 'data' && media != 'sendonly') {
       if (sdpSemantics == 'plan-b') {
