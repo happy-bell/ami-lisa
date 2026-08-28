@@ -5,6 +5,7 @@ import 'package:amiapp/pages/setting/setting_info_photo_page.dart';
 import 'package:amiapp/pages/staff/manager_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amiapp/appdefine.dart';
@@ -37,6 +38,10 @@ class _SettingPageState extends State<SettingPage> {
   bool _savedSwitch = false;
   String _androidId = '';
 
+  /// アプリのバージョン。設定画面の見出しに出す。
+  /// どの版が入っているか、テレビの前で確かめられるようにするため。
+  String _appVersion = '';
+
   final _listHeight = 44.0;
 
   @override
@@ -54,6 +59,10 @@ class _SettingPageState extends State<SettingPage> {
         if (mounted) setState(() => _androidId = id);
       });
     }
+    PackageInfo.fromPlatform().then((info) {
+      if (!mounted) return;
+      setState(() => _appVersion = '${info.version} (${info.buildNumber})');
+    }).catchError((_) {});
   }
 
   @override
@@ -669,7 +678,7 @@ class _SettingPageState extends State<SettingPage> {
       },
       child: Scaffold(
         appBar: WidgetUtil.appBar(
-          '設定',
+          _appVersion.isEmpty ? '設定' : '設定　　$_appVersion',
           backgroundColor: WidgetUtil.iosNavbarBG,
           foregroundColor: Colors.black,
         ),
