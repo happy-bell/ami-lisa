@@ -105,7 +105,7 @@ void cleanupLocked() {
 extern "C" {
 
 JNIEXPORT jint JNICALL
-Java_jp_amiplus_mulch_UsbAudioCapture_nativeStart(JNIEnv *env, jobject, jint fd, jint preferredRate) {
+Java_jp_amiplus_lisa_UsbAudioCapture_nativeStart(JNIEnv *env, jobject, jint fd, jint preferredRate) {
     std::lock_guard<std::mutex> lifecycle(gLifecycle);
     if (g.running) {
         return g.sampleRate;
@@ -201,26 +201,26 @@ Java_jp_amiplus_mulch_UsbAudioCapture_nativeStart(JNIEnv *env, jobject, jint fd,
 }
 
 JNIEXPORT void JNICALL
-Java_jp_amiplus_mulch_UsbAudioCapture_nativeStop(JNIEnv *, jobject) {
+Java_jp_amiplus_lisa_UsbAudioCapture_nativeStop(JNIEnv *, jobject) {
     std::lock_guard<std::mutex> lifecycle(gLifecycle);
     cleanupLocked();
     LOGI("stopped");
 }
 
 JNIEXPORT jint JNICALL
-Java_jp_amiplus_mulch_UsbAudioCapture_nativeGetChannels(JNIEnv *, jobject) {
+Java_jp_amiplus_lisa_UsbAudioCapture_nativeGetChannels(JNIEnv *, jobject) {
     return g.channels;
 }
 
 JNIEXPORT jint JNICALL
-Java_jp_amiplus_mulch_UsbAudioCapture_nativeAvailable(JNIEnv *, jobject) {
+Java_jp_amiplus_lisa_UsbAudioCapture_nativeAvailable(JNIEnv *, jobject) {
     std::lock_guard<std::mutex> lk(g.mtx);
     return static_cast<jint>(g.count);
 }
 
 // Reads up to maxShorts samples (oldest first). Returns samples copied.
 JNIEXPORT jint JNICALL
-Java_jp_amiplus_mulch_UsbAudioCapture_nativeReadPcm(JNIEnv *env, jobject, jshortArray out, jint maxShorts) {
+Java_jp_amiplus_lisa_UsbAudioCapture_nativeReadPcm(JNIEnv *env, jobject, jshortArray out, jint maxShorts) {
     std::lock_guard<std::mutex> lk(g.mtx);
     const size_t cap = g.ring.size();
     if (cap == 0 || g.count == 0 || maxShorts <= 0) return 0;
@@ -237,7 +237,7 @@ Java_jp_amiplus_mulch_UsbAudioCapture_nativeReadPcm(JNIEnv *env, jobject, jshort
 
 // Drops all but the newest keepSamples from the ring (latency control).
 JNIEXPORT void JNICALL
-Java_jp_amiplus_mulch_UsbAudioCapture_nativeTrim(JNIEnv *, jobject, jint keepSamples) {
+Java_jp_amiplus_lisa_UsbAudioCapture_nativeTrim(JNIEnv *, jobject, jint keepSamples) {
     std::lock_guard<std::mutex> lk(g.mtx);
     if (keepSamples >= 0 && g.count > static_cast<size_t>(keepSamples)) {
         g.count = static_cast<size_t>(keepSamples);
@@ -246,7 +246,7 @@ Java_jp_amiplus_mulch_UsbAudioCapture_nativeTrim(JNIEnv *, jobject, jint keepSam
 
 // out[0]=totalSamples, out[1]=rms(window), out[2]=peakAbs(window), out[3]=buffered
 JNIEXPORT void JNICALL
-Java_jp_amiplus_mulch_UsbAudioCapture_nativeStats(JNIEnv *env, jobject, jdoubleArray out) {
+Java_jp_amiplus_lisa_UsbAudioCapture_nativeStats(JNIEnv *env, jobject, jdoubleArray out) {
     double vals[4] = {0, 0, 0, 0};
     {
         std::lock_guard<std::mutex> lk(g.mtx);
@@ -262,7 +262,7 @@ Java_jp_amiplus_mulch_UsbAudioCapture_nativeStats(JNIEnv *env, jobject, jdoubleA
 }
 
 JNIEXPORT jstring JNICALL
-Java_jp_amiplus_mulch_UsbAudioCapture_nativeLastError(JNIEnv *env, jobject) {
+Java_jp_amiplus_lisa_UsbAudioCapture_nativeLastError(JNIEnv *env, jobject) {
     return env->NewStringUTF(g.lastError.c_str());
 }
 

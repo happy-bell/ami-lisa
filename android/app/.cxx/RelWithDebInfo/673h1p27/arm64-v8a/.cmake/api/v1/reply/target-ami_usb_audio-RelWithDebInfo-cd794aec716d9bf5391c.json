@@ -107,11 +107,11 @@
 	[
 		{
 			"backtrace" : 3,
-			"id" : "usb-1.0::@0644b129cb2b2174b263"
+			"id" : "uac::@6890427a1f51a3e7e1df"
 		},
 		{
 			"backtrace" : 3,
-			"id" : "uac::@6890427a1f51a3e7e1df"
+			"id" : "usb-1.0::@0644b129cb2b2174b263"
 		}
 	],
 	"id" : "ami_usb_audio::@6890427a1f51a3e7e1df",
