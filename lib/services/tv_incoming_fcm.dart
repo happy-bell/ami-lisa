@@ -71,18 +71,20 @@ String _callerIdFromMessage(RemoteMessage message) {
     final v = data[key]?.toString();
     if (v != null && v.isNotEmpty) return v;
   }
-  final body = message.notification?.body ?? '';
-  final title = message.notification?.title ?? '';
-  for (final text in [title, body]) {
-    var pos1 = text.indexOf('[');
-    var pos2 = text.indexOf(']');
-    if (pos1 < 0 || pos2 <= pos1) {
-      pos1 = text.indexOf('【');
-      pos2 = text.indexOf('】');
-    }
-    if (pos1 >= 0 && pos2 > pos1) {
-      return text.substring(pos1 + 1, pos2);
-    }
+  final body = _idFromBrackets(message.notification?.body ?? '');
+  if (body.isNotEmpty) return body;
+  return _idFromBrackets(message.notification?.title ?? '');
+}
+
+String _idFromBrackets(String text) {
+  var pos1 = text.indexOf('[');
+  var pos2 = text.indexOf(']');
+  if (pos1 < 0 || pos2 <= pos1) {
+    pos1 = text.indexOf('【');
+    pos2 = text.indexOf('】');
   }
-  return '';
+  if (pos1 < 0 || pos2 <= pos1) return '';
+  final id = text.substring(pos1 + 1, pos2).trim();
+  if (id.isEmpty || id.toUpperCase() == 'M001') return '';
+  return id;
 }

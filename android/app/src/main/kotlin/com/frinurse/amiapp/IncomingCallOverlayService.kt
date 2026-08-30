@@ -777,7 +777,11 @@ class IncomingCallOverlayService : Service() {
                 .apply()
             dismissOverlay(context)
             MainActivity.dispatchIncomingAction("reject", callerId, "")
-            returnToPreviousFromService(context)
+            if (wasScreenOffAtCall(context)) {
+                lockScreenForStandby(context)
+            } else {
+                returnToPreviousFromService(context)
+            }
         }
 
         fun finishIncomingUi() {
@@ -859,8 +863,9 @@ class IncomingCallOverlayService : Service() {
             val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val already = prefs.getBoolean(KEY_SCREEN_OFF_AT_CALL, false) ||
                 prefs.getBoolean(KEY_SCREEN_OFF_AT_INCOMING, false)
-            val marked = wasOff || already || isTvStandby(app) ||
-                prefs.getBoolean(KEY_STANDBY, false)
+            // 起こしたあとの isTvStandby / KEY_STANDBY は見ない。
+            // 地デジ視聴中の着信を「電源オフ発」と誤ると、終了後に消灯してしまう。
+            val marked = wasOff || already
             prefs.edit()
                 .putBoolean(KEY_SCREEN_OFF_AT_CALL, marked)
                 .putBoolean(KEY_SCREEN_OFF_AT_INCOMING, marked)
@@ -879,13 +884,23 @@ class IncomingCallOverlayService : Service() {
                 prefs.getBoolean(KEY_SCREEN_OFF_AT_INCOMING, false)
         }
 
+        fun isIrisChanghong(): Boolean {
+            val man = Build.MANUFACTURER.lowercase()
+            val brand = Build.BRAND.lowercase()
+            return man.contains("changhong") ||
+                brand.contains("iris") ||
+                brand.contains("chiq")
+        }
+
         fun requestDeviceAdminIfNeeded(activity: Activity) {
             try {
                 val dpm = activity.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
                 val comp = ComponentName(activity, AmiDeviceAdminReceiver::class.java)
                 if (dpm.isAdminActive(comp)) return
                 val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                if (prefs.getBoolean(KEY_ADMIN_PROMPTED, false)) return
+                // 一度拒否すると lockNow が使えず、電源オフへ戻せない。
+                // Iris は拒否後も聞き直す。他機種は従来どおり一度だけ。
+                if (!isIrisChanghong() && prefs.getBoolean(KEY_ADMIN_PROMPTED, false)) return
                 prefs.edit().putBoolean(KEY_ADMIN_PROMPTED, true).apply()
                 val i = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
                 i.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, comp)
@@ -894,7 +909,7 @@ class IncomingCallOverlayService : Service() {
                     "電源オフ中の着信で通話したあと、TVを電源オフに戻すために使います。"
                 )
                 activity.startActivity(i)
-                Log.i(TAG, "requested device admin")
+                Log.i(TAG, "requested device admin iris=${isIrisChanghong()}")
             } catch (e: Exception) {
                 Log.w(TAG, "requestDeviceAdmin: ${e.message}")
             }
@@ -920,31 +935,40 @@ class IncomingCallOverlayService : Service() {
                 }
             } catch (_: Exception) {
             }
-            tryGoToSleep(context)
-            tryLockNow(context)
-            sleepDisplay(context)
+            // Iris はキー注入がグローバル電源に届かない。lockNow が本丸。
+            val locked = tryLockNow(context)
+            if (locked) {
+                Log.i(TAG, "lockNow ok; skip power-key toggle")
+            } else {
+                tryGoToSleep(context)
+                sleepDisplay(context)
+            }
             consumeScreenOffIncoming(context)
-            scheduleHideAfterSleep(context)
+            scheduleHideAfterSleep(context, lockOnly = locked)
             Log.i(
                 TAG,
-                "lockScreenForStandby requested interactive=${isScreenOn(context)} " +
+                "lockScreenForStandby requested locked=$locked " +
+                    "interactive=${isScreenOn(context)} " +
                     "standby=${isTvStandby(context)} screen=${sysProp("sys.tcl.screen")}"
             )
-            // 失敗しても地デジへは戻さない（returnToPreviousApp を止める）。
+            // 失敗しても地デジ／ホームへは戻さない（returnToPreviousApp を止める）。
             return true
         }
 
-        private fun scheduleHideAfterSleep(context: Context) {
+        private fun scheduleHideAfterSleep(context: Context, lockOnly: Boolean) {
             val app = context.applicationContext
-            for (delay in longArrayOf(200, 600, 1200, 2000)) {
+            for (delay in longArrayOf(300, 800, 1600, 2800, 4000)) {
                 wakeHandler.postDelayed({
                     if (!isTvStandby(app) && isScreenOn(app)) {
-                        Log.i(TAG, "sleep retry delay=$delay")
-                        tryGoToSleep(app)
-                        tryLockNow(app)
-                        sleepDisplay(app)
+                        Log.i(TAG, "sleep retry delay=$delay lockOnly=$lockOnly")
+                        val locked = tryLockNow(app)
+                        if (!lockOnly && !locked) {
+                            tryGoToSleep(app)
+                            sleepDisplay(app)
+                        }
                         return@postDelayed
                     }
+                    // 消灯できたときだけ背面へ。点灯中の moveTaskToBack はホームが出る。
                     try {
                         MainActivity.currentActivity()?.moveTaskToBack(true)
                     } catch (_: Exception) {
@@ -1035,24 +1059,65 @@ class IncomingCallOverlayService : Service() {
             } catch (_: Exception) {
             }
             sendTclSleepBroadcast(app)
+            sendIrisSleepBroadcasts(app)
             sendSleepKey(app, KeyEvent.KEYCODE_SLEEP)
-            sendSleepKey(app, KeyEvent.KEYCODE_POWER)
+            // POWER / TV_POWER はトグル。SLEEP の直後に送ると点灯し直す。
+            // lockNow が使えない機種だけ、まだ点灯しているとき遅れて1回送る。
             wakeHandler.postDelayed({
-                if (isTvStandby(app)) {
+                if (isTvStandby(app) || !isScreenOn(app)) {
                     Log.i(TAG, "sleepDisplay already off")
                     return@postDelayed
                 }
                 Log.i(TAG, "sleepDisplay retry SLEEP")
                 sendTclSleepBroadcast(app)
+                sendIrisSleepBroadcasts(app)
                 sendSleepKey(app, KeyEvent.KEYCODE_SLEEP)
             }, 400)
             wakeHandler.postDelayed({
-                if (isTvStandby(app)) return@postDelayed
-                Log.i(TAG, "sleepDisplay retry TV_POWER (still on)")
-                sendSleepKey(app, KeyEvent.KEYCODE_TV_POWER)
+                if (isTvStandby(app) || !isScreenOn(app)) return@postDelayed
+                Log.i(TAG, "sleepDisplay retry POWER (still on)")
+                sendSleepKey(app, KeyEvent.KEYCODE_POWER)
             }, 900)
             Log.i(TAG, "sleepDisplay requested")
             return true
+        }
+
+        /** Iris/Changhong: アプリからのキー注入はグローバル電源に届かない。メーカー側へ渡す。 */
+        private fun sendIrisSleepBroadcasts(app: Context) {
+            if (!isIrisChanghong()) return
+            try {
+                val now = SystemClock.uptimeMillis()
+                val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_POWER, 0)
+                val up = KeyEvent(now, now + 50, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_POWER, 0)
+                for (ev in arrayOf(down, up)) {
+                    val i = Intent("android.intent.action.GLOBAL_BUTTON").apply {
+                        setClassName(
+                            "com.mediatek.tv.service",
+                            "com.mediatek.hotkey.dispatcher.GlobalKeyReceiver"
+                        )
+                        putExtra(Intent.EXTRA_KEY_EVENT, ev)
+                        addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+                    }
+                    app.sendBroadcast(i)
+                }
+                Log.i(TAG, "sent GLOBAL_BUTTON POWER to MTK")
+            } catch (e: Exception) {
+                Log.w(TAG, "mtk global power: ${e.message}")
+            }
+            try {
+                val i = Intent(
+                    "com.google.android.apps.tv.launcherx.sleeptimer.schedule_device_sleep"
+                ).apply {
+                    setClassName(
+                        "com.google.android.apps.tv.launcherx",
+                        "com.google.android.apps.tv.launcherx.sleeptimer.SleepTimerBroadcastReceiver_Receiver"
+                    )
+                }
+                app.sendBroadcast(i)
+                Log.i(TAG, "sent launcherx schedule_device_sleep")
+            } catch (e: Exception) {
+                Log.w(TAG, "launcherx sleep: ${e.message}")
+            }
         }
 
         private fun sendTclSleepBroadcast(app: Context) {
@@ -1586,8 +1651,9 @@ class IncomingCallOverlayService : Service() {
         startRingtone()
         val overlayOk = canDrawOverlays(this)
         val screenOn = isScreenOn(this)
-        // 画面オフ、またはオーバーレイ不可の機種は着信用 Activity で点灯する（メーカー不問）。
-        val needActivity = !screenOn || !overlayOk
+        val fromPowerOff = wasScreenOffAtCall(this)
+        // 電源オフ発／画面オフ／オーバーレイ不可は着信用 Activity（はい／いいえ）。
+        val needActivity = fromPowerOff || !screenOn || !overlayOk
         startForeground(
             INCOMING_NOTIF_ID,
             buildIncomingNotification(callerId, label, useFullScreen = needActivity)

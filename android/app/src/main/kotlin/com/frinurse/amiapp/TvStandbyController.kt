@@ -86,17 +86,7 @@ object TvStandbyController {
                 Log.w(TAG, "device admin not active; cannot lock")
                 return false
             }
-            // 電源オン時に直前アプリ(地デジ/Netflix等)が出るよう、画面オフの前に
-            // アミを背面へ送って直前アプリを最前面へ戻す。通話中はアミが前面のため、
-            // これをしないと電源オン時にアミが開いてしまう。
-            (context as? android.app.Activity)?.let { act ->
-                try {
-                    IncomingCallOverlayService.returnToPreviousApp(act)
-                    Log.i(TAG, "restored previous app before lock")
-                } catch (e: Exception) {
-                    Log.w(TAG, "returnToPreviousApp before lock failed: ${e.message}")
-                }
-            }
+            // 電源オフ発の着信では地デジを出さない。lockNow だけで消灯する。
             dpm.lockNow()
             Log.i(TAG, "lockNow(): screen off for standby")
             true

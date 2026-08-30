@@ -71,6 +71,25 @@ class TvUtil {
     return _isTelevision;
   }
 
+  /// WebRTC が開ける内蔵マイク。UAC 占有中に USB を指定すると AudioRecord が失敗する。
+  static Future<String?> findBuiltinMicDeviceId() async {
+    try {
+      final raw = await _channel.invokeMethod('listAudioInputs');
+      if (raw is! List) return null;
+      for (final item in raw) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        if (map['isSource'] != true) continue;
+        if ((map['type'] as int? ?? -1) != 15) continue;
+        final id = map['webrtcDeviceId']?.toString() ?? map['id']?.toString();
+        if (id != null && id.isNotEmpty) return id;
+      }
+    } catch (e) {
+      debugPrint('findBuiltinMicDeviceId failed: $e');
+    }
+    return null;
+  }
+
   /// ネイティブの入力一覧から USB マイクの WebRTC deviceId を返す。
   static Future<String?> findUsbAudioDeviceId() async {
     try {
@@ -125,6 +144,19 @@ class TvUtil {
       debugPrint('setUvcAntiFlicker60 failed: $e');
     }
     return null;
+  }
+
+  /// USBカメラ（Camera2 または UVC / 既知機種）が挿さっているか。
+  /// Wi‑Fiドングルだけのときは false。
+  static Future<bool> hasUsbCamera() async {
+    if (!_isTelevision) return true;
+    try {
+      final raw = await _channel.invokeMethod('hasUsbCamera');
+      return raw == true;
+    } catch (e) {
+      debugPrint('hasUsbCamera failed: $e');
+      return true;
+    }
   }
 
   /// 接続中USBカメラのプロファイル (c270n / emeet / tzz / usb20a / usb20b / tcl_usb / generic)。
@@ -462,7 +494,7 @@ class TvUtil {
     }
   }
 
-  /// 画面をオフ（ロック）してTV電源オフ状態へ戻す。TV005かつデバイス管理有効時のみ成功しtrue。
+  /// 電源オフ発の着信後、地デジへ戻さず画面をオフへ戻す。
   static Future<bool> lockScreenForStandby() async {
     if (!_isTelevision) return false;
     try {

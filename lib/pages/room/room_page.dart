@@ -42,6 +42,7 @@ import '../../services/tv_message_schedule.dart';
 import '../../services/tv_pi_vitals.dart';
 import '../../services/tv_vital_serial.dart';
 import '../../services/tv_weather.dart';
+import '../../widgets/no_camera_banner.dart';
 import '../../widgets/tv_pi_address_list.dart';
 import '../../widgets/tv_weather_panel.dart';
 import '../../widgets/tv_pi_spo2_popup.dart';
@@ -110,6 +111,8 @@ class _RoomPageState extends State<RoomPage>
   bool _watching = false;
   bool _receivingCall = false;
   bool _incomingConnecting = false;
+  bool _hasUsbCamera = true;
+  Timer? _cameraCheckTimer;
 
   @override
   void initState() {
@@ -209,6 +212,7 @@ class _RoomPageState extends State<RoomPage>
       if (TvUtil.isTelevision) {
         Peer.warmupTvCamera();
         unawaited(TvVitalSerial.instance.bindOnLogin());
+        _startCameraCheck();
       }
     }
   }
@@ -224,6 +228,7 @@ class _RoomPageState extends State<RoomPage>
       _handlePendingIncomingIfNeeded();
       _startGetInfoTimer(isGet: true);
       _startHealthTimerIfPi();
+      unawaited(_refreshUsbCamera());
     } else if (state == AppLifecycleState.paused) {
       if (_sleeptimer != null) {
         _sleeptimer!.cancel();
@@ -245,6 +250,22 @@ class _RoomPageState extends State<RoomPage>
         _isconnect = false;
       });
     }
+  }
+
+  void _startCameraCheck() {
+    if (!TvUtil.isTelevision) return;
+    _cameraCheckTimer?.cancel();
+    unawaited(_refreshUsbCamera());
+    _cameraCheckTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      unawaited(_refreshUsbCamera());
+    });
+  }
+
+  Future<void> _refreshUsbCamera() async {
+    if (!TvUtil.isTelevision || !mounted) return;
+    final has = await TvUtil.hasUsbCamera();
+    if (!mounted || has == _hasUsbCamera) return;
+    setState(() => _hasUsbCamera = has);
   }
 
   void _bindIncomingCallHandler() {
@@ -313,6 +334,7 @@ class _RoomPageState extends State<RoomPage>
     CheckmeRingService.instance.removeListener(_onRingChanged);
     CheckmeProService.instance.removeListener(_onRingChanged);
     AndVitalService.instance.removeListener(_onRingChanged);
+    _cameraCheckTimer?.cancel();
     _healthTimer?.cancel();
     _weatherTimer?.cancel();
     _vitalsTimer?.cancel();
@@ -1301,19 +1323,15 @@ class _RoomPageState extends State<RoomPage>
       // 復帰より「電源オフに戻す」を優先する。地デジ等へ戻してしまうと要件と逆になる。
       final wasOff = await TvUtil.wasScreenOffAtCall();
       if (wasOff) {
-        // wakelock を握ったままだと消灯できない。Android 12 では特に必須。
+        // 地デジ→電源オフ→着信→通話。終了後は地デジへ戻さず電源オフ。
         try {
           await WakelockPlus.disable();
         } catch (_) {}
         final locked = await TvUtil.lockScreenForStandby();
         print('[DEBUG PRINT] standby wasOff=true locked=$locked');
-        if (locked) return;
-        // ロック不可(デバイス管理未有効等)の時のみ従来動作にフォールバック。
-        final restored = await TvUtil.returnToPreviousApp();
-        print('[DEBUG PRINT] standby fallback returnToPreviousApp=$restored');
-        if (!restored && AppManager.isPiTvLayout) _piFocusHome();
         return;
       }
+      // 地デジ→着信→通話。終了後は地デジへ戻す。
       final restored = await TvUtil.returnToPreviousApp();
       print('[DEBUG PRINT] returnToPreviousApp=$restored');
       if (!restored) {
@@ -1605,6 +1623,11 @@ class _RoomPageState extends State<RoomPage>
                           label: '設定',
                           onPressed: _toSetting,
                         ),
+                        if (!_hasUsbCamera)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: NoCameraBanner(compact: true),
+                          ),
                       ],
                     ),
                   ),
@@ -1828,6 +1851,7 @@ class _RoomPageState extends State<RoomPage>
                       onInfo: () => _openInfoPage(autoPlayAudio: false),
                       onClock: _showSleep,
                       onSetting: _toSetting,
+                      showNoCamera: !_hasUsbCamera,
                       homeFocusNode: _piHomeFocus,
                       videoFocusNode: _piVideoCloseFocus,
                       ringFocusNode: _piRingFocus,

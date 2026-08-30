@@ -1,6 +1,7 @@
 package jp.amiplus.lisa
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import com.cloudwebrtc.webrtc.FlutterWebRTCPlugin
 import com.cloudwebrtc.webrtc.audio.AudioProcessingAdapter
@@ -271,6 +272,17 @@ object UsbMicBridge {
         }
     }
 
+    /// アイリス（Changhong）は HAL が USB マイクを出す。UAC で占有すると
+    /// AudioRecord が usbaudio HAL を開けず、スマホが無音になる。
+    private fun useHalUsbInsteadOfUac(): Boolean {
+        val man = Build.MANUFACTURER.lowercase()
+        val brand = Build.BRAND.lowercase()
+        val model = Build.MODEL.lowercase()
+        return man.contains("changhong") ||
+            brand.contains("iris") ||
+            model.contains("pont")
+    }
+
     /** AudioManagerがUSB入力を公開している端末(正規経路が動く)か */
     private fun halSupportsUsbInput(context: Context): Boolean {
         return try {
@@ -296,6 +308,22 @@ object UsbMicBridge {
                     "ok" to true,
                     "skipped" to true,
                     "reason" to "${profile.id}_skip_uac",
+                    "device" to device.productName,
+                )
+            }
+            if (profile.forceUacInjection &&
+                useHalUsbInsteadOfUac() &&
+                halSupportsUsbInput(context)
+            ) {
+                Log.i(
+                    TAG,
+                    "UsbMicBridge: skip force UAC on Iris HAL USB " +
+                        "profile=${profile.id} device=${device.productName}"
+                )
+                return mapOf(
+                    "ok" to true,
+                    "skipped" to true,
+                    "reason" to "iris_hal_usb",
                     "device" to device.productName,
                 )
             }

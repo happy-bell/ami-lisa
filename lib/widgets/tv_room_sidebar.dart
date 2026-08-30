@@ -1,5 +1,6 @@
 import 'package:amiapp/services/checkme_pro_service.dart';
 import 'package:amiapp/services/checkme_ring_service.dart';
+import 'package:amiapp/widgets/no_camera_banner.dart';
 import 'package:amiapp/widgets/tv_pi_focus_button.dart';
 import 'package:flutter/material.dart';
 
@@ -36,6 +37,7 @@ class TvRoomSidebar extends StatelessWidget {
     this.pr = '-',
     this.hr = '-',
     this.pi = '-',
+    this.showNoCamera = false,
   });
 
   final String displayName;
@@ -69,6 +71,7 @@ class TvRoomSidebar extends StatelessWidget {
   final String pr;
   final String hr;
   final String pi;
+  final bool showNoCamera;
 
   static const _gap = 2.0;
 
@@ -146,6 +149,11 @@ class TvRoomSidebar extends StatelessWidget {
           ),
         ),
         _menu('設定', onSetting, color: const Color(0xFFCC3333)),
+        if (showNoCamera)
+          const Padding(
+            padding: EdgeInsets.only(bottom: _gap),
+            child: NoCameraBanner(compact: true),
+          ),
         Expanded(
           child: showVitals
               ? TvPiVitalTable(

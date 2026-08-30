@@ -52,9 +52,8 @@ class AmiIncomingFcmReceiver : BroadcastReceiver() {
                 Log.w(TAG, "flags missing; still handling on TV callerId=$callerId")
             }
 
-            // 注: 画面オフ状態の記録は Socket着信ハンドラ(room_page)側で wake 前に
-            // setScreenOffAtCall として行う。ここ(FCM)で行うと wakeDisplay 後に
-            // 上書きされる恐れがあるため行わない。
+            // 起こす前に電源オフ発かを残す。自動応答／手動応答のどちらでも同じ。
+            IncomingCallOverlayService.rememberScreenOffAtIncoming(context)
             IncomingCallOverlayService.captureForegroundApp(context)
             IncomingCallOverlayService.wakeDisplay(context)
 
@@ -139,27 +138,28 @@ class AmiIncomingFcmReceiver : BroadcastReceiver() {
             return ""
         }
 
+        private fun idFromBrackets(text: String): String {
+            var pos1 = text.indexOf('[')
+            var pos2 = text.indexOf(']')
+            if (pos1 < 0 || pos2 <= pos1) {
+                pos1 = text.indexOf('【')
+                pos2 = text.indexOf('】')
+            }
+            if (pos1 < 0 || pos2 <= pos1) return ""
+            val id = text.substring(pos1 + 1, pos2).trim()
+            // タイトルは [M001]:呼び出し。発信者UDIDは本文側。
+            if (id.isEmpty() || id.equals("M001", ignoreCase = true)) return ""
+            return id
+        }
+
         private fun callerIdFrom(extras: Bundle): String {
             for (key in arrayOf("udid", "callerId", "id")) {
                 val v = extras.getString(key)
                 if (!v.isNullOrEmpty()) return v
             }
-            val texts = listOf(
-                notificationText(extras, "title"),
-                notificationText(extras, "body")
-            )
-            for (text in texts) {
-                var pos1 = text.indexOf('[')
-                var pos2 = text.indexOf(']')
-                if (pos1 < 0 || pos2 <= pos1) {
-                    pos1 = text.indexOf('【')
-                    pos2 = text.indexOf('】')
-                }
-                if (pos1 >= 0 && pos2 > pos1) {
-                    return text.substring(pos1 + 1, pos2)
-                }
-            }
-            return ""
+            val body = idFromBrackets(notificationText(extras, "body"))
+            if (body.isNotEmpty()) return body
+            return idFromBrackets(notificationText(extras, "title"))
         }
     }
 }

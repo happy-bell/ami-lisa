@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.hardware.camera2.CameraManager
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
@@ -136,6 +137,9 @@ class MainActivity : FlutterActivity() {
                 }
                 "getUsbCameraProfile" -> {
                     result.success(getUsbCameraProfile())
+                }
+                "hasUsbCamera" -> {
+                    result.success(hasUsbCamera())
                 }
                 "setUvcAntiFlicker60" -> {
                     Thread {
@@ -616,6 +620,37 @@ class MainActivity : FlutterActivity() {
             if (intf.interfaceClass == UsbConstants.USB_CLASS_VIDEO) return true
         }
         return false
+    }
+
+    private fun hasVideoClass(device: UsbDevice): Boolean {
+        for (i in 0 until device.interfaceCount) {
+            if (device.getInterface(i).interfaceClass == UsbConstants.USB_CLASS_VIDEO) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Wi‑Fiドングルなどは除外し、Camera2 か UVC / 既知カメラだけを「挿さっている」と見る。
+    private fun hasUsbCamera(): Boolean {
+        try {
+            val cm = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            if (cm.cameraIdList.isNotEmpty()) {
+                return true
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "hasUsbCamera cameraIdList: ${e.message}")
+        }
+        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+        return usbManager.deviceList.values.any { device ->
+            CameraProfiles.matchesKnown(device) ||
+                CameraProfiles.looksLikeCamera(
+                    device.vendorId,
+                    device.productId,
+                    device.productName,
+                ) ||
+                hasVideoClass(device)
+        }
     }
 
     private fun getUsbCameraProfile(): Map<String, Any?> {
