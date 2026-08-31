@@ -221,13 +221,13 @@ class MainActivity : FlutterActivity() {
                 }
                 "showIncomingCallOverlay" -> {
                     val callerId = call.argument<String>("callerId") ?: ""
-                    val callerName = call.argument<String>("callerName") ?: "着信"
+                    val callerName = call.argument<String>("callerName") ?: "着信中"
                     IncomingCallOverlayService.showOverlay(this, callerId, callerName)
                     result.success(true)
                 }
                 "acceptIncomingCall" -> {
                     val callerId = call.argument<String>("callerId") ?: ""
-                    val callerName = call.argument<String>("callerName") ?: "着信"
+                    val callerName = call.argument<String>("callerName") ?: "着信中"
                     IncomingCallOverlayService.acceptIncoming(this, callerId, callerName)
                     result.success(true)
                 }
@@ -242,6 +242,20 @@ class MainActivity : FlutterActivity() {
                 "dismissIncomingCallOverlay" -> {
                     IncomingCallOverlayService.dismissOverlay(this)
                     result.success(true)
+                }
+                "cancelIncomingCallOverlay" -> {
+                    val callerId = call.argument<String>("callerId") ?: ""
+                    IncomingCallOverlayService.cancelIncomingUi(this, callerId)
+                    result.success(true)
+                }
+                "timeoutIncomingCallOverlay" -> {
+                    val callerId = call.argument<String>("callerId") ?: ""
+                    IncomingCallOverlayService.timeoutIncomingUi(this, callerId)
+                    result.success(true)
+                }
+                "wasIncomingCancelled" -> {
+                    val callerId = call.argument<String>("callerId") ?: ""
+                    result.success(IncomingCallOverlayService.wasIncomingCancelled(callerId))
                 }
                 "getPendingIncomingCall" -> {
                     result.success(consumePendingIncomingCall())

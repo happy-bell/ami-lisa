@@ -97,7 +97,21 @@ class IncomingCallOverlayService : Service() {
         @Volatile
         private var acceptGuardUntil = 0L
 
-        private const val DISPLAY_NAME = "着信"
+        private const val DISPLAY_NAME = "着信中"
+        private const val OVERLAY_TIMEOUT_MS = 29_000L
+        private const val CANCEL_GRACE_MS = 8_000L
+
+        @Volatile
+        var ringingCallerId = ""
+
+        @Volatile
+        private var cancelledCallerId = ""
+
+        @Volatile
+        private var cancelledUntil = 0L
+
+        @Volatile
+        private var timeoutContext: Context? = null
 
         private fun shouldSkipIncomingUi(): Boolean {
             if (acceptInProgress) return true
@@ -113,6 +127,65 @@ class IncomingCallOverlayService : Service() {
             Handler(Looper.getMainLooper()).postDelayed({
                 acceptInProgress = false
             }, 12_000L)
+        }
+
+        fun wasIncomingCancelled(callerId: String): Boolean {
+            if (callerId.isEmpty()) return false
+            return callerId == cancelledCallerId && System.currentTimeMillis() < cancelledUntil
+        }
+
+        fun markIncomingCancelled(callerId: String) {
+            if (callerId.isNotEmpty()) {
+                cancelledCallerId = callerId
+                cancelledUntil = System.currentTimeMillis() + CANCEL_GRACE_MS
+            }
+            if (ringingCallerId == callerId || callerId.isEmpty()) {
+                ringingCallerId = ""
+            }
+            wakeHandler.removeCallbacks(overlayTimeout)
+        }
+
+        /** スマホ切断。着信画面を消し、はいが遅れても通話に入らない。 */
+        fun cancelIncomingUi(context: Context, callerId: String) {
+            val app = context.applicationContext
+            val accepting = acceptInProgress
+            markIncomingCancelled(callerId)
+            IncomingCallActivity.finishIfOpen()
+            dismissOverlay(app)
+            if (!accepting) {
+                if (wasScreenOffAtCall(app)) {
+                    lockScreenForStandby(app)
+                } else {
+                    returnToPreviousFromService(app)
+                }
+            }
+            Log.i(TAG, "cancelIncomingUi caller=$callerId accepting=$accepting")
+        }
+
+        /**
+         * 29秒で着信画面だけ消す。電源は切らない。
+         * 着信あり表示時点の画面（地デジ等）へ戻す。
+         */
+        fun timeoutIncomingUi(context: Context, callerId: String) {
+            val app = context.applicationContext
+            val accepting = acceptInProgress
+            markIncomingCancelled(callerId)
+            IncomingCallActivity.finishIfOpen()
+            dismissOverlay(app)
+            if (!accepting) {
+                val restored = returnToPreviousFromService(app)
+                Log.i(TAG, "timeoutIncomingUi restore=$restored caller=$callerId")
+            } else {
+                Log.i(TAG, "timeoutIncomingUi skip restore: accepting caller=$callerId")
+            }
+        }
+
+        private val overlayTimeout = Runnable {
+            val id = ringingCallerId
+            val app = timeoutContext ?: return@Runnable
+            if (id.isEmpty()) return@Runnable
+            Log.i(TAG, "incoming overlay timeout 29s caller=$id")
+            timeoutIncomingUi(app, id)
         }
 
         private data class WatchApp(val pkg: String, val taskId: Int, val className: String)
@@ -765,6 +838,12 @@ class IncomingCallOverlayService : Service() {
         }
 
         fun acceptFromUi(context: Context, callerId: String, callerName: String) {
+            if (wasIncomingCancelled(callerId)) {
+                Log.i(TAG, "acceptFromUi ignored: cancelled $callerId")
+                IncomingCallActivity.finishIfOpen()
+                dismissOverlay(context)
+                return
+            }
             acceptIncoming(context, callerId, callerName)
         }
 
@@ -1333,6 +1412,12 @@ class IncomingCallOverlayService : Service() {
                 showOverlayInternal(id, DISPLAY_NAME)
             }
             ACTION_ACCEPT_INCOMING -> {
+                val id = intent.getStringExtra(EXTRA_CALLER_ID) ?: ""
+                if (wasIncomingCancelled(id)) {
+                    Log.i(TAG, "ACTION_ACCEPT_INCOMING ignored: cancelled $id")
+                    dismissOverlayInternal()
+                    return START_STICKY
+                }
                 markAcceptGuard()
                 if (!waiting) {
                     waiting = true
@@ -1340,7 +1425,6 @@ class IncomingCallOverlayService : Service() {
                 }
                 startForeground(NOTIF_ID, buildWaitingNotification())
                 captureForegroundApp(this)
-                val id = intent.getStringExtra(EXTRA_CALLER_ID) ?: ""
                 val name = DISPLAY_NAME
                 dismissOverlayInternal()
                 wakeDisplayInternal()
@@ -1641,6 +1725,10 @@ class IncomingCallOverlayService : Service() {
             return
         }
         incomingUiActive = true
+        ringingCallerId = callerId
+        timeoutContext = applicationContext
+        wakeHandler.removeCallbacks(overlayTimeout)
+        wakeHandler.postDelayed(overlayTimeout, OVERLAY_TIMEOUT_MS)
         val label = DISPLAY_NAME
         // 先に起こすと判定が消えるため、点灯前に電源オフ発かどうかを残す。
         rememberScreenOffAtIncoming(this)
@@ -1812,6 +1900,8 @@ class IncomingCallOverlayService : Service() {
 
     private fun dismissOverlayInternal() {
         incomingUiActive = false
+        if (ringingCallerId.isNotEmpty()) ringingCallerId = ""
+        wakeHandler.removeCallbacks(overlayTimeout)
         IncomingCallActivity.finishIfOpen()
         stopRingtone()
         try {
@@ -1867,6 +1957,11 @@ class IncomingCallOverlayService : Service() {
     }
 
     private fun onAccept(callerId: String, callerName: String) {
+        if (wasIncomingCancelled(callerId)) {
+            Log.i(TAG, "accept ignored: cancelled $callerId")
+            dismissOverlayInternal()
+            return
+        }
         Log.i(TAG, "accept $callerId")
         markAcceptGuard()
         dismissOverlayInternal()

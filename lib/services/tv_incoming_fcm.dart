@@ -52,12 +52,12 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     if (autoReceive) {
       await channel.invokeMethod('acceptIncomingCall', {
         'callerId': callerId,
-        'callerName': '着信',
+        'callerName': '着信中',
       });
     } else {
       await channel.invokeMethod('showIncomingCallOverlay', {
         'callerId': callerId,
-        'callerName': '着信',
+        'callerName': '着信中',
       });
     }
   } catch (e) {

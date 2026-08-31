@@ -58,7 +58,7 @@ class IncomingCallActivity : Activity() {
         IncomingCallOverlayService.wakeDisplay(this)
 
         val callerId = intent.getStringExtra(IncomingCallOverlayService.EXTRA_CALLER_ID) ?: ""
-        val callerName = intent.getStringExtra(IncomingCallOverlayService.EXTRA_CALLER_NAME) ?: "着信"
+        val callerName = intent.getStringExtra(IncomingCallOverlayService.EXTRA_CALLER_NAME) ?: "着信中"
 
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.TRANSPARENT)
@@ -135,7 +135,7 @@ class IncomingCallActivity : Activity() {
             gravity = Gravity.CENTER
         })
         panel.addView(TextView(this).apply {
-            text = "着信"
+            text = "着信中"
             setTextColor(Color.parseColor("#DDEEFF"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
             gravity = Gravity.CENTER

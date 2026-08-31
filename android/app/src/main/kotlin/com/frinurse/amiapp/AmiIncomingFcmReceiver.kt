@@ -64,7 +64,7 @@ class AmiIncomingFcmReceiver : BroadcastReceiver() {
                 return
             }
 
-            val callerName = "着信"
+            val callerName = "着信中"
             Log.i(
                 TAG,
                 "fcm incoming callerId=$callerId pi=${flags.piLayout} auto=${flags.autoReceive}"

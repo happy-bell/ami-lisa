@@ -111,6 +111,11 @@ class _RoomPageState extends State<RoomPage>
   bool _watching = false;
   bool _receivingCall = false;
   bool _incomingConnecting = false;
+  bool _incomingAborted = false;
+  String? _ringingCallerId;
+  String? _cancelledCallerId;
+  DateTime? _cancelledAt;
+  Timer? _incomingOverlayTimer;
   bool _hasUsbCamera = true;
   Timer? _cameraCheckTimer;
 
@@ -290,21 +295,107 @@ class _RoomPageState extends State<RoomPage>
     if (callerId.isEmpty) return;
     if (action == 'accept') {
       if (_receivingCall) return;
+      // スマホ切断と「はい」が重なったときのズレを吸収する。
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+      if (_wasJustCancelled(callerId) || await TvUtil.wasIncomingCancelled(callerId)) {
+        print('[DEBUG PRINT] accept dropped: caller cancelled $callerId');
+        await _restoreAfterIncomingGone(callerId);
+        return;
+      }
+      _incomingOverlayTimer?.cancel();
+      _incomingOverlayTimer = null;
+      _ringingCallerId = null;
       await TvUtil.dismissIncomingCallOverlay();
       if (!mounted) return;
       await _receiveWhenResumed(callerId);
     } else if (action == 'reject') {
+      _incomingOverlayTimer?.cancel();
+      _ringingCallerId = null;
       await TvUtil.dismissIncomingCallOverlay();
       try {
         socketservice.io.emit("call_reject", [callerId]);
       } catch (_) {}
+    } else if (action == 'cancel') {
+      await _onIncomingCancelled(callerId);
     }
+  }
+
+  void _markIncomingCancelled(String callerId) {
+    _cancelledCallerId = callerId;
+    _cancelledAt = DateTime.now();
+    if (_ringingCallerId == callerId) {
+      _incomingAborted = true;
+      _ringingCallerId = null;
+    }
+    _incomingOverlayTimer?.cancel();
+    _incomingOverlayTimer = null;
+  }
+
+  bool _wasJustCancelled(String callerId) {
+    if (_cancelledCallerId != callerId) return false;
+    final at = _cancelledAt;
+    if (at == null) return false;
+    return DateTime.now().difference(at) < const Duration(seconds: 8);
+  }
+
+  void _armIncomingOverlayTimeout(String callerId) {
+    _incomingOverlayTimer?.cancel();
+    _incomingOverlayTimer = Timer(const Duration(seconds: 29), () {
+      if (_ringingCallerId != callerId) return;
+      unawaited(_onIncomingOverlayTimeout(callerId));
+    });
+  }
+
+  Future<void> _onIncomingOverlayTimeout(String callerId) async {
+    if (callerId.isEmpty) return;
+    _markIncomingCancelled(callerId);
+    await TvUtil.timeoutIncomingCallOverlay(callerId: callerId);
+  }
+
+  Future<void> _onIncomingCancelled(String callerId) async {
+    if (callerId.isEmpty) return;
+    _markIncomingCancelled(callerId);
+    await TvUtil.cancelIncomingCallOverlay(callerId: callerId);
+  }
+
+  Future<void> _restoreAfterIncomingGone(String callerId) async {
+    await TvUtil.dismissIncomingCallOverlay();
+    if (!TvUtil.isTelevision) return;
+    try {
+      final wasOff = await TvUtil.wasScreenOffAtCall();
+      if (wasOff) {
+        try {
+          await WakelockPlus.disable();
+        } catch (_) {}
+        await TvUtil.lockScreenForStandby();
+        return;
+      }
+      await TvUtil.returnToPreviousApp();
+    } catch (_) {}
+  }
+
+  String? _callerIdFromAppMessage(dynamic data) {
+    if (data is! Map) return null;
+    final direct = data['udid']?.toString();
+    if (direct != null && direct.isNotEmpty) return direct;
+    final info = data['info'];
+    if (info is Map) {
+      final id = info['udid']?.toString();
+      if (id != null && id.isNotEmpty) return id;
+    }
+    return null;
   }
 
   /// 他アプリ／電源オフ／はい のあと、全面化してから通話開始する。
   Future<void> _receiveWhenResumed(String callerId) async {
     if (_incomingConnecting || _receivingCall) return;
+    if (_wasJustCancelled(callerId) || await TvUtil.wasIncomingCancelled(callerId)) {
+      await _restoreAfterIncomingGone(callerId);
+      return;
+    }
     _incomingConnecting = true;
+    _incomingAborted = false;
     AppManager.tvForceAccept = true;
     _active = true;
     try {
@@ -312,6 +403,10 @@ class _RoomPageState extends State<RoomPage>
         for (var i = 0; i < 40; i++) {
           await Future<void>.delayed(const Duration(milliseconds: 100));
           if (!mounted) return;
+          if (_incomingAborted || _wasJustCancelled(callerId)) {
+            await _restoreAfterIncomingGone(callerId);
+            return;
+          }
           if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
             break;
           }
@@ -321,6 +416,12 @@ class _RoomPageState extends State<RoomPage>
         await Future<void>.delayed(const Duration(milliseconds: 300));
       }
       if (!mounted) return;
+      if (_incomingAborted ||
+          _wasJustCancelled(callerId) ||
+          await TvUtil.wasIncomingCancelled(callerId)) {
+        await _restoreAfterIncomingGone(callerId);
+        return;
+      }
       await _receive(callerId);
     } finally {
       _incomingConnecting = false;
@@ -335,6 +436,7 @@ class _RoomPageState extends State<RoomPage>
     CheckmeProService.instance.removeListener(_onRingChanged);
     AndVitalService.instance.removeListener(_onRingChanged);
     _cameraCheckTimer?.cancel();
+    _incomingOverlayTimer?.cancel();
     _healthTimer?.cancel();
     _weatherTimer?.cancel();
     _vitalsTimer?.cancel();
@@ -1246,9 +1348,12 @@ class _RoomPageState extends State<RoomPage>
 
       // 自動応答オフ: 地デジ／他アプリ／電源オフ／ホームでもはい・いいえ。
       if (!auto) {
+        _incomingAborted = false;
+        _ringingCallerId = udid;
+        _armIncomingOverlayTimeout(udid);
         await TvUtil.showIncomingCallOverlay(
           callerId: udid,
-          callerName: '着信',
+          callerName: '着信中',
         );
         return;
       }
@@ -1263,7 +1368,7 @@ class _RoomPageState extends State<RoomPage>
         }
         await TvUtil.acceptIncomingCall(
           callerId: udid,
-          callerName: '着信',
+          callerName: '着信中',
         );
         return;
       }
@@ -2120,6 +2225,11 @@ class _RoomPageState extends State<RoomPage>
       }
       final udid = data["info"]["udid"].toString();
       _handleIncomingCall(udid);
+    }
+    else if (message == 'call_cancel') {
+      final udid = _callerIdFromAppMessage(data);
+      if (udid == null) return;
+      unawaited(_onIncomingCancelled(udid));
     }
     else if (message == 'auto_receives') {
       _onAutoReceives();

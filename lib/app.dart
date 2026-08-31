@@ -251,7 +251,7 @@ class AppState extends State<AppPage> with WidgetsBindingObserver {
     SharedPreferences.getInstance().then((prefs) {
       prefs.setString('bcId', targetId);
     });
-    _handleTvRemoteIncoming(targetId, '着信');
+    _handleTvRemoteIncoming(targetId, '着信中');
   }
 
   void _handleTvRemoteIncoming(String callerId, String callerName) {

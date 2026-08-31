@@ -412,7 +412,7 @@ class TvUtil {
   /// 視聴中・スクリーンレス待機のどちらでも着信枠を出し、画面を起こす。
   static Future<void> showIncomingCallOverlay({
     required String callerId,
-    String callerName = '着信',
+    String callerName = '着信中',
   }) async {
     if (!_isTelevision) return;
     await captureForegroundApp();
@@ -426,7 +426,7 @@ class TvUtil {
   /// 確認なしで画面を点け、全面化して通話開始する（自動応答）。
   static Future<void> acceptIncomingCall({
     required String callerId,
-    String callerName = '着信',
+    String callerName = '着信中',
   }) async {
     if (!_isTelevision) return;
     await captureForegroundApp();
@@ -452,7 +452,7 @@ class TvUtil {
   /// ami-EX / ami-LiSA とも自動応答ONなら確認なし。OFFならはい／いいえ。
   static Future<void> handleWatchingIncoming({
     required String callerId,
-    String callerName = '着信',
+    String callerName = '着信中',
   }) async {
     if (!_isTelevision) return;
     final auto = AppManager.appsettings['AUTO_RECEIVE'] == '1';
@@ -523,6 +523,38 @@ class TvUtil {
     try {
       await _channel.invokeMethod('dismissIncomingCallOverlay');
     } catch (_) {}
+  }
+
+  /// スマホ切断。着信画面を消し、遅れた「はい」を無効にする。
+  static Future<void> cancelIncomingCallOverlay({required String callerId}) async {
+    if (!_isTelevision) return;
+    try {
+      await _channel.invokeMethod('cancelIncomingCallOverlay', {
+        'callerId': callerId,
+      });
+    } catch (_) {}
+  }
+
+  /// 29秒タイムアウト。電源は切らず、着信あり表示時点の画面へ戻す。
+  static Future<void> timeoutIncomingCallOverlay({required String callerId}) async {
+    if (!_isTelevision) return;
+    try {
+      await _channel.invokeMethod('timeoutIncomingCallOverlay', {
+        'callerId': callerId,
+      });
+    } catch (_) {}
+  }
+
+  static Future<bool> wasIncomingCancelled(String callerId) async {
+    if (!_isTelevision) return false;
+    try {
+      final ok = await _channel.invokeMethod<bool>('wasIncomingCancelled', {
+        'callerId': callerId,
+      });
+      return ok == true;
+    } catch (_) {
+      return false;
+    }
   }
 
   static Future<Map<String, dynamic>?> getPendingIncomingCall() async {
