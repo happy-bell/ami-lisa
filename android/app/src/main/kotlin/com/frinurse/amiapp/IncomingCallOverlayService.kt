@@ -89,6 +89,9 @@ class IncomingCallOverlayService : Service() {
         private const val KIOSK_INTERVAL_MS = 25_000L
 
         @Volatile
+        private var serviceAlive = false
+
+        @Volatile
         var incomingUiActive = false
 
         @Volatile
@@ -741,10 +744,12 @@ class IncomingCallOverlayService : Service() {
             val i = Intent(context, IncomingCallOverlayService::class.java).apply {
                 action = ACTION_START_WAITING
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(i)
-            } else {
+            // 起動済みなら startService。startForegroundService を重ねると
+            // 5秒以内にもう一度 startForeground が必須になり、落ちる。
+            if (serviceAlive || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
                 context.startService(i)
+            } else {
+                context.startForegroundService(i)
             }
         }
 
@@ -1301,6 +1306,7 @@ class IncomingCallOverlayService : Service() {
 
     private var windowManager: WindowManager? = null
     private var overlayView: View? = null
+    private var keepAliveView: View? = null
     private var ringtone: Ringtone? = null
     private var waiting = false
     private var wakeLock: PowerManager.WakeLock? = null
@@ -1309,20 +1315,16 @@ class IncomingCallOverlayService : Service() {
     private var playbackCallback: AudioManager.AudioPlaybackCallback? = null
     private val kioskHandler = Handler(Looper.getMainLooper())
     private var kioskWatchPosted = false
+    private var foregroundStarted = false
     private val kioskWatch = object : Runnable {
         override fun run() {
             kioskWatchPosted = false
             if (!waiting) return
-            try {
-                startForeground(NOTIF_ID, buildWaitingNotification())
-            } catch (e: Exception) {
-                Log.w(TAG, "kiosk heartbeat: ${e.message}")
-            }
-            // アプリを前面へ引き戻す処理は行わない。
-            // ラズパイ版の常駐用の仕組みで、LiSA では不要。
-            // 利用者が戻るボタンで抜けたのに勝手に立ち上がってしまう。
-            // ここに残る startForeground は常駐を保つための心拍で、
-            // 電源オフからの着信復帰に必要なため消さないこと。
+            // TCL は startForeground を default_borbid で恒久拒否するため
+            // FGS では優先度を上げられない。不可視オーバーレイで
+            // perceptible(adj200) を保ち、CPUロックも維持する。
+            acquireCpuLock()
+            ensureKeepAliveOverlay()
             scheduleKioskWatch()
         }
     }
@@ -1342,7 +1344,11 @@ class IncomingCallOverlayService : Service() {
                         .putBoolean(KEY_AMI_WAS_TOP, ours)
                         .putBoolean(KEY_RESTORE_ON_SCREEN_ON, ours)
                         .apply()
+                    keepProcessAlive("standby ${intent?.action}")
                     Log.i(TAG, "${intent?.action} ours=$ours waiting=$waiting standby=true")
+                }
+                Intent.ACTION_DREAMING_STOPPED -> {
+                    keepProcessAlive("dream stopped")
                 }
                 Intent.ACTION_SCREEN_ON,
                 Intent.ACTION_USER_PRESENT,
@@ -1374,25 +1380,35 @@ class IncomingCallOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        serviceAlive = true
         ensureChannel()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         ensurePlaybackMonitor()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        serviceAlive = true
+        // startForegroundService から来た場合、ここで必ず startForeground する。
+        if (intent?.action != ACTION_STOP_WAITING) {
+            waiting = true
+            prefs().edit().putBoolean(KEY_WAITING, true).apply()
+            ensureForeground("onStart ${intent?.action ?: "restart"}")
+        }
         when (intent?.action) {
             ACTION_START_WAITING -> {
                 waiting = true
                 prefs().edit().putBoolean(KEY_WAITING, true).apply()
-                startForeground(NOTIF_ID, buildWaitingNotification())
+                ensureForeground("start waiting")
                 ensureStandbyGuard()
-                Log.i(TAG, "call waiting started")
+                Log.i(TAG, "call waiting started fg=$foregroundStarted")
             }
             ACTION_STOP_WAITING -> {
                 waiting = false
+                foregroundStarted = false
                 prefs().edit().putBoolean(KEY_WAITING, false).apply()
                 stopKioskWatch()
                 dismissOverlayInternal()
+                removeKeepAliveOverlay()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 Log.i(TAG, "call waiting stopped")
@@ -1406,7 +1422,7 @@ class IncomingCallOverlayService : Service() {
                     waiting = true
                     prefs().edit().putBoolean(KEY_WAITING, true).apply()
                 }
-                startForeground(NOTIF_ID, buildWaitingNotification())
+                ensureForeground("show overlay")
                 ensureStandbyGuard()
                 val id = intent.getStringExtra(EXTRA_CALLER_ID) ?: ""
                 showOverlayInternal(id, DISPLAY_NAME)
@@ -1423,7 +1439,7 @@ class IncomingCallOverlayService : Service() {
                     waiting = true
                     prefs().edit().putBoolean(KEY_WAITING, true).apply()
                 }
-                startForeground(NOTIF_ID, buildWaitingNotification())
+                ensureForeground("accept incoming")
                 captureForegroundApp(this)
                 val name = DISPLAY_NAME
                 dismissOverlayInternal()
@@ -1441,7 +1457,7 @@ class IncomingCallOverlayService : Service() {
                 // サービス再起動時
                 if (prefs().getBoolean(KEY_WAITING, false)) {
                     waiting = true
-                    startForeground(NOTIF_ID, buildWaitingNotification())
+                    ensureForeground("restart")
                     ensureStandbyGuard()
                 }
             }
@@ -1450,15 +1466,11 @@ class IncomingCallOverlayService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (waiting || prefs().getBoolean(KEY_WAITING, false)) {
-            waiting = true
-            try {
-                startForeground(NOTIF_ID, buildWaitingNotification())
-                ensureStandbyGuard()
-                Log.i(TAG, "onTaskRemoved: keep waiting")
-            } catch (e: Exception) {
-                Log.w(TAG, "onTaskRemoved: ${e.message}")
-            }
+        keepProcessAlive("onTaskRemoved")
+        try {
+            startWaiting(this)
+        } catch (e: Exception) {
+            Log.w(TAG, "onTaskRemoved restart: ${e.message}")
         }
         super.onTaskRemoved(rootIntent)
     }
@@ -1467,9 +1479,12 @@ class IncomingCallOverlayService : Service() {
         val keep = waiting || prefs().getBoolean(KEY_WAITING, false)
         stopKioskWatch()
         dismissOverlayInternal()
+        removeKeepAliveOverlay()
         releaseCpuLock()
         unregisterScreenReceiver()
         unregisterPlaybackMonitor()
+        foregroundStarted = false
+        serviceAlive = false
         super.onDestroy()
         if (keep) {
             Log.i(TAG, "onDestroy: restart waiting")
@@ -1496,8 +1511,85 @@ class IncomingCallOverlayService : Service() {
         }
     }
 
+    /** ホーム／Netflix／スクリーンセーバー中もプロセスだけ残す。前面には出さない。 */
+    private fun keepProcessAlive(reason: String) {
+        waiting = true
+        prefs().edit().putBoolean(KEY_WAITING, true).apply()
+        try {
+            ensureForeground("keep $reason")
+            ensureStandbyGuard()
+            Log.i(TAG, "keep process: $reason fg=$foregroundStarted")
+        } catch (e: Exception) {
+            Log.w(TAG, "keep process failed ($reason): ${e.message}")
+        }
+    }
+
+    /** startForegroundService のあとは必ず startForeground する。省略すると即落ちる。 */
+    private fun ensureForeground(reason: String) {
+        try {
+            startForeground(NOTIF_ID, buildWaitingNotification())
+            foregroundStarted = true
+            Log.i(TAG, "startForeground ok ($reason)")
+        } catch (e: Exception) {
+            Log.w(TAG, "startForeground failed ($reason): ${e.message}")
+        }
+        acquireCpuLock()
+    }
+
+    /**
+     * TCL(TclAppBoot) は startForeground を恒久拒否するため、FGS では
+     * バックグラウンド優先度を上げられない。代わりに不可視 1px の
+     * オーバーレイを保持すると hasOverlayUi で perceptible(adj 200) に
+     * 固定され、Netflix→YouTube のメモリ圧でも LMK の犠牲順が後になる。
+     */
+    private fun ensureKeepAliveOverlay() {
+        if (keepAliveView != null) return
+        if (!canDrawOverlays(this)) return
+        try {
+            val v = View(this).apply {
+                // 完全透明だと非表示扱いになる恐れがあるため、ほぼ透明の1pxにする。
+                setBackgroundColor(Color.argb(1, 0, 0, 0))
+            }
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+            val lp = WindowManager.LayoutParams(
+                1,
+                1,
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+                x = 0
+                y = 0
+            }
+            windowManager?.addView(v, lp)
+            keepAliveView = v
+            Log.i(TAG, "keep-alive overlay added")
+        } catch (e: Exception) {
+            Log.w(TAG, "keep-alive overlay: ${e.message}")
+        }
+    }
+
+    private fun removeKeepAliveOverlay() {
+        val v = keepAliveView ?: return
+        keepAliveView = null
+        try {
+            windowManager?.removeView(v)
+            Log.i(TAG, "keep-alive overlay removed")
+        } catch (_: Exception) {
+        }
+    }
+
     private fun ensureStandbyGuard() {
         acquireCpuLock()
+        ensureKeepAliveOverlay()
         ensurePlaybackMonitor()
         scheduleKioskWatch()
         if (screenReceiverRegistered) return
@@ -1506,6 +1598,7 @@ class IncomingCallOverlayService : Service() {
             addAction(Intent.ACTION_SCREEN_ON)
             // TCL(Android12)は独自アクションで消灯を通知してくる。
             addAction(Intent.ACTION_DREAMING_STARTED)
+            addAction(Intent.ACTION_DREAMING_STOPPED)
             addAction("com.tcl.action.sleep")
             addAction("tcl.sys.intent.action.SCREEN_OFF")
             addAction("tcl.sys.intent.action.SCREEN_ON")
@@ -1923,7 +2016,8 @@ class IncomingCallOverlayService : Service() {
         } catch (_: Exception) {
         }
         if (waiting) {
-            startForeground(NOTIF_ID, buildWaitingNotification())
+            foregroundStarted = false
+            ensureForeground("after overlay")
         }
     }
 

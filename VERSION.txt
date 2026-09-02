@@ -1,8 +1,8 @@
 versionName=4.6.3
-versionCode=52
+versionCode=58
 package=jp.amiplus.lisa
-device=TV005
-date=2026-08-30 11:31
+device=TV007
+date=2026-09-02 15:30
 source=ami3.29.2TV_LiSA
-tag=v4.6.3.52
-note=検証自動応答 Sheet3 検証３。電源オフ発の着信後、直前どおり電源オフへ戻す（確認済み）。
+tag=
+note=TCLはstartForegroundを恒久拒否(default_borbid)。不可視1pxオーバーレイでperceptible(adj200)を維持し、Netflix→YouTubeのLMK killを防ぐ。

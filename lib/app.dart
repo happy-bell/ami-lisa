@@ -103,6 +103,9 @@ class AppState extends State<AppPage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WakelockPlus.enable();
+    if (TvUtil.isTelevision) {
+      TvUtil.startCallWaiting();
+    }
     _checkIncomingAtLaunch();
 
     // Run code required to handle interacted messages in an async function

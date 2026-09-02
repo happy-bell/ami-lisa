@@ -433,6 +433,9 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {
         }
         logPersistent("onCreate tv=${isTelevisionDevice()}")
+        if (isTelevisionDevice()) {
+            IncomingCallOverlayService.startWaiting(this)
+        }
         if (intent?.getStringExtra("incoming_action") != null) {
             setTurnScreenOn(true)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -491,6 +494,7 @@ class MainActivity : FlutterActivity() {
         if (isTelevisionDevice()) {
             releaseScreenKeepOn()
             markRestoreIfScreenOff()
+            IncomingCallOverlayService.startWaiting(this)
         }
         super.onPause()
     }
