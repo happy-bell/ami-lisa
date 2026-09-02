@@ -1,0 +1,276 @@
+{
+	"archive" : {},
+	"artifacts" : 
+	[
+		{
+			"path" : "third_party/libusb-cmake/libusb-1.0.a"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"target_include_directories",
+			"target_link_libraries",
+			"target_sources"
+		],
+		"files" : 
+		[
+			"third_party/libusb-cmake/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 251,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 276,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 296,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 262,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 340,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 372,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -O2 -g -DNDEBUG -fPIC"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 2,
+					"path" : "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/third_party/libusb-cmake/gen_include"
+				},
+				{
+					"backtrace" : 2,
+					"path" : "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/src/main/cpp/third_party/libusb-cmake/libusb/libusb/os"
+				},
+				{
+					"backtrace" : 3,
+					"isSystem" : true,
+					"path" : "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/src/main/cpp/third_party/libusb-cmake/libusb/libusb"
+				}
+			],
+			"language" : "C",
+			"sourceIndexes" : 
+			[
+				2,
+				3,
+				4,
+				5,
+				8,
+				9,
+				12,
+				14,
+				16,
+				17
+			],
+			"sysroot" : 
+			{
+				"path" : "/Users/happybell/Library/Android/sdk/ndk/26.3.11579264/toolchains/llvm/prebuilt/darwin-x86_64/sysroot"
+			}
+		}
+	],
+	"id" : "usb-1.0::@0644b129cb2b2174b263",
+	"name" : "usb-1.0",
+	"nameOnDisk" : "libusb-1.0.a",
+	"paths" : 
+	{
+		"build" : "third_party/libusb-cmake",
+		"source" : "third_party/libusb-cmake"
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Header Files",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				6,
+				7,
+				10,
+				11,
+				13,
+				15,
+				18
+			]
+		},
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				2,
+				3,
+				4,
+				5,
+				8,
+				9,
+				12,
+				14,
+				16,
+				17
+			]
+		},
+		{
+			"name" : "CMake Rules",
+			"sourceIndexes" : 
+			[
+				19
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 4,
+			"path" : "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/third_party/libusb-cmake/gen_include/config.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 4,
+			"isGenerated" : true,
+			"path" : "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/third_party/libusb-cmake/gen_include/version_describe.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 4,
+			"compileGroupIndex" : 0,
+			"path" : "third_party/libusb-cmake/libusb/libusb/core.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 4,
+			"compileGroupIndex" : 0,
+			"path" : "third_party/libusb-cmake/libusb/libusb/descriptor.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 4,
+			"compileGroupIndex" : 0,
+			"path" : "third_party/libusb-cmake/libusb/libusb/hotplug.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 4,
+			"compileGroupIndex" : 0,
+			"path" : "third_party/libusb-cmake/libusb/libusb/io.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 4,
+			"path" : "third_party/libusb-cmake/libusb/libusb/libusb.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 4,
+			"path" : "third_party/libusb-cmake/libusb/libusb/libusbi.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 4,
+			"compileGroupIndex" : 0,
+			"path" : "third_party/libusb-cmake/libusb/libusb/strerror.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 4,
+			"compileGroupIndex" : 0,
+			"path" : "third_party/libusb-cmake/libusb/libusb/sync.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 4,
+			"path" : "third_party/libusb-cmake/libusb/libusb/version.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 4,
+			"path" : "third_party/libusb-cmake/libusb/libusb/version_nano.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 5,
+			"compileGroupIndex" : 0,
+			"path" : "third_party/libusb-cmake/libusb/libusb/os/events_posix.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 5,
+			"path" : "third_party/libusb-cmake/libusb/libusb/os/events_posix.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 5,
+			"compileGroupIndex" : 0,
+			"path" : "third_party/libusb-cmake/libusb/libusb/os/threads_posix.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 5,
+			"path" : "third_party/libusb-cmake/libusb/libusb/os/threads_posix.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 6,
+			"compileGroupIndex" : 0,
+			"path" : "third_party/libusb-cmake/libusb/libusb/os/linux_netlink.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 6,
+			"compileGroupIndex" : 0,
+			"path" : "third_party/libusb-cmake/libusb/libusb/os/linux_usbfs.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 6,
+			"path" : "third_party/libusb-cmake/libusb/libusb/os/linux_usbfs.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 0,
+			"isGenerated" : true,
+			"path" : "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/third_party/libusb-cmake/gen_include/version_describe.h.rule",
+			"sourceGroupIndex" : 2
+		}
+	],
+	"type" : "STATIC_LIBRARY"
+}

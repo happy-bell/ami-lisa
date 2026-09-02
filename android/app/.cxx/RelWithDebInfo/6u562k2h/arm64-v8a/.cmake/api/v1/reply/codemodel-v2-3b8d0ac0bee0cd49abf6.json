@@ -1,0 +1,111 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1
+					],
+					"jsonFile" : "directory-.-RelWithDebInfo-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6.0"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				},
+				{
+					"build" : "third_party/libusb-cmake",
+					"jsonFile" : "directory-third_party.libusb-cmake-RelWithDebInfo-f92821dd05b661845e9d.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "third_party/libusb-cmake",
+					"targetIndexes" : 
+					[
+						2
+					]
+				}
+			],
+			"name" : "RelWithDebInfo",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1
+					],
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "ami_usb_audio",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						1
+					],
+					"name" : "usb-1.0",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ami_usb_audio::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ami_usb_audio-RelWithDebInfo-d27fc70fd398e7400b73.json",
+					"name" : "ami_usb_audio",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "uac::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-uac-RelWithDebInfo-a22a86cc89ec49d82c9c.json",
+					"name" : "uac",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "usb-1.0::@0644b129cb2b2174b263",
+					"jsonFile" : "target-usb-1.0-RelWithDebInfo-60ae46e52f5d5b21e759.json",
+					"name" : "usb-1.0",
+					"projectIndex" : 1
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a",
+		"source" : "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/src/main/cpp"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

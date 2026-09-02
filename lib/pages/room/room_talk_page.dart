@@ -1189,9 +1189,34 @@ class RoomTalkPageState extends State<RoomTalkPage>
                   top: 8,
                   right: 8,
                   width: constraints.maxWidth * 0.15,
-                  child: _LisaTalkEndButton(
-                    autofocus: true,
-                    onPressed: _callEndButton,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _LisaTalkEndButton(
+                        autofocus: true,
+                        onPressed: _callEndButton,
+                      ),
+                      // ami-LiSA 二者通話: 通話終了の下に自分の映像。
+                      // 三者通話は中央上（上の Positioned）に出す。
+                      if (_talking &&
+                          !_hasRemote2Video &&
+                          AppManager.safetyCheckId.isEmpty) ...[
+                        const SizedBox(height: 8),
+                        AspectRatio(
+                          aspectRatio: 4 / 3,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: RTCVideoView(
+                              _localRenderer,
+                              mirror: true,
+                              objectFit: RTCVideoViewObjectFit
+                                  .RTCVideoViewObjectFitCover,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               if (_callendIsEnabled &&

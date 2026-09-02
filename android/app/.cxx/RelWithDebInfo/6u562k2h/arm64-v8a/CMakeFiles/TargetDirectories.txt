@@ -1,0 +1,7 @@
+/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/CMakeFiles/uac.dir
+/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/CMakeFiles/ami_usb_audio.dir
+/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/CMakeFiles/edit_cache.dir
+/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/CMakeFiles/rebuild_cache.dir
+/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/third_party/libusb-cmake/CMakeFiles/usb-1.0.dir
+/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/third_party/libusb-cmake/CMakeFiles/edit_cache.dir
+/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/third_party/libusb-cmake/CMakeFiles/rebuild_cache.dir

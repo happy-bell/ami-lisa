@@ -1,0 +1,1 @@
+#define THROW_ON_ERROR

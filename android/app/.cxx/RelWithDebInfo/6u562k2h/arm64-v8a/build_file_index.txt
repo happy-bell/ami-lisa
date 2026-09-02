@@ -1,0 +1,2 @@
+/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/src/main/cpp/CMakeLists.txt
+/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/src/main/cpp/third_party/libusb-cmake/CMakeLists.txt

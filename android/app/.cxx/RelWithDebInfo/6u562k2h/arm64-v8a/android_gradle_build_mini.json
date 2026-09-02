@@ -1,0 +1,40 @@
+{
+  "buildFiles": [
+    "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/src/main/cpp/CMakeLists.txt",
+    "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/src/main/cpp/third_party/libusb-cmake/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/happybell/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/happybell/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "ami_usb_audio::@6890427a1f51a3e7e1df": {
+      "artifactName": "ami_usb_audio",
+      "abi": "arm64-v8a",
+      "output": "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/build/app/intermediates/cxx/RelWithDebInfo/6u562k2h/obj/arm64-v8a/libami_usb_audio.so",
+      "runtimeFiles": []
+    },
+    "uac::@6890427a1f51a3e7e1df": {
+      "artifactName": "uac",
+      "abi": "arm64-v8a",
+      "output": "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/libuac.a",
+      "runtimeFiles": []
+    },
+    "usb-1.0::@0644b129cb2b2174b263": {
+      "artifactName": "usb-1.0",
+      "abi": "arm64-v8a",
+      "output": "/Users/happybell/StudioProjects/ami_tv/ami3.29.2TV_LiSA/android/app/.cxx/RelWithDebInfo/6u562k2h/arm64-v8a/third_party/libusb-cmake/libusb-1.0.a",
+      "runtimeFiles": []
+    }
+  }
+}
