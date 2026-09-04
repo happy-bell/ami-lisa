@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:amiapp/services/appmanager.dart';
+import 'package:amiapp/services/tv_message_schedule.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -465,6 +466,69 @@ class TvUtil {
     if (_safetySplashUsed) return false;
     _safetySplashUsed = true;
     return true;
+  }
+
+  /// LiSA が前面（時計/ホーム表示中）かどうか。
+  static Future<bool> isAppForeground() async {
+    if (!_isTelevision) return true;
+    try {
+      return await _channel.invokeMethod<bool>('isAppForeground') == true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// 静かな見守り開始。FGSをカメラ/マイク種別へ昇格し、
+  /// 前面化せず裏からカメラ・マイクを使えるようにする。
+  static Future<void> beginQuietWatch() async {
+    if (!_isTelevision) return;
+    try {
+      await _channel.invokeMethod('beginQuietWatch');
+    } catch (e) {
+      debugPrint('beginQuietWatch failed: $e');
+    }
+  }
+
+  /// 静かな見守り終了。FGS種別を通常へ戻す。
+  static Future<void> endQuietWatch() async {
+    if (!_isTelevision) return;
+    try {
+      await _channel.invokeMethod('endQuietWatch');
+    } catch (e) {
+      debugPrint('endQuietWatch failed: $e');
+    }
+  }
+
+  /// 電源オフ発の見守り用。画面は点けずにタスクだけ前面へ出す。
+  static Future<void> bringToFrontQuiet() async {
+    if (!_isTelevision) return;
+    try {
+      await _channel.invokeMethod('bringToFrontQuiet');
+    } catch (e) {
+      debugPrint('bringToFrontQuiet failed: $e');
+    }
+  }
+
+  /// 見守り中の時計＋「見守り中」を他アプリの上に出す。
+  /// [color] は設定／時計の明るさ（ARGB）。
+  static Future<void> showSafetyWatchUi({int? color}) async {
+    if (!_isTelevision) return;
+    try {
+      await _channel.invokeMethod('showSafetyWatchUi', {
+        'color': color ?? TvMessageSchedule.currentClockColor().value,
+      });
+    } catch (e) {
+      debugPrint('showSafetyWatchUi failed: $e');
+    }
+  }
+
+  static Future<void> hideSafetyWatchUi() async {
+    if (!_isTelevision) return;
+    try {
+      await _channel.invokeMethod('hideSafetyWatchUi');
+    } catch (e) {
+      debugPrint('hideSafetyWatchUi failed: $e');
+    }
   }
 
   /// 視聴中・待機中にアプリを前面へ出す（確認ダイアログは出さない）。

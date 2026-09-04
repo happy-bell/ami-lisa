@@ -239,6 +239,16 @@ class MainActivity : FlutterActivity() {
                     IncomingCallOverlayService.bringToFront(this)
                     result.success(true)
                 }
+                "showSafetyWatchUi" -> {
+                    val color = call.argument<Int>("color")
+                        ?: IncomingCallOverlayService.DEFAULT_CLOCK_COLOR
+                    IncomingCallOverlayService.showSafetyWatchUi(this, color)
+                    result.success(true)
+                }
+                "hideSafetyWatchUi" -> {
+                    IncomingCallOverlayService.hideSafetyWatchUi(this)
+                    result.success(true)
+                }
                 "dismissIncomingCallOverlay" -> {
                     IncomingCallOverlayService.dismissOverlay(this)
                     result.success(true)

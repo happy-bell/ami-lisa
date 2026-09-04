@@ -85,8 +85,7 @@ class _ClockWidgetState extends State<ClockWidget> {
         fontSize1: fontSize1,
         fontSize2: fontSize2 * 1.3,
         screenWidth: MediaQuery.of(context).size.width,
-        color: widget.color ??
-            TvMessageSchedule.colorAt(0, key: TvMessageSchedule.clockKey),
+        color: widget.color ?? TvMessageSchedule.currentClockColor(),
         watching: widget.watching,
       );
     }
@@ -220,12 +219,12 @@ class _ClockWidgetState extends State<ClockWidget> {
             top: centerY + (timeHeight / 2) + (showDate ? 20 : 0),
             left: 0,
             width: screenWidth,
-            child: const Center(
+            child: Center(
               child: Text(
                 '見守り中',
                 style: TextStyle(
-                  color: Color(0xFF999999),
-                  fontSize: 28,
+                  color: color,
+                  fontSize: 30,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'sans-serif',
                   height: 1.0,

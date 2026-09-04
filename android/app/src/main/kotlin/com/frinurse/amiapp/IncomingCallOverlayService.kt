@@ -39,7 +39,9 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.TextClock
 import android.widget.TextView
 
 /**
@@ -61,9 +63,18 @@ class IncomingCallOverlayService : Service() {
         const val ACTION_ACCEPT_INCOMING = "jp.amiplus.lisa.action.ACCEPT_INCOMING"
         const val ACTION_DISMISS_OVERLAY = "jp.amiplus.lisa.action.DISMISS_OVERLAY"
         const val ACTION_BRING_TO_FRONT = "jp.amiplus.lisa.action.BRING_TO_FRONT"
+        const val ACTION_SHOW_SAFETY_UI = "jp.amiplus.lisa.action.SHOW_SAFETY_UI"
+        const val ACTION_HIDE_SAFETY_UI = "jp.amiplus.lisa.action.HIDE_SAFETY_UI"
 
         const val EXTRA_CALLER_ID = "caller_id"
         const val EXTRA_CALLER_NAME = "caller_name"
+        const val EXTRA_SAFETY_COLOR = "safety_clock_color"
+
+        /** 設定／時計のデフォルト（明るい RGB 110,151,81）。 */
+        const val DEFAULT_CLOCK_COLOR = 0xFF6E9751.toInt()
+
+        @Volatile
+        private var safetyClockColor = DEFAULT_CLOCK_COLOR
 
         const val PREFS = "ami_tv_call"
         const val KEY_WAITING = "call_waiting_enabled"
@@ -99,6 +110,10 @@ class IncomingCallOverlayService : Service() {
         /** 電源オフ発のとき、POWER は1回だけ送る（トグルなので連打すると消灯・フリーズする）。 */
         @Volatile
         private var pendingPowerWake = false
+
+        /** この見守り／起床セッションですでに POWER を送ったか。 */
+        @Volatile
+        private var powerKeySent = false
 
         @Volatile
         var incomingUiActive = false
@@ -828,9 +843,39 @@ class IncomingCallOverlayService : Service() {
         }
 
         /** 確認なしでアプリを前面へ。バックグラウンド制限を避けるためサービスから出す。 */
+        fun showSafetyWatchUi(context: Context, color: Int = DEFAULT_CLOCK_COLOR) {
+            safetyClockColor = color
+            val app = context.applicationContext
+            val i = Intent(app, IncomingCallOverlayService::class.java).apply {
+                action = ACTION_SHOW_SAFETY_UI
+                putExtra(EXTRA_SAFETY_COLOR, color)
+            }
+            try {
+                if (serviceAlive || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                    app.startService(i)
+                } else {
+                    app.startForegroundService(i)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "showSafetyWatchUi: ${e.message}")
+            }
+        }
+
+        fun hideSafetyWatchUi(context: Context) {
+            val app = context.applicationContext
+            val i = Intent(app, IncomingCallOverlayService::class.java).apply {
+                action = ACTION_HIDE_SAFETY_UI
+            }
+            try {
+                app.startService(i)
+            } catch (e: Exception) {
+                Log.w(TAG, "hideSafetyWatchUi: ${e.message}")
+            }
+        }
+
         fun bringToFront(context: Context) {
             val app = context.applicationContext
-            bringFrontUntil = System.currentTimeMillis() + 3_000L
+            bringFrontUntil = System.currentTimeMillis() + 8_000L
             wakeDisplay(app)
             val i = Intent(app, IncomingCallOverlayService::class.java).apply {
                 action = ACTION_BRING_TO_FRONT
@@ -851,15 +896,17 @@ class IncomingCallOverlayService : Service() {
             val app = context.applicationContext
             val standby = isTvStandby(app) || pendingPowerWake
             applyTurnScreenOn(MainActivity.currentActivity())
-            if (!standby && MainActivity.isInForeground()) {
+            // 見守り前面化中は「すでに前面」でも startActivity する。
+            // TCL はスクリーンレスで isInForeground=true のまま他アプリが乗ることがある。
+            val forcing = System.currentTimeMillis() <= bringFrontUntil
+            if (!forcing && !standby && MainActivity.isInForeground()) {
                 Log.i(TAG, "restoreMainActivity skip: already front")
                 return
             }
-            // 点灯中は既存タスクを前面にするだけ。
-            // 電源オフ中は Activity を出して TURN_SCREEN_ON を付ける。
-            if (!standby && moveAmiTaskToFront(app)) {
+            if (!forcing && !standby && moveAmiTaskToFront(app)) {
                 return
             }
+            moveAmiTaskToFront(app)
             val i = Intent(app, MainActivity::class.java).apply {
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -1078,6 +1125,8 @@ class IncomingCallOverlayService : Service() {
          */
         fun lockScreenForStandby(context: Context): Boolean {
             bringFrontUntil = 0L
+            pendingPowerWake = false
+            powerKeySent = false
             if (!wasScreenOffAtCall(context)) return false
             IncomingCallActivity.finishIfOpen()
             releaseIncomingWakeLocks()
@@ -1331,7 +1380,7 @@ class IncomingCallOverlayService : Service() {
             // 先に起こすと判定が消える。TCL は isInteractive のままスクリーンレス。
             rememberScreenOffAtIncoming(context)
             val app = context.applicationContext
-            if (forcePowerOn || isTvStandby(app)) {
+            if ((forcePowerOn || isTvStandby(app)) && !powerKeySent) {
                 pendingPowerWake = true
             }
             tryWakeOnce(app)
@@ -1418,8 +1467,9 @@ class IncomingCallOverlayService : Service() {
             sendTclWakeBroadcast(context)
             sendOneKey(context, KeyEvent.KEYCODE_WAKEUP)
             // POWER はトグル。1回だけ。連打すると消灯やフリーズになる。
-            if (pendingPowerWake) {
+            if (pendingPowerWake && !powerKeySent) {
                 pendingPowerWake = false
+                powerKeySent = true
                 sendOneKey(context, KeyEvent.KEYCODE_POWER)
                 Log.i(TAG, "wakeDisplay POWER once")
             }
@@ -1448,6 +1498,7 @@ class IncomingCallOverlayService : Service() {
 
     private var windowManager: WindowManager? = null
     private var overlayView: View? = null
+    private var safetyWatchView: View? = null
     private var keepAliveView: View? = null
     private var ringtone: Ringtone? = null
     private var waiting = false
@@ -1486,6 +1537,10 @@ class IncomingCallOverlayService : Service() {
                         .putBoolean(KEY_AMI_WAS_TOP, ours)
                         .putBoolean(KEY_RESTORE_ON_SCREEN_ON, ours)
                         .apply()
+                    // 消灯したら POWER 1回制限をリセット。
+                    // 残したままだと次の電源オフ発見守りで電源が入らない。
+                    pendingPowerWake = false
+                    powerKeySent = false
                     keepProcessAlive("standby ${intent?.action}")
                     Log.i(TAG, "${intent?.action} ours=$ours waiting=$waiting standby=true")
                 }
@@ -1595,6 +1650,12 @@ class IncomingCallOverlayService : Service() {
                 launchAppAccept(id, name)
             }
             ACTION_DISMISS_OVERLAY -> dismissOverlayInternal()
+            ACTION_SHOW_SAFETY_UI -> {
+                safetyClockColor = intent.getIntExtra(EXTRA_SAFETY_COLOR, safetyClockColor)
+                ensureForeground("safety ui")
+                showSafetyWatchInternal()
+            }
+            ACTION_HIDE_SAFETY_UI -> hideSafetyWatchInternal()
             ACTION_BRING_TO_FRONT -> {
                 if (!waiting) {
                     waiting = true
@@ -1605,11 +1666,9 @@ class IncomingCallOverlayService : Service() {
                 wakeDisplayInternal()
                 restoreMainActivity(this)
                 val h = Handler(Looper.getMainLooper())
-                for (delay in longArrayOf(300, 800)) {
+                for (delay in longArrayOf(300, 800, 1600, 2800)) {
                     h.postDelayed({
-                        if (System.currentTimeMillis() <= bringFrontUntil &&
-                            (!MainActivity.isInForeground() || needsPanelWake(this))
-                        ) {
+                        if (System.currentTimeMillis() <= bringFrontUntil) {
                             restoreMainActivity(this)
                         }
                     }, delay)
@@ -1641,6 +1700,7 @@ class IncomingCallOverlayService : Service() {
         val keep = waiting || prefs().getBoolean(KEY_WAITING, false)
         stopKioskWatch()
         dismissOverlayInternal()
+        hideSafetyWatchInternal()
         removeKeepAliveOverlay()
         releaseCpuLock()
         unregisterScreenReceiver()
@@ -1745,6 +1805,101 @@ class IncomingCallOverlayService : Service() {
         try {
             windowManager?.removeView(v)
             Log.i(TAG, "keep-alive overlay removed")
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun showSafetyWatchInternal() {
+        val clockColor = safetyClockColor
+        val existing = safetyWatchView
+        if (existing != null) {
+            applySafetyWatchColor(existing, clockColor)
+            Log.i(TAG, "safety watch ui color updated")
+            return
+        }
+        if (!canDrawOverlays(this)) {
+            Log.w(TAG, "safety watch ui: no overlay permission")
+            return
+        }
+        try {
+            val date = TextClock(this).apply {
+                format12Hour = null
+                format24Hour = "yyyy年M月d日（E）"
+                setTextColor(clockColor)
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, 96f)
+                gravity = Gravity.CENTER
+            }
+            val clock = TextClock(this).apply {
+                format12Hour = null
+                format24Hour = "HH:mm"
+                setTextColor(clockColor)
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, 240f)
+                gravity = Gravity.CENTER
+            }
+            val label = TextView(this).apply {
+                text = "見守り中"
+                setTextColor(clockColor)
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, 30f)
+                gravity = Gravity.CENTER
+                setPadding(0, 24, 0, 0)
+            }
+            val col = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                addView(date)
+                addView(clock)
+                addView(label)
+            }
+            val root = FrameLayout(this).apply {
+                setBackgroundColor(Color.BLACK)
+                addView(
+                    col,
+                    FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        Gravity.CENTER
+                    )
+                )
+            }
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+            val lp = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
+                PixelFormat.OPAQUE
+            )
+            windowManager?.addView(root, lp)
+            safetyWatchView = root
+            Log.i(TAG, "safety watch ui added")
+        } catch (e: Exception) {
+            Log.w(TAG, "safety watch ui: ${e.message}")
+        }
+    }
+
+    private fun applySafetyWatchColor(root: View, color: Int) {
+        val col = (root as? FrameLayout)?.getChildAt(0) as? LinearLayout ?: return
+        for (i in 0 until col.childCount) {
+            (col.getChildAt(i) as? TextView)?.setTextColor(color)
+        }
+    }
+
+    private fun hideSafetyWatchInternal() {
+        val v = safetyWatchView ?: return
+        safetyWatchView = null
+        try {
+            windowManager?.removeView(v)
+            Log.i(TAG, "safety watch ui removed")
         } catch (_: Exception) {
         }
     }

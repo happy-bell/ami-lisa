@@ -33,6 +33,11 @@ class Peer {
   // var _turnCredential;
 
   bool _emeetCapture = false;
+
+  /// 見守り(静音)用。true のとき音声を一切取得せず、
+  /// 音声モードの切り替え(prepareCommunicationAudio)も行わない。
+  /// 視聴中の Netflix / 地デジ等の音に影響を与えないため。
+  bool _videoOnly = false;
   bool _closed = false;
   MediaStream? _localStream;
   set localStream(value) => _localStream = value;
@@ -167,6 +172,7 @@ class Peer {
     final stream = _localStream;
     _localStream = null;
     _emeetCapture = false;
+    _videoOnly = false;
     if (stream != null) {
       for (final track in stream.getTracks()) {
         try {
@@ -307,11 +313,12 @@ class Peer {
     }
   }
 
-  void invite(String peerId, String media, useScreen) {
+  void invite(String peerId, String media, useScreen, {bool videoOnly = false}) {
     if (AppManager.isPiTvLayout && _closed) {
       print('peer invite skipped (closed)');
       return;
     }
+    _videoOnly = videoOnly;
     _createPeerConnection(peerId, media, useScreen, isHost: true).then((pc) {
       if (AppManager.isPiTvLayout && _closed) {
         try {
@@ -454,6 +461,7 @@ class Peer {
             final af2 = await TvUtil.setUvcAntiFlicker60();
             print('EMEET uvc anti-flicker after open: $af2');
           } catch (_) {}
+          if (_videoOnly) return stream;
           return _attachEmeetAudio(stream);
         }
         lastAudio ??= stream;
@@ -462,6 +470,10 @@ class Peer {
       }
     }
     if (lastAudio != null) return lastAudio;
+    if (_videoOnly) {
+      // 映像のみモードで映像が取れなかった。音声で代替しない。
+      throw StateError('EMEET video-only capture failed');
+    }
     print('EMEET fallback audio-only');
     return navigator.mediaDevices.getUserMedia({
       'audio': true,
@@ -479,29 +491,34 @@ class Peer {
       } catch (_) {}
     }
 
-    // マイク権限を確実に取得（USBカメラ内蔵マイク含む）
-    try {
-      final mic = await Permission.microphone.request();
-      print('microphone permission: $mic');
-    } catch (e) {
-      print('microphone permission request failed: $e');
-    }
-
-    if (TvUtil.isTelevision) {
+    // 映像のみ(静音見守り)のときは音声関連を一切触らない。
+    // prepareCommunicationAudio は音声モードを通話用に切り替えるため、
+    // 視聴中の Netflix / 地デジの音に影響する。
+    if (!_videoOnly) {
+      // マイク権限を確実に取得（USBカメラ内蔵マイク含む）
       try {
-        const channel = MethodChannel('jp.amiplus.lisa/tv');
-        final usbPerm = await channel.invokeMethod('ensureUsbAudioPermission');
-        print('ensureUsbAudioPermission: $usbPerm');
-        // 権限ダイアログを新規表示した場合のみ、付与を待つ
-        final requested = usbPerm is Map && usbPerm['requested'] == true;
-        if (requested) {
-          await Future.delayed(const Duration(milliseconds: 1000));
-        }
-        final prepared =
-            await channel.invokeMethod('prepareCommunicationAudio');
-        print('prepareCommunicationAudio: $prepared');
+        final mic = await Permission.microphone.request();
+        print('microphone permission: $mic');
       } catch (e) {
-        print('prepareCommunicationAudio failed: $e');
+        print('microphone permission request failed: $e');
+      }
+
+      if (TvUtil.isTelevision) {
+        try {
+          const channel = MethodChannel('jp.amiplus.lisa/tv');
+          final usbPerm = await channel.invokeMethod('ensureUsbAudioPermission');
+          print('ensureUsbAudioPermission: $usbPerm');
+          // 権限ダイアログを新規表示した場合のみ、付与を待つ
+          final requested = usbPerm is Map && usbPerm['requested'] == true;
+          if (requested) {
+            await Future.delayed(const Duration(milliseconds: 1000));
+          }
+          final prepared =
+              await channel.invokeMethod('prepareCommunicationAudio');
+          print('prepareCommunicationAudio: $prepared');
+        } catch (e) {
+          print('prepareCommunicationAudio failed: $e');
+        }
       }
     }
 
@@ -512,7 +529,7 @@ class Peer {
     final camId = cam?['id']?.toString() ?? '';
 
     String? audioDeviceId;
-    if (TvUtil.isTelevision) {
+    if (TvUtil.isTelevision && !_videoOnly) {
       audioDeviceId = await _preferUsbAudioDeviceId();
       if (audioDeviceId != null && audioDeviceId.isNotEmpty) {
         try {
@@ -542,13 +559,13 @@ class Peer {
       }
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          'audio': true,
+          'audio': !_videoOnly,
           'video': videoConstraints,
         });
       } catch (e) {
         print('getUserMedia failed ($e), retry with simple constraints');
         stream = await navigator.mediaDevices.getUserMedia({
-          'audio': true,
+          'audio': !_videoOnly,
           'video': true,
         });
       }
@@ -558,7 +575,7 @@ class Peer {
           print('TV camera retry ${i + 1}');
           try {
             final retry = await navigator.mediaDevices.getUserMedia({
-              'audio': true,
+              'audio': !_videoOnly,
               'video': true,
             });
             if (retry.getVideoTracks().isNotEmpty) {
@@ -596,7 +613,7 @@ class Peer {
     }
 
     // 映像は取れたが音声トラックが無い場合、音声だけ再取得して結合
-    if (stream.getAudioTracks().isEmpty) {
+    if (stream.getAudioTracks().isEmpty && !_videoOnly) {
       print('no audio tracks; retry audio-only getUserMedia');
       try {
         if (audioDeviceId != null && audioDeviceId.isNotEmpty) {
@@ -668,7 +685,7 @@ class Peer {
       } catch (_) {}
     }
 
-    if (TvUtil.isTelevision) {
+    if (TvUtil.isTelevision && !_videoOnly) {
       // 送信開始前にUSBマイク注入を完了させる（非同期だと最初の数秒が途切れる）
       try {
         final res = await TvUtil.usbMicStart();

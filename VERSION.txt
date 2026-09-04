@@ -1,8 +1,8 @@
 versionName=4.6.3
-versionCode=94
+versionCode=101
 package=jp.amiplus.lisa
-device=TV007
-date=2026-09-04 15:12
+device=TV005/TV007
+date=2026-09-04 18:10
 source=ami3.29.2TV_LiSA
-tag=v4.6.3.94
-note=見守り一式。見守り中は28px/#999999。タグ保存済み。いつでもこの版に戻せる。
+tag=(未保存。保存版は v4.6.3.94)
+note=見守り修正: 電源オフ判定を時計オーバーレイ表示より先に実施（終了後の電源オフ復帰を修正）。時計に日付（年月日・曜日）を追加。消灯時にPOWERキー1回制限をリセット。終了時はオーバーレイを消してから直前状態へ復帰。

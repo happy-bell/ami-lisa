@@ -1470,6 +1470,9 @@ class _RoomPageState extends State<RoomPage>
   Future<void> _beginSafetyCheck(String udid) async {
     if (TvUtil.isTelevision) {
       TvUtil.beginSafetyBringToFront();
+      // 電源オフ判定は時計オーバーレイより先に行う。
+      // オーバーレイの TURN_SCREEN_ON が先に画面を起こすと
+      // 「電源オフ発」と記録されず、終了後に電源オフへ戻せない。
       var screenOn = true;
       var standby = false;
       try {
@@ -1485,6 +1488,11 @@ class _RoomPageState extends State<RoomPage>
         } catch (_) {}
       }
       if (mounted) setState(() {});
+      try {
+        await TvUtil.showSafetyWatchUi(
+          color: TvMessageSchedule.currentClockColor().value,
+        );
+      } catch (_) {}
       try {
         await TvUtil.wakeScreen(forcePowerOn: _safetyRestoreStandby);
         await TvUtil.bringToFront();
@@ -1503,7 +1511,7 @@ class _RoomPageState extends State<RoomPage>
   }
 
   Future<void> _frontAfterSafetyInvite(String udid) async {
-    for (final delay in const [400, 900]) {
+    for (final delay in const [300, 800, 1600, 2800]) {
       await Future<void>.delayed(Duration(milliseconds: delay));
       if (!_safetyCheckIds.contains(udid)) return;
       try {
@@ -1552,6 +1560,9 @@ class _RoomPageState extends State<RoomPage>
     _safetyCheckIds.clear();
     _safetyRestoreStandby = false;
     TvUtil.endSafetyBringToFront();
+    if (TvUtil.isTelevision) {
+      unawaited(TvUtil.hideSafetyWatchUi());
+    }
     _disposePeer();
     if (AppManager.isPiTvLayout && _watching) {
       _watching = false;
@@ -1564,6 +1575,11 @@ class _RoomPageState extends State<RoomPage>
   }
 
   Future<void> _restoreAfterSafety(bool toPowerOff) async {
+    // 時計オーバーレイ(KEEP_SCREEN_ON付き)を先に消す。
+    // 残したまま電源オフへ戻すと消灯を妨げることがある。
+    try {
+      await TvUtil.hideSafetyWatchUi();
+    } catch (_) {}
     try {
       await TvUtil.restoreAfterSafety(toPowerOff: toPowerOff);
     } catch (e) {
@@ -1670,13 +1686,10 @@ class _RoomPageState extends State<RoomPage>
                     child: IgnorePointer(
                       child: ColoredBox(
                         color: Colors.black,
-                        child: (clockSlot == null &&
-                                _safetyCheckIds.isEmpty)
-                            ? const SizedBox.shrink()
-                            : ClockWidget(
-                                color: clockSlot?.color,
-                                watching: _safetyCheckIds.isNotEmpty,
-                              ),
+                        child: ClockWidget(
+                          color: clockSlot?.color,
+                          watching: _safetyCheckIds.isNotEmpty,
+                        ),
                       ),
                     ),
                   )

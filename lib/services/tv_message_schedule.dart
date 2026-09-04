@@ -182,6 +182,12 @@ class TvMessageSchedule {
     await AppManager.saveAppSetting(clockFaceKey, value == '0' ? '0' : '1');
   }
 
+  /// 設定／時計のいまの色。時間帯が無いときは明るい（index 0）。
+  static Color currentClockColor() {
+    return activeAt(DateTime.now(), key: clockKey)?.color ??
+        colorAt(0, key: clockKey);
+  }
+
   static TvMessageSlot? activeAt(DateTime now, {String key = messageKey}) {
     final nowMin = now.hour * 60 + now.minute;
     for (final slot in load(key)) {
