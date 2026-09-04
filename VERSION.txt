@@ -1,8 +1,8 @@
 versionName=4.6.3
-versionCode=90
+versionCode=94
 package=jp.amiplus.lisa
 device=TV007
-date=2026-09-04 14:05
+date=2026-09-04 15:12
 source=ami3.29.2TV_LiSA
-tag=
-note=見守り開始でami-LiSAホームへ前面化。見守り中は左上watchingアイコンを出さない。
+tag=v4.6.3.94
+note=見守り一式。見守り中は28px/#999999。タグ保存済み。いつでもこの版に戻せる。

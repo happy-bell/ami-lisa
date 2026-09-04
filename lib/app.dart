@@ -131,6 +131,7 @@ class AppState extends State<AppPage> with WidgetsBindingObserver {
     if (!TvUtil.isTelevision) return;
     if (!_splashDone) return;                     // 起動時のロゴが先
     if (AppManager.status != AppStatus.None) return;   // 通話中は出さない
+    if (!TvUtil.takeResumeSplash()) return;
 
     // 画面が一瞬切り替わっただけで何度も流れないようにする。
     final last = _lastOverlayAt;

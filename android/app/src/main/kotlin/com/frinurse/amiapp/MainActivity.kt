@@ -277,7 +277,8 @@ class MainActivity : FlutterActivity() {
                     result.success(id)
                 }
                 "wakeScreen" -> {
-                    IncomingCallOverlayService.wakeDisplay(this)
+                    val force = call.argument<Boolean>("forcePowerOn") ?: false
+                    IncomingCallOverlayService.wakeDisplay(this, forcePowerOn = force)
                     setTurnScreenOn(true)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                         setShowWhenLocked(true)

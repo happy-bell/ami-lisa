@@ -390,10 +390,12 @@ class TvUtil {
     }
   }
 
-  static Future<void> wakeScreen() async {
+  static Future<void> wakeScreen({bool forcePowerOn = false}) async {
     if (!_isTelevision) return;
     try {
-      await _channel.invokeMethod('wakeScreen');
+      await _channel.invokeMethod('wakeScreen', {
+        'forcePowerOn': forcePowerOn,
+      });
     } catch (e) {
       debugPrint('wakeScreen failed: $e');
     }
@@ -435,6 +437,34 @@ class TvUtil {
       'callerId': callerId,
       'callerName': callerName,
     });
+  }
+
+  static DateTime? _safetyBringUntil;
+  static bool _safetySplashUsed = false;
+
+  /// 見守り前面化。スプラッシュは最初の1回だけ出す。
+  static void beginSafetyBringToFront() {
+    if (!_isTelevision) return;
+    _safetyBringUntil = DateTime.now().add(const Duration(seconds: 10));
+    _safetySplashUsed = false;
+  }
+
+  static void endSafetyBringToFront() {
+    _safetyBringUntil = null;
+    _safetySplashUsed = false;
+  }
+
+  /// 前面復帰ロゴを出してよいか。見守り再試行中は2回目以降を止める。
+  static bool takeResumeSplash() {
+    final until = _safetyBringUntil;
+    if (until == null || DateTime.now().isAfter(until)) {
+      _safetyBringUntil = null;
+      _safetySplashUsed = false;
+      return true;
+    }
+    if (_safetySplashUsed) return false;
+    _safetySplashUsed = true;
+    return true;
   }
 
   /// 視聴中・待機中にアプリを前面へ出す（確認ダイアログは出さない）。

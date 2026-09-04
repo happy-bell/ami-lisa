@@ -1463,11 +1463,13 @@ class _RoomPageState extends State<RoomPage>
       }
     }
     _safetyCheckIds.add(udid);
+    if (mounted) setState(() {});
     unawaited(_beginSafetyCheck(udid));
   }
 
   Future<void> _beginSafetyCheck(String udid) async {
     if (TvUtil.isTelevision) {
+      TvUtil.beginSafetyBringToFront();
       var screenOn = true;
       var standby = false;
       try {
@@ -1482,21 +1484,32 @@ class _RoomPageState extends State<RoomPage>
           await TvUtil.captureForegroundApp();
         } catch (_) {}
       }
+      if (mounted) setState(() {});
       try {
-        await TvUtil.wakeScreen();
+        await TvUtil.wakeScreen(forcePowerOn: _safetyRestoreStandby);
         await TvUtil.bringToFront();
-        for (final delay in const [300, 800, 1600, 2800]) {
-          await Future<void>.delayed(Duration(milliseconds: delay));
-          if (!_safetyCheckIds.contains(udid)) return;
-          await TvUtil.bringToFront();
+        if (_safetyRestoreStandby) {
+          await Future<void>.delayed(const Duration(milliseconds: 350));
         }
       } catch (e) {
         debugPrint('safety check wake: $e');
       }
-      if (mounted) setState(() {});
     }
     if (!_safetyCheckIds.contains(udid)) return;
     peer.invite(udid, 'sendonly', true);
+    if (TvUtil.isTelevision) {
+      unawaited(_frontAfterSafetyInvite(udid));
+    }
+  }
+
+  Future<void> _frontAfterSafetyInvite(String udid) async {
+    for (final delay in const [400, 900]) {
+      await Future<void>.delayed(Duration(milliseconds: delay));
+      if (!_safetyCheckIds.contains(udid)) return;
+      try {
+        await TvUtil.bringToFront();
+      } catch (_) {}
+    }
   }
 
   Future<void> _onAutoReceives() async {
@@ -1538,6 +1551,7 @@ class _RoomPageState extends State<RoomPage>
     }
     _safetyCheckIds.clear();
     _safetyRestoreStandby = false;
+    TvUtil.endSafetyBringToFront();
     _disposePeer();
     if (AppManager.isPiTvLayout && _watching) {
       _watching = false;

@@ -96,6 +96,10 @@ class IncomingCallOverlayService : Service() {
         @Volatile
         private var bringFrontUntil = 0L
 
+        /** 電源オフ発のとき、POWER は1回だけ送る（トグルなので連打すると消灯・フリーズする）。 */
+        @Volatile
+        private var pendingPowerWake = false
+
         @Volatile
         var incomingUiActive = false
 
@@ -826,7 +830,7 @@ class IncomingCallOverlayService : Service() {
         /** 確認なしでアプリを前面へ。バックグラウンド制限を避けるためサービスから出す。 */
         fun bringToFront(context: Context) {
             val app = context.applicationContext
-            bringFrontUntil = System.currentTimeMillis() + 6_000L
+            bringFrontUntil = System.currentTimeMillis() + 3_000L
             wakeDisplay(app)
             val i = Intent(app, IncomingCallOverlayService::class.java).apply {
                 action = ACTION_BRING_TO_FRONT
@@ -845,13 +849,22 @@ class IncomingCallOverlayService : Service() {
 
         fun restoreMainActivity(context: Context) {
             val app = context.applicationContext
-            moveAmiTaskToFront(app)
+            val standby = isTvStandby(app) || pendingPowerWake
+            applyTurnScreenOn(MainActivity.currentActivity())
+            if (!standby && MainActivity.isInForeground()) {
+                Log.i(TAG, "restoreMainActivity skip: already front")
+                return
+            }
+            // 点灯中は既存タスクを前面にするだけ。
+            // 電源オフ中は Activity を出して TURN_SCREEN_ON を付ける。
+            if (!standby && moveAmiTaskToFront(app)) {
+                return
+            }
             val i = Intent(app, MainActivity::class.java).apply {
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                        Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                 )
             }
             try {
@@ -860,21 +873,10 @@ class IncomingCallOverlayService : Service() {
             } catch (e: Exception) {
                 Log.w(TAG, "restoreMainActivity: ${e.message}")
             }
-            try {
-                val pi = PendingIntent.getActivity(
-                    app,
-                    31,
-                    i,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                pi.send()
-            } catch (e: Exception) {
-                Log.w(TAG, "restoreMainActivity pending: ${e.message}")
-            }
         }
 
         @Suppress("DEPRECATION")
-        private fun moveAmiTaskToFront(context: Context) {
+        private fun moveAmiTaskToFront(context: Context): Boolean {
             try {
                 val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                 val my = context.packageName
@@ -883,7 +885,7 @@ class IncomingCallOverlayService : Service() {
                     if (pkg == my && task.id > 0) {
                         am.moveTaskToFront(task.id, 0)
                         Log.i(TAG, "moved ami task ${task.id} to front")
-                        return
+                        return true
                     }
                 }
                 for (task in am.getRecentTasks(20, ActivityManager.RECENT_WITH_EXCLUDED)) {
@@ -893,13 +895,14 @@ class IncomingCallOverlayService : Service() {
                         if (id > 0) {
                             am.moveTaskToFront(id, 0)
                             Log.i(TAG, "moved ami recent task $id to front")
-                            return
+                            return true
                         }
                     }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "moveAmiTaskToFront: ${e.message}")
             }
+            return false
         }
 
         fun dismissOverlay(context: Context) {
@@ -1324,16 +1327,57 @@ class IncomingCallOverlayService : Service() {
         private val wakeHandler = Handler(Looper.getMainLooper())
 
         /** 画面オフ／待機からパネルを起こす。メーカー不問。点灯したら再試行しない（視聴中のTCL等を邪魔しない）。 */
-        fun wakeDisplay(context: Context) {
+        fun wakeDisplay(context: Context, forcePowerOn: Boolean = false) {
             // 先に起こすと判定が消える。TCL は isInteractive のままスクリーンレス。
             rememberScreenOffAtIncoming(context)
             val app = context.applicationContext
+            if (forcePowerOn || isTvStandby(app)) {
+                pendingPowerWake = true
+            }
             tryWakeOnce(app)
-            if (isScreenOn(app) && !isTvStandby(app)) return
-            for (delay in longArrayOf(250, 700, 1400, 2500)) {
+            if (!isTvStandby(app) && !pendingPowerWake) return
+            for (delay in longArrayOf(400, 1200)) {
                 wakeHandler.postDelayed({
-                    if (!isScreenOn(app) || isTvStandby(app)) tryWakeOnce(app)
+                    if (isTvStandby(app)) tryWakeOnce(app)
                 }, delay)
+            }
+        }
+
+        private fun needsPanelWake(context: Context): Boolean {
+            if (isTvStandby(context)) return true
+            if (pendingPowerWake) return true
+            return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean(KEY_STANDBY, false) && !isScreenOn(context)
+        }
+
+        private fun applyTurnScreenOn(act: Activity?) {
+            if (act == null) return
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    act.setTurnScreenOn(true)
+                    act.setShowWhenLocked(true)
+                }
+                act.window?.addFlags(
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "applyTurnScreenOn: ${e.message}")
+            }
+        }
+
+        private fun sendTclWakeBroadcast(app: Context) {
+            for (action in arrayOf(
+                "tcl.sys.intent.action.SCREEN_ON",
+                "com.tcl.action.wakeup",
+                "com.tcl.action.unsleep",
+                "com.tcl.action.screenon",
+            )) {
+                try {
+                    app.sendBroadcast(Intent(action).addCategory(Intent.CATEGORY_DEFAULT))
+                } catch (e: Exception) {
+                    Log.w(TAG, "tcl wake $action: ${e.message}")
+                }
             }
         }
 
@@ -1365,9 +1409,39 @@ class IncomingCallOverlayService : Service() {
             } catch (e: Exception) {
                 Log.w(TAG, "wakeUp: ${e.message}")
             }
+            applyTurnScreenOn(MainActivity.currentActivity())
             try {
                 Runtime.getRuntime().exec(arrayOf("input", "keyevent", "224"))
             } catch (_: Exception) {
+            }
+            if (!needsPanelWake(context)) return
+            sendTclWakeBroadcast(context)
+            sendOneKey(context, KeyEvent.KEYCODE_WAKEUP)
+            // POWER はトグル。1回だけ。連打すると消灯やフリーズになる。
+            if (pendingPowerWake) {
+                pendingPowerWake = false
+                sendOneKey(context, KeyEvent.KEYCODE_POWER)
+                Log.i(TAG, "wakeDisplay POWER once")
+            }
+        }
+
+        private fun sendOneKey(app: Context, code: Int) {
+            try {
+                val imc = Class.forName("android.hardware.input.InputManager")
+                val im = imc.getMethod("getInstance").invoke(null)
+                val inject = imc.methods.firstOrNull { it.name == "injectInputEvent" } ?: return
+                val now = SystemClock.uptimeMillis()
+                val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0)
+                val up = KeyEvent(now, now + 30, KeyEvent.ACTION_UP, code, 0)
+                if (inject.parameterTypes.size >= 2) {
+                    inject.invoke(im, down, 0)
+                    inject.invoke(im, up, 0)
+                } else {
+                    inject.invoke(im, down)
+                    inject.invoke(im, up)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "sendOneKey $code: ${e.message}")
             }
         }
     }
@@ -1531,9 +1605,11 @@ class IncomingCallOverlayService : Service() {
                 wakeDisplayInternal()
                 restoreMainActivity(this)
                 val h = Handler(Looper.getMainLooper())
-                for (delay in longArrayOf(400, 1200, 2500)) {
+                for (delay in longArrayOf(300, 800)) {
                     h.postDelayed({
-                        if (System.currentTimeMillis() <= bringFrontUntil) {
+                        if (System.currentTimeMillis() <= bringFrontUntil &&
+                            (!MainActivity.isInForeground() || needsPanelWake(this))
+                        ) {
                             restoreMainActivity(this)
                         }
                     }, delay)

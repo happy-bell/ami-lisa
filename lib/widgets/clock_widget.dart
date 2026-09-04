@@ -224,8 +224,8 @@ class _ClockWidgetState extends State<ClockWidget> {
               child: Text(
                 '見守り中',
                 style: TextStyle(
-                  color: Colors.orange,
-                  fontSize: 16,
+                  color: Color(0xFF999999),
+                  fontSize: 28,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'sans-serif',
                   height: 1.0,
