@@ -1,8 +1,8 @@
 versionName=4.6.3
-versionCode=59
+versionCode=90
 package=jp.amiplus.lisa
 device=TV007
-date=2026-09-04 12:46
+date=2026-09-04 14:05
 source=ami3.29.2TV_LiSA
-tag=v4.6.3.59
-note=ami-LiSA通話画面。右上の通話終了ボタンの下に自分の映像を出す。TV007落ち対策(58)を含む。
+tag=
+note=見守り開始でami-LiSAホームへ前面化。見守り中は左上watchingアイコンを出さない。

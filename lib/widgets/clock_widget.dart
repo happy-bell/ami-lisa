@@ -6,9 +6,10 @@ import 'package:amiapp/services/appmanager.dart';
 import 'package:amiapp/services/tv_message_schedule.dart';
 
 class ClockWidget extends StatefulWidget {
-  const ClockWidget({super.key, this.color});
+  const ClockWidget({super.key, this.color, this.watching = false});
 
   final Color? color;
+  final bool watching;
 
   @override
   _ClockWidgetState createState() => _ClockWidgetState();
@@ -86,6 +87,7 @@ class _ClockWidgetState extends State<ClockWidget> {
         screenWidth: MediaQuery.of(context).size.width,
         color: widget.color ??
             TvMessageSchedule.colorAt(0, key: TvMessageSchedule.clockKey),
+        watching: widget.watching,
       );
     }
     var text = _text;
@@ -152,6 +154,7 @@ class _ClockWidgetState extends State<ClockWidget> {
     required double fontSize2,
     required double screenWidth,
     required Color color,
+    required bool watching,
   }) {
     final year = AppManager.dateFormat(_nowTime, 'yyyy年');
     final weekday = AppManager.dateFormat(_nowTime, 'E');
@@ -212,6 +215,24 @@ class _ClockWidgetState extends State<ClockWidget> {
             ),
           ),
         ),
+        if (watching)
+          Positioned(
+            top: centerY + (timeHeight / 2) + (showDate ? 20 : 0),
+            left: 0,
+            width: screenWidth,
+            child: const Center(
+              child: Text(
+                '見守り中',
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'sans-serif',
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

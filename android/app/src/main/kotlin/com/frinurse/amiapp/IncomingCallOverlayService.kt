@@ -60,6 +60,7 @@ class IncomingCallOverlayService : Service() {
         const val ACTION_SHOW_OVERLAY = "jp.amiplus.lisa.action.SHOW_OVERLAY"
         const val ACTION_ACCEPT_INCOMING = "jp.amiplus.lisa.action.ACCEPT_INCOMING"
         const val ACTION_DISMISS_OVERLAY = "jp.amiplus.lisa.action.DISMISS_OVERLAY"
+        const val ACTION_BRING_TO_FRONT = "jp.amiplus.lisa.action.BRING_TO_FRONT"
 
         const val EXTRA_CALLER_ID = "caller_id"
         const val EXTRA_CALLER_NAME = "caller_name"
@@ -90,6 +91,10 @@ class IncomingCallOverlayService : Service() {
 
         @Volatile
         private var serviceAlive = false
+
+        /** 見守り前面化の再試行期限。終了後の直前復帰とぶつからないようにする。 */
+        @Volatile
+        private var bringFrontUntil = 0L
 
         @Volatile
         var incomingUiActive = false
@@ -520,6 +525,7 @@ class IncomingCallOverlayService : Service() {
 
         /** 通話終了後、直前の視聴アプリへ戻す。Netflix/YouTube は再起動せず既存タスクへ。 */
         fun returnToPreviousApp(activity: Activity): Boolean {
+            bringFrontUntil = 0L
             val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val pkg = prefs.getString(KEY_PREV_PACKAGE, "") ?: ""
             val taskId = prefs.getInt(KEY_PREV_TASK_ID, -1)
@@ -817,14 +823,30 @@ class IncomingCallOverlayService : Service() {
             }
         }
 
-        /** 確認なしでアプリを前面へ（通話開始は Flutter 側） */
+        /** 確認なしでアプリを前面へ。バックグラウンド制限を避けるためサービスから出す。 */
         fun bringToFront(context: Context) {
-            wakeDisplay(context)
-            restoreMainActivity(context)
+            val app = context.applicationContext
+            bringFrontUntil = System.currentTimeMillis() + 6_000L
+            wakeDisplay(app)
+            val i = Intent(app, IncomingCallOverlayService::class.java).apply {
+                action = ACTION_BRING_TO_FRONT
+            }
+            try {
+                if (serviceAlive || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                    app.startService(i)
+                } else {
+                    app.startForegroundService(i)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "bringToFront start: ${e.message}")
+                restoreMainActivity(app)
+            }
         }
 
         fun restoreMainActivity(context: Context) {
-            val i = Intent(context, MainActivity::class.java).apply {
+            val app = context.applicationContext
+            moveAmiTaskToFront(app)
+            val i = Intent(app, MainActivity::class.java).apply {
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or
@@ -832,7 +854,52 @@ class IncomingCallOverlayService : Service() {
                         Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
                 )
             }
-            context.startActivity(i)
+            try {
+                app.startActivity(i)
+                Log.i(TAG, "restoreMainActivity started")
+            } catch (e: Exception) {
+                Log.w(TAG, "restoreMainActivity: ${e.message}")
+            }
+            try {
+                val pi = PendingIntent.getActivity(
+                    app,
+                    31,
+                    i,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                pi.send()
+            } catch (e: Exception) {
+                Log.w(TAG, "restoreMainActivity pending: ${e.message}")
+            }
+        }
+
+        @Suppress("DEPRECATION")
+        private fun moveAmiTaskToFront(context: Context) {
+            try {
+                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                val my = context.packageName
+                for (task in am.getRunningTasks(20)) {
+                    val pkg = task.topActivity?.packageName ?: task.baseActivity?.packageName
+                    if (pkg == my && task.id > 0) {
+                        am.moveTaskToFront(task.id, 0)
+                        Log.i(TAG, "moved ami task ${task.id} to front")
+                        return
+                    }
+                }
+                for (task in am.getRecentTasks(20, ActivityManager.RECENT_WITH_EXCLUDED)) {
+                    val cn = task.topActivity ?: task.baseIntent?.component
+                    if (cn?.packageName == my) {
+                        val id = recentTaskId(task)
+                        if (id > 0) {
+                            am.moveTaskToFront(id, 0)
+                            Log.i(TAG, "moved ami recent task $id to front")
+                            return
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "moveAmiTaskToFront: ${e.message}")
+            }
         }
 
         fun dismissOverlay(context: Context) {
@@ -1007,6 +1074,7 @@ class IncomingCallOverlayService : Service() {
          * TV-TV(Android 11) と同じ lockNow / goToSleep で画面を落とす。
          */
         fun lockScreenForStandby(context: Context): Boolean {
+            bringFrontUntil = 0L
             if (!wasScreenOffAtCall(context)) return false
             IncomingCallActivity.finishIfOpen()
             releaseIncomingWakeLocks()
@@ -1453,6 +1521,24 @@ class IncomingCallOverlayService : Service() {
                 launchAppAccept(id, name)
             }
             ACTION_DISMISS_OVERLAY -> dismissOverlayInternal()
+            ACTION_BRING_TO_FRONT -> {
+                if (!waiting) {
+                    waiting = true
+                    prefs().edit().putBoolean(KEY_WAITING, true).apply()
+                }
+                ensureForeground("bring to front")
+                ensureStandbyGuard()
+                wakeDisplayInternal()
+                restoreMainActivity(this)
+                val h = Handler(Looper.getMainLooper())
+                for (delay in longArrayOf(400, 1200, 2500)) {
+                    h.postDelayed({
+                        if (System.currentTimeMillis() <= bringFrontUntil) {
+                            restoreMainActivity(this)
+                        }
+                    }, delay)
+                }
+            }
             else -> {
                 // サービス再起動時
                 if (prefs().getBoolean(KEY_WAITING, false)) {

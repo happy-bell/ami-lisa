@@ -506,6 +506,17 @@ class TvUtil {
     }
   }
 
+  /// 見守り終了後。電源オフ発なら電源オフへ、それ以外は直前の視聴アプリへ。
+  static Future<void> restoreAfterSafety({required bool toPowerOff}) async {
+    if (!_isTelevision) return;
+    if (toPowerOff) {
+      await setScreenOffAtCall(true);
+      await lockScreenForStandby();
+      return;
+    }
+    await returnToPreviousApp();
+  }
+
   /// 視聴中アプリ（Netflix / 地デジ等）へ戻す。記録が無ければ false。
   static Future<bool> returnToPreviousApp() async {
     if (!_isTelevision) return false;

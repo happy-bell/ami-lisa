@@ -108,6 +108,7 @@ class _RoomPageState extends State<RoomPage>
   double _imageOpacity = 0.0;
 
   final _safetyCheckIds = [];
+  bool _safetyRestoreStandby = false;
   bool _watching = false;
   bool _receivingCall = false;
   bool _incomingConnecting = false;
@@ -1387,7 +1388,7 @@ class _RoomPageState extends State<RoomPage>
     if (_isSleep && (AppManager.isPiTvLayout || !TvUtil.isTelevision)) {
       _setBrightness(0.8);
     }
-    _safetyCheckEnd();
+    _safetyCheckEnd(restoreTv: false);
     if (AppManager.isPiTvLayout) {
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
@@ -1449,25 +1450,52 @@ class _RoomPageState extends State<RoomPage>
   }
 
   void _receiveSafetyCheck(String udid) {
-    // ami-LiSA はこのフェーズでは従来どおり（安眠モードONかつ時計画面）。
-    // ami-EX は同じ Google TV アプリ。ホームレイアウトが違うだけなので、
-    // ホーム／時計のどちらからでもスマホの見守りを受ける。
-    if (!AppManager.isPiTvLayout) {
-      if (AppManager.appsettings['SLEEP_MODE'] != '1') {
-        socketservice.io.emit("safety_check_error", [udid]);
-        return;
-      }
-      if (!_isSleep) {
-        socketservice.io.emit("safety_check_error", [udid]);
-        return;
-      }
-    }
-
     if (_safetyCheckIds.isNotEmpty) {
       socketservice.io.emit("safety_check_error", [udid]);
       return;
     }
+    // 非TVは従来どおり（安眠モードONかつ時計画面）。
+    // TV（ami-LiSA / ami-EX）は電源オフ・地デジ・Netflix/YouTube 中でも受ける。
+    if (!TvUtil.isTelevision && !AppManager.isPiTvLayout) {
+      if (AppManager.appsettings['SLEEP_MODE'] != '1' || !_isSleep) {
+        socketservice.io.emit("safety_check_error", [udid]);
+        return;
+      }
+    }
     _safetyCheckIds.add(udid);
+    unawaited(_beginSafetyCheck(udid));
+  }
+
+  Future<void> _beginSafetyCheck(String udid) async {
+    if (TvUtil.isTelevision) {
+      var screenOn = true;
+      var standby = false;
+      try {
+        screenOn = await TvUtil.isScreenOn();
+      } catch (_) {}
+      try {
+        standby = await TvUtil.isTvStandby();
+      } catch (_) {}
+      _safetyRestoreStandby = !screenOn || standby;
+      if (!_safetyRestoreStandby) {
+        try {
+          await TvUtil.captureForegroundApp();
+        } catch (_) {}
+      }
+      try {
+        await TvUtil.wakeScreen();
+        await TvUtil.bringToFront();
+        for (final delay in const [300, 800, 1600, 2800]) {
+          await Future<void>.delayed(Duration(milliseconds: delay));
+          if (!_safetyCheckIds.contains(udid)) return;
+          await TvUtil.bringToFront();
+        }
+      } catch (e) {
+        debugPrint('safety check wake: $e');
+      }
+      if (mounted) setState(() {});
+    }
+    if (!_safetyCheckIds.contains(udid)) return;
     peer.invite(udid, 'sendonly', true);
   }
 
@@ -1502,26 +1530,35 @@ class _RoomPageState extends State<RoomPage>
     _safetyCheckEnd();
   }
 
-  void _safetyCheckEnd() {
-    if (_safetyCheckIds.isNotEmpty) {
+  void _safetyCheckEnd({bool restoreTv = true}) {
+    final had = _safetyCheckIds.isNotEmpty;
+    final restoreStandby = _safetyRestoreStandby;
+    if (had) {
       socketservice.io.emit("safety_check_stop", []);
     }
     _safetyCheckIds.clear();
+    _safetyRestoreStandby = false;
     _disposePeer();
     if (AppManager.isPiTvLayout && _watching) {
-      if (mounted) {
-        setState(() {
-          _watching = false;
-        });
-      } else {
-        _watching = false;
-      }
+      _watching = false;
     }
+    if (mounted) setState(() {});
     _initPeer();
+    if (had && restoreTv && TvUtil.isTelevision) {
+      unawaited(_restoreAfterSafety(restoreStandby));
+    }
+  }
+
+  Future<void> _restoreAfterSafety(bool toPowerOff) async {
+    try {
+      await TvUtil.restoreAfterSafety(toPowerOff: toPowerOff);
+    } catch (e) {
+      debugPrint('restore after safety: $e');
+    }
   }
 
   Future<void> _onCallButton() async {
-    _safetyCheckEnd();
+    _safetyCheckEnd(restoreTv: false);
     _tap();
   }
 
@@ -1619,9 +1656,13 @@ class _RoomPageState extends State<RoomPage>
                     child: IgnorePointer(
                       child: ColoredBox(
                         color: Colors.black,
-                        child: clockSlot == null
+                        child: (clockSlot == null &&
+                                _safetyCheckIds.isEmpty)
                             ? const SizedBox.shrink()
-                            : ClockWidget(color: clockSlot.color),
+                            : ClockWidget(
+                                color: clockSlot?.color,
+                                watching: _safetyCheckIds.isNotEmpty,
+                              ),
                       ),
                     ),
                   )
@@ -1744,7 +1785,9 @@ class _RoomPageState extends State<RoomPage>
                     width: statusImageSize,
                     child: Image.asset(_statusImage),
                   ),
-                if (_watching && !AppManager.isPiTvLayout)
+                if (_watching &&
+                    !AppManager.isPiTvLayout &&
+                    !TvUtil.isTelevision)
                   Positioned(
                     top: 8,
                     left: 8,
