@@ -446,6 +446,19 @@ class MainActivity : FlutterActivity() {
         logPersistent("onCreate tv=${isTelevisionDevice()}")
         if (isTelevisionDevice()) {
             IncomingCallOverlayService.startWaiting(this)
+            LisaWatchdogService.start(this)
+        }
+        // 番犬による再起動なら、視聴中のアプリを邪魔しないよう少し待って背面へ。
+        if (intent?.getBooleanExtra(
+                IncomingCallOverlayService.EXTRA_WATCHDOG_RESTART, false
+            ) == true
+        ) {
+            android.os.Handler(mainLooper).postDelayed({
+                try {
+                    moveTaskToBack(true)
+                } catch (_: Exception) {
+                }
+            }, 1500)
         }
         if (intent?.getStringExtra("incoming_action") != null) {
             setTurnScreenOn(true)
@@ -506,6 +519,7 @@ class MainActivity : FlutterActivity() {
             releaseScreenKeepOn()
             markRestoreIfScreenOff()
             IncomingCallOverlayService.startWaiting(this)
+            LisaWatchdogService.start(this)
         }
         super.onPause()
     }

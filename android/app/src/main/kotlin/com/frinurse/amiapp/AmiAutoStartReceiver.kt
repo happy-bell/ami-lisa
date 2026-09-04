@@ -42,6 +42,13 @@ class AmiAutoStartReceiver : BroadcastReceiver() {
             Log.e(TAG, "startWaiting failed", e)
         }
 
+        // 本体プロセスの見張り番も起こす（LMK対策）。
+        try {
+            LisaWatchdogService.start(app)
+        } catch (e: Exception) {
+            Log.e(TAG, "watchdog start failed", e)
+        }
+
         // アプリ更新直後はアプリ本体も開いてソケット接続を確実にする。
         // 端末起動直後は他アプリ(地デジ等)の起動を妨げないよう、更新時のみ。
         if (action == Intent.ACTION_MY_PACKAGE_REPLACED) {

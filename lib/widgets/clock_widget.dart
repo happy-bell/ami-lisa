@@ -158,8 +158,10 @@ class _ClockWidgetState extends State<ClockWidget> {
     final year = AppManager.dateFormat(_nowTime, 'yyyy年');
     final weekday = AppManager.dateFormat(_nowTime, 'E');
     final date = '${_nowTime.month}月${_nowTime.day}日（$weekday）';
-    final showDate =
-        !AppManager.isPiTvLayout || TvMessageSchedule.showClockDate;
+    // 見守り中は ami-EX でも ami-LiSA と同じ表示(日付あり)にする。
+    final showDate = !AppManager.isPiTvLayout ||
+        TvMessageSchedule.showClockDate ||
+        watching;
     return Stack(
       children: [
         if (showDate)

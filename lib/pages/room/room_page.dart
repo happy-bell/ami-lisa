@@ -1476,10 +1476,13 @@ class _RoomPageState extends State<RoomPage>
       var screenOn = true;
       var standby = false;
       try {
-        screenOn = await TvUtil.isScreenOn();
-      } catch (_) {}
-      try {
-        standby = await TvUtil.isTvStandby();
+        // 2つの状態確認を並列にして接続開始を早める。
+        final states = await Future.wait<bool>([
+          TvUtil.isScreenOn().catchError((_) => true),
+          TvUtil.isTvStandby().catchError((_) => false),
+        ]);
+        screenOn = states[0];
+        standby = states[1];
       } catch (_) {}
       _safetyRestoreStandby = !screenOn || standby;
       if (!_safetyRestoreStandby) {
@@ -1496,6 +1499,9 @@ class _RoomPageState extends State<RoomPage>
       try {
         await TvUtil.wakeScreen(forcePowerOn: _safetyRestoreStandby);
         await TvUtil.bringToFront();
+        // カメラのウォームアップ(開閉テスト)を画面点灯待ちと並行で先に始め、
+        // invite 時の createStream での待ちを無くして映像取得を早める。
+        unawaited(Peer.warmupTvCamera());
         if (_safetyRestoreStandby) {
           await Future<void>.delayed(const Duration(milliseconds: 350));
         }
@@ -2116,6 +2122,22 @@ class _RoomPageState extends State<RoomPage>
                 if (_piHealthFullscreen)
                   Positioned.fill(
                     child: _healthOverlay(),
+                  ),
+                // 見守り中は ami-EX でも ami-LiSA と同じ全画面時計を最前面に出す。
+                // メッセージ・サイドバー・天気などはこの黒背景で隠れる。
+                if (AppManager.isPiTvLayout &&
+                    TvUtil.isTelevision &&
+                    _safetyCheckIds.isNotEmpty)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ColoredBox(
+                        color: Colors.black,
+                        child: ClockWidget(
+                          color: clockSlot?.color,
+                          watching: true,
+                        ),
+                      ),
+                    ),
                   ),
               ],
             );

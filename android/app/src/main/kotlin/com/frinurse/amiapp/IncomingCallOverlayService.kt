@@ -86,6 +86,8 @@ class IncomingCallOverlayService : Service() {
         const val KEY_PREV_TASK_ID = "prev_watch_task_id"
         const val KEY_PREV_CLASS = "prev_watch_class"
         const val KEY_INTERRUPTED = "prev_watch_interrupted"
+        /** 番犬(:watch)による再起動を MainActivity に知らせる。 */
+        const val EXTRA_WATCHDOG_RESTART = "watchdog_restart"
         const val KEY_AMI_WAS_TOP = "ami_was_top_at_screen_off"
         // 着信到達時に画面オフ(TV電源オフ)だったか。通話終了後に電源オフへ戻す判定に使う。
         /** 着信が届いた瞬間に画面オフ(TV電源オフ)だったか。wake前に立てる。 */
@@ -889,6 +891,28 @@ class IncomingCallOverlayService : Service() {
             } catch (e: Exception) {
                 Log.w(TAG, "bringToFront start: ${e.message}")
                 restoreMainActivity(app)
+            }
+        }
+
+        /**
+         * 番犬(:watch)からの再起動。LMK で本体が死んだあとに MainActivity を
+         * 立て直す。視聴の邪魔をしないよう、MainActivity 側で
+         * EXTRA_WATCHDOG_RESTART を見て背面へ回る。
+         */
+        fun restoreMainAfterCrash(context: Context) {
+            val app = context.applicationContext
+            try {
+                val intent = Intent(app, MainActivity::class.java).apply {
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    )
+                    putExtra(EXTRA_WATCHDOG_RESTART, true)
+                }
+                app.startActivity(intent)
+                Log.i(TAG, "restoreMainAfterCrash startActivity")
+            } catch (e: Exception) {
+                Log.w(TAG, "restoreMainAfterCrash: ${e.message}")
             }
         }
 
