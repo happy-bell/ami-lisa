@@ -28,6 +28,7 @@ import 'package:amiapp/services/and_vital_service.dart';
 import 'package:amiapp/services/ble_exclusive.dart';
 import 'package:amiapp/services/checkme_pro_service.dart';
 import 'package:amiapp/services/checkme_ring_service.dart';
+import 'package:amiapp/services/scbtn_call_button_service.dart';
 import 'package:amiapp/services/socket_io_service.dart';
 import 'package:real_volume/real_volume.dart';
 
@@ -149,6 +150,14 @@ class _RoomPageState extends State<RoomPage>
     CheckmeRingService.instance.start();
     CheckmeProService.instance.addListener(_onRingChanged);
     AndVitalService.instance.addListener(_onRingChanged);
+    ScbtnCallButtonService.instance.addListener(_onScbtnPressed);
+    ScbtnCallButtonService.instance.start();
+  }
+
+  void _onScbtnPressed() {
+    if (!ScbtnCallButtonService.instance.takePress()) return;
+    if (!mounted) return;
+    _onCallButton();
   }
 
   void _onRingChanged() {
@@ -438,6 +447,7 @@ class _RoomPageState extends State<RoomPage>
     CheckmeRingService.instance.removeListener(_onRingChanged);
     CheckmeProService.instance.removeListener(_onRingChanged);
     AndVitalService.instance.removeListener(_onRingChanged);
+    ScbtnCallButtonService.instance.removeListener(_onScbtnPressed);
     _cameraCheckTimer?.cancel();
     _incomingOverlayTimer?.cancel();
     _healthTimer?.cancel();

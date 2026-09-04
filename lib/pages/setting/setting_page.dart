@@ -18,9 +18,11 @@ import 'package:amiapp/pages/staff/staff_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
 import 'package:amiapp/services/appmanager.dart';
 import 'package:amiapp/services/address_sync.dart';
+import 'package:amiapp/services/scbtn_call_button_service.dart';
 
 import '../../helpers/widget_util.dart';
 import '../../widgets/and_vital_pair_dialog.dart';
+import 'ble_call_button_page.dart';
 import '../../widgets/tv_focusable.dart';
 import '../elan/setting/elan_setting_info_video_page.dart';
 import '../live/live_page.dart';
@@ -328,6 +330,17 @@ class _SettingPageState extends State<SettingPage> {
       switchListContainer(
           TvUtil.isTelevision ? '自動応答（視聴中も確認なし）' : '自動応答',
           'AUTO_RECEIVE'),
+      if (TvUtil.isTelevision)
+        nextListContainer(
+          'コールボタン',
+          ScbtnCallButtonService.instance.registeredId,
+          () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BleCallButtonPage()),
+            );
+            setState(() => _savedSwitch = !_savedSwitch);
+          },
+        ),
       if (dispType == '1')
         nextListContainer('通話開始時間', AppManager.callDelayText(), () async {
           var result = await Navigator.of(context).push(MaterialPageRoute(

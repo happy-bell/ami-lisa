@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/helpers/tv_util.dart';
 import 'package:amiapp/notifiers/address_notifier.dart';
+import 'package:amiapp/pages/setting/ble_call_button_page.dart';
 import 'package:amiapp/pages/setting/setting_select_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
 import 'package:amiapp/services/appmanager.dart';
@@ -317,6 +318,18 @@ class _TvPiSettingPageState extends State<TvPiSettingPage> {
                       'ホーム画面  ${AppManager.tvLayoutLabel()}',
                       _weatherBtnColor,
                       _changeLayout,
+                      width: menuW,
+                    ),
+                    _btn(
+                      'コールボタン',
+                      _weatherBtnColor,
+                      () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const BleCallButtonPage(),
+                          ),
+                        );
+                      },
                       width: menuW,
                     ),
                     if (_message.isNotEmpty)

@@ -1,9 +1,9 @@
 versionName=4.6.3
-versionCode=105
+versionCode=106
 package=jp.amiplus.lisa
-device=TV005/TV007
-date=2026-09-04 22:00
+device=TV007
+date=2026-09-04 22:44
 source=ami3.29.2TV_LiSA
-branch=work/v4.6.3.94
-tag=(未保存。保存版は v4.6.3.102)
-note=見守り直後のスプラッシュは1回だけ。終了後は消灯まで黒画面を残し、ami-EXが一瞬見えないようにする。
+branch=work/ble-scbtn2
+tag=(未保存)
+note=RS-SCBTN2 BLEコールボタン。管理画面登録のMACをlistで受け、広告の押下で発信。
