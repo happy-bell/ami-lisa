@@ -1,8 +1,9 @@
 versionName=4.6.3
-versionCode=102
+versionCode=105
 package=jp.amiplus.lisa
 device=TV005/TV007
-date=2026-09-04 18:35
+date=2026-09-04 22:00
 source=ami3.29.2TV_LiSA
-tag=v4.6.3.102
-note=1) ami-EXでも見守り中はami-LiSAと同じ全画面時計を表示（メッセージ等は非表示）。2) カメラウォームアップを並行実行し映像取得を短縮。3) 番犬サービス(LisaWatchdogService)を復元しLMKで落ちても自動再起動。4) 版はコミット+タグで管理（v4.6.3.101 も保全済み）。
+branch=work/v4.6.3.94
+tag=(未保存。保存版は v4.6.3.102)
+note=見守り直後のスプラッシュは1回だけ。終了後は消灯まで黒画面を残し、ami-EXが一瞬見えないようにする。

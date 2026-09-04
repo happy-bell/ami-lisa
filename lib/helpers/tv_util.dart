@@ -443,11 +443,12 @@ class TvUtil {
   static DateTime? _safetyBringUntil;
   static bool _safetySplashUsed = false;
 
-  /// 見守り前面化。スプラッシュは最初の1回だけ出す。
+  /// 見守り前面化。復帰ロゴ（2回目のスプラッシュ）は出さない。
   static void beginSafetyBringToFront() {
     if (!_isTelevision) return;
-    _safetyBringUntil = DateTime.now().add(const Duration(seconds: 10));
-    _safetySplashUsed = false;
+    _safetyBringUntil = DateTime.now().add(const Duration(seconds: 12));
+    _safetySplashUsed = true;
+    safetyWatchActive = true;
   }
 
   static void endSafetyBringToFront() {
@@ -455,7 +456,7 @@ class TvUtil {
     _safetySplashUsed = false;
   }
 
-  /// 前面復帰ロゴを出してよいか。見守り再試行中は2回目以降を止める。
+  /// 前面復帰ロゴを出してよいか。見守り再試行中は出さない（2回目を消す）。
   static bool takeResumeSplash() {
     final until = _safetyBringUntil;
     if (until == null || DateTime.now().isAfter(until)) {
@@ -463,9 +464,7 @@ class TvUtil {
       _safetySplashUsed = false;
       return true;
     }
-    if (_safetySplashUsed) return false;
-    _safetySplashUsed = true;
-    return true;
+    return false;
   }
 
   /// LiSA が前面（時計/ホーム表示中）かどうか。
@@ -509,10 +508,14 @@ class TvUtil {
     }
   }
 
+  /// 見守り中かどうか。見守り中は前面復帰ロゴ（2回目のスプラッシュ）を出さない。
+  static bool safetyWatchActive = false;
+
   /// 見守り中の時計＋「見守り中」を他アプリの上に出す。
   /// [color] は設定／時計の明るさ（ARGB）。
   static Future<void> showSafetyWatchUi({int? color}) async {
     if (!_isTelevision) return;
+    safetyWatchActive = true;
     try {
       await _channel.invokeMethod('showSafetyWatchUi', {
         'color': color ?? TvMessageSchedule.currentClockColor().value,
@@ -524,6 +527,7 @@ class TvUtil {
 
   static Future<void> hideSafetyWatchUi() async {
     if (!_isTelevision) return;
+    safetyWatchActive = false;
     try {
       await _channel.invokeMethod('hideSafetyWatchUi');
     } catch (e) {

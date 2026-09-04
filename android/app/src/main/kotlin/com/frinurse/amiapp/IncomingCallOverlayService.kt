@@ -105,9 +105,16 @@ class IncomingCallOverlayService : Service() {
         @Volatile
         private var serviceAlive = false
 
+        @Volatile
+        private var running: IncomingCallOverlayService? = null
+
         /** 見守り前面化の再試行期限。終了後の直前復帰とぶつからないようにする。 */
         @Volatile
         private var bringFrontUntil = 0L
+
+        /** 見守り前面化で startActivity したか。2回目のスプラッシュを出さない。 */
+        @Volatile
+        private var safetyActivityStarted = false
 
         /** 電源オフ発のとき、POWER は1回だけ送る（トグルなので連打すると消灯・フリーズする）。 */
         @Volatile
@@ -547,6 +554,7 @@ class IncomingCallOverlayService : Service() {
         /** 通話終了後、直前の視聴アプリへ戻す。Netflix/YouTube は再起動せず既存タスクへ。 */
         fun returnToPreviousApp(activity: Activity): Boolean {
             bringFrontUntil = 0L
+            safetyActivityStarted = false
             val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val pkg = prefs.getString(KEY_PREV_PACKAGE, "") ?: ""
             val taskId = prefs.getInt(KEY_PREV_TASK_ID, -1)
@@ -877,7 +885,11 @@ class IncomingCallOverlayService : Service() {
 
         fun bringToFront(context: Context) {
             val app = context.applicationContext
-            bringFrontUntil = System.currentTimeMillis() + 8_000L
+            val now = System.currentTimeMillis()
+            if (now > bringFrontUntil) {
+                safetyActivityStarted = false
+            }
+            bringFrontUntil = now + 8_000L
             wakeDisplay(app)
             val i = Intent(app, IncomingCallOverlayService::class.java).apply {
                 action = ACTION_BRING_TO_FRONT
@@ -931,6 +943,11 @@ class IncomingCallOverlayService : Service() {
                 return
             }
             moveAmiTaskToFront(app)
+            // 見守り再試行では startActivity を1回だけ。2回目がスプラッシュになる。
+            if (forcing && safetyActivityStarted) {
+                Log.i(TAG, "restoreMainActivity skip startActivity: already started")
+                return
+            }
             val i = Intent(app, MainActivity::class.java).apply {
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -940,6 +957,7 @@ class IncomingCallOverlayService : Service() {
             }
             try {
                 app.startActivity(i)
+                if (forcing) safetyActivityStarted = true
                 Log.i(TAG, "restoreMainActivity started")
             } catch (e: Exception) {
                 Log.w(TAG, "restoreMainActivity: ${e.message}")
@@ -1149,6 +1167,7 @@ class IncomingCallOverlayService : Service() {
          */
         fun lockScreenForStandby(context: Context): Boolean {
             bringFrontUntil = 0L
+            safetyActivityStarted = false
             pendingPowerWake = false
             powerKeySent = false
             if (!wasScreenOffAtCall(context)) return false
@@ -1163,6 +1182,8 @@ class IncomingCallOverlayService : Service() {
                 }
             } catch (_: Exception) {
             }
+            // 時計オーバーレイは残して ami-EX を隠す。KEEP_SCREEN_ON だけ外す。
+            running?.releaseSafetyWatchKeepOn()
             // Iris はキー注入がグローバル電源に届かない。lockNow が本丸。
             val locked = tryLockNow(context)
             if (locked) {
@@ -1197,6 +1218,8 @@ class IncomingCallOverlayService : Service() {
                         return@postDelayed
                     }
                     // 消灯できたときだけ背面へ。点灯中の moveTaskToBack はホームが出る。
+                    // オーバーレイは消灯後に外す。先に外すと ami-EX が一瞬見える。
+                    running?.hideSafetyWatchInternal()
                     try {
                         MainActivity.currentActivity()?.moveTaskToBack(true)
                     } catch (_: Exception) {
@@ -1602,6 +1625,7 @@ class IncomingCallOverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         serviceAlive = true
+        running = this
         ensureChannel()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         ensurePlaybackMonitor()
@@ -1731,6 +1755,7 @@ class IncomingCallOverlayService : Service() {
         unregisterPlaybackMonitor()
         foregroundStarted = false
         serviceAlive = false
+        running = null
         super.onDestroy()
         if (keep) {
             Log.i(TAG, "onDestroy: restart waiting")
@@ -1925,6 +1950,22 @@ class IncomingCallOverlayService : Service() {
             windowManager?.removeView(v)
             Log.i(TAG, "safety watch ui removed")
         } catch (_: Exception) {
+        }
+    }
+
+    /** 消灯できるように KEEP_SCREEN_ON だけ外し、黒画面は残して ami-EX を隠す。 */
+    private fun releaseSafetyWatchKeepOn() {
+        val v = safetyWatchView ?: return
+        try {
+            val wm = windowManager ?: return
+            val lp = v.layoutParams as? WindowManager.LayoutParams ?: return
+            lp.flags = (lp.flags and
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON.inv() and
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON.inv())
+            wm.updateViewLayout(v, lp)
+            Log.i(TAG, "safety watch keep-on released")
+        } catch (e: Exception) {
+            Log.w(TAG, "releaseSafetyWatchKeepOn: ${e.message}")
         }
     }
 

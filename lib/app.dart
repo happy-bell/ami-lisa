@@ -123,6 +123,10 @@ class AppState extends State<AppPage> with WidgetsBindingObserver {
   /// 前面に戻ったときのロゴ。最後に出した時刻。
   DateTime? _lastOverlayAt;
 
+  /// 起動ロゴ（LisaSplashPage）が終わった時刻。
+  /// この直後に前面復帰ロゴを重ねると「スプラッシュが2回出る」ため抑止に使う。
+  DateTime? _splashDoneAt;
+
   /// 前面に戻ったらロゴを2秒だけ重ねる。
   ///
   /// 画面は差し替えないので、裏では接続も着信待ちもそのまま進む。
@@ -131,6 +135,14 @@ class AppState extends State<AppPage> with WidgetsBindingObserver {
     if (!TvUtil.isTelevision) return;
     if (!_splashDone) return;                     // 起動時のロゴが先
     if (AppManager.status != AppStatus.None) return;   // 通話中は出さない
+    // 見守り中は時計だけを見せる。2回目のスプラッシュ（前面復帰ロゴ）は出さない。
+    if (TvUtil.safetyWatchActive) return;
+    // 起動ロゴを見せた直後は、前面化の再試行で2回目が重なるので出さない。
+    final doneAt = _splashDoneAt;
+    if (doneAt != null &&
+        DateTime.now().difference(doneAt) < const Duration(seconds: 10)) {
+      return;
+    }
     if (!TvUtil.takeResumeSplash()) return;
 
     // 画面が一瞬切り替わっただけで何度も流れないようにする。
@@ -440,6 +452,7 @@ class AppState extends State<AppPage> with WidgetsBindingObserver {
       return LisaSplashPage(
         onFinished: () {
           if (!mounted) return;
+          _splashDoneAt = DateTime.now();
           setState(() => _splashDone = true);
         },
       );

@@ -109,6 +109,8 @@ class _RoomPageState extends State<RoomPage>
 
   final _safetyCheckIds = [];
   bool _safetyRestoreStandby = false;
+  /// 電源オフへ戻すまで ami-EX を隠す黒画面。
+  bool _safetyBlankCover = false;
   bool _watching = false;
   bool _receivingCall = false;
   bool _incomingConnecting = false;
@@ -1566,8 +1568,12 @@ class _RoomPageState extends State<RoomPage>
     _safetyCheckIds.clear();
     _safetyRestoreStandby = false;
     TvUtil.endSafetyBringToFront();
-    if (TvUtil.isTelevision) {
+    // 電源オフへ戻すときはオーバーレイを残し、ami-EX が一瞬出ないようにする。
+    if (TvUtil.isTelevision && !(restoreTv && restoreStandby)) {
       unawaited(TvUtil.hideSafetyWatchUi());
+    }
+    if (TvUtil.isTelevision && restoreTv && restoreStandby) {
+      _safetyBlankCover = true;
     }
     _disposePeer();
     if (AppManager.isPiTvLayout && _watching) {
@@ -1581,15 +1587,27 @@ class _RoomPageState extends State<RoomPage>
   }
 
   Future<void> _restoreAfterSafety(bool toPowerOff) async {
-    // 時計オーバーレイ(KEEP_SCREEN_ON付き)を先に消す。
-    // 残したまま電源オフへ戻すと消灯を妨げることがある。
-    try {
-      await TvUtil.hideSafetyWatchUi();
-    } catch (_) {}
+    if (!toPowerOff) {
+      try {
+        await TvUtil.hideSafetyWatchUi();
+      } catch (_) {}
+    }
     try {
       await TvUtil.restoreAfterSafety(toPowerOff: toPowerOff);
     } catch (e) {
       debugPrint('restore after safety: $e');
+    }
+    if (toPowerOff) {
+      // 消灯後にオーバーレイと黒カバーを外す。先に外すと ami-EX が見える。
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      try {
+        await TvUtil.hideSafetyWatchUi();
+      } catch (_) {}
+    }
+    if (mounted) {
+      setState(() => _safetyBlankCover = false);
+    } else {
+      _safetyBlankCover = false;
     }
   }
 
@@ -2127,15 +2145,17 @@ class _RoomPageState extends State<RoomPage>
                 // メッセージ・サイドバー・天気などはこの黒背景で隠れる。
                 if (AppManager.isPiTvLayout &&
                     TvUtil.isTelevision &&
-                    _safetyCheckIds.isNotEmpty)
+                    (_safetyCheckIds.isNotEmpty || _safetyBlankCover))
                   Positioned.fill(
                     child: IgnorePointer(
                       child: ColoredBox(
                         color: Colors.black,
-                        child: ClockWidget(
-                          color: clockSlot?.color,
-                          watching: true,
-                        ),
+                        child: _safetyCheckIds.isNotEmpty
+                            ? ClockWidget(
+                                color: clockSlot?.color,
+                                watching: true,
+                              )
+                            : const SizedBox.expand(),
                       ),
                     ),
                   ),
