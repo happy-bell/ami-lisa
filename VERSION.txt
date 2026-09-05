@@ -1,9 +1,9 @@
 versionName=4.6.3
-versionCode=105
+versionCode=128
 package=jp.amiplus.lisa
-device=TV005/TV007
-date=2026-09-04 22:00
+device=TV007
+date=2026-09-05 12:17
 source=ami3.29.2TV_LiSA
 branch=work/v4.6.3.94
-tag=(未保存。保存版は v4.6.3.102)
-note=見守り直後のスプラッシュは1回だけ。終了後は消灯まで黒画面を残し、ami-EXが一瞬見えないようにする。
+tag=(未保存。中身は c5f5641 / 4.6.3(105))
+note=4.6.3(105) に戻した。TVが127のため投入用に128。
