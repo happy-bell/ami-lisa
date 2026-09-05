@@ -60,9 +60,9 @@ class Peer {
   final Map<String, RTCPeerConnection> _peerConnections = {};
   static Future<void>? _tvWarmup;
 
-  /// 起動直後の USB カメラ初回オープン失敗を避ける。
+  /// 通話・見守り開始時だけ呼ぶ。アプリ起動では呼ばない（ランプが点く）。
   /// TCL では映像を開きっぱなしにすると WebRTC ネイティブが落ちる／ANR になるため、
-  /// 開いてすぐ閉じ、通話時に開き直す。
+  /// 開いてすぐ閉じ、本通話で開き直す。
   static Future<void> warmupTvCamera() {
     _tvWarmup ??= _warmupTvCameraOnce();
     return _tvWarmup!;

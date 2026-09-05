@@ -218,7 +218,7 @@ class _RoomPageState extends State<RoomPage>
       _startHealthTimerIfPi();
       _syncCheckmeProForLayout();
       if (TvUtil.isTelevision) {
-        Peer.warmupTvCamera();
+        // 起動時にカメラを開くとランプが点灯する。通話・見守り開始まで開かない。
         unawaited(TvVitalSerial.instance.bindOnLogin());
         _startCameraCheck();
       }

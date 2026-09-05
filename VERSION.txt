@@ -1,9 +1,9 @@
 versionName=4.6.3
-versionCode=128
+versionCode=129
 package=jp.amiplus.lisa
-device=TV007
-date=2026-09-05 12:17
+device=TV005
+date=2026-09-05 12:28
 source=ami3.29.2TV_LiSA
 branch=work/v4.6.3.94
-tag=(未保存。中身は c5f5641 / 4.6.3(105))
-note=4.6.3(105) に戻した。TVが127のため投入用に128。
+tag=(未保存)
+note=起動時にカメラを開かない。ランプが点灯する不具合を止める。
