@@ -138,6 +138,8 @@ class CheckmeProService extends ChangeNotifier {
       try {
         await FlutterBluePlus.stopScan();
       } catch (_) {}
+      // 共有スキャンを巻き添えにしているので、すぐ戻す。
+      await BleScanner.instance.reopen();
       await _disconnect('ボタンで停止', closePopup: true);
       _setStatus('停止中');
     }

@@ -370,6 +370,9 @@ class AndVitalService extends ChangeNotifier {
     try {
       await FlutterBluePlus.stopScan();
     } catch (_) {}
+    // 上の stopScan は相手を選べないので、共有スキャンも巻き添えに
+    // なる。血圧計の接続と共有スキャンはぶつからないため、すぐ戻す。
+    await BleScanner.instance.reopen();
   }
 
   Future<void> _releaseOthers() async {

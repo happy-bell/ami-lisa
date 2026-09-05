@@ -187,6 +187,18 @@ class BleScanner {
     await _open();
   }
 
+  /// 外から止められたスキャンを、その場で掛け直す。
+  ///
+  /// Ring / Checkme Pro を止めるための `FlutterBluePlus.stopScan()` は、
+  /// 相手を選べないので共有スキャンも巻き添えにする。呼んだ側が
+  /// すぐここを呼べば、見張り（最大5秒待ち）を待たずに戻せる。
+  Future<void> reopen() async {
+    if (!_running || _yielding) return;
+    if (FlutterBluePlus.isScanningNow) return;
+    _log('外から止められたので掛け直します');
+    await _open();
+  }
+
   /// スキャンが生きているかを確かめる。
   ///
   /// 他の機器の startScan で黙って止められることがあり、
