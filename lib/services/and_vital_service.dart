@@ -8,7 +8,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:amiapp/services/ble_bus.dart';
+import 'package:amiapp/services/ble_scanner.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/ble/and_vital_codec.dart';
 import 'package:amiapp/helpers/tv_util.dart';
@@ -270,19 +270,66 @@ class AndVitalService extends ChangeNotifier {
     }
   }
 
+  /// 対象の機器を探す。
+  ///
+  /// [BleScanner] が動いている時は、そこへ相乗りして自前ではスキャン
+  /// しない。血圧計はペアリングされている限り 12秒スキャン → 3秒休む を
+  /// 永久に繰り返すので、自前でスキャンすると呼び出しボタンの聞き取りを
+  /// 15秒のうち12秒も止めてしまう（2026-09-05 実測）。
+  ///
+  /// [BleScanner] が動いていないテレビ（呼び出しボタンが未登録）では、
+  /// 従来どおり自前でスキャンする。動きは今までと変わらない。
   Future<List<BluetoothDevice>> _scanTargets(Duration timeout) async {
+    if (BleScanner.instance.isRunning) {
+      return _scanTargetsShared(timeout);
+    }
+    return _scanTargetsOwn(timeout);
+  }
+
+  bool _isTarget(ScanResult r) {
+    final name = _advName(r);
+    final uuids = r.advertisementData.serviceUuids.map((g) => g.str);
+    final hitName = AndVitalCodec.nameMatches(name);
+    final hitUuid = uuids.any((u) => AndVitalCodec.kindForService(u) != null);
+    return hitName || hitUuid;
+  }
+
+  /// 1本にまとめたスキャンから拾う。自分ではスキャンを起こさない。
+  Future<List<BluetoothDevice>> _scanTargetsShared(Duration timeout) async {
+    final found = <String, BluetoothDevice>{};
+    void collect(List<ScanResult> results) {
+      for (final r in results) {
+        if (_isTarget(r)) found[r.device.remoteId.str] = r.device;
+      }
+    }
+
+    // すでに届いているものを先に見る。去った機器は BleScanner が
+    // 一覧から外しているので、古い相手に繋ぎにいくことはない。
+    collect(BleScanner.instance.latest);
+    if (found.isNotEmpty) return found.values.toList();
+
+    final sub = BleScanner.instance.results.listen(collect);
+    try {
+      final deadline = DateTime.now().add(timeout);
+      while (DateTime.now().isBefore(deadline)) {
+        if (found.isNotEmpty) break;
+        if (_paused || !_started) break;
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+    } finally {
+      await sub.cancel();
+    }
+    return found.values.toList();
+  }
+
+  /// 自前でスキャンする（呼び出しボタンが未登録のテレビ向け）。
+  Future<List<BluetoothDevice>> _scanTargetsOwn(Duration timeout) async {
     final found = <String, BluetoothDevice>{};
     StreamSubscription<List<ScanResult>>? sub;
     try {
       sub = FlutterBluePlus.scanResults.listen((results) {
         for (final r in results) {
-          final name = _advName(r);
-          final uuids = r.advertisementData.serviceUuids.map((g) => g.str);
-          final hitName = AndVitalCodec.nameMatches(name);
-          final hitUuid = uuids.any((u) => AndVitalCodec.kindForService(u) != null);
-          if (hitName || hitUuid) {
-            found[r.device.remoteId.str] = r.device;
-          }
+          if (_isTarget(r)) found[r.device.remoteId.str] = r.device;
         }
       });
       await FlutterBluePlus.startScan(
@@ -317,8 +364,6 @@ class AndVitalService extends ChangeNotifier {
 
   Future<void> _holdOthers() async {
     _bleHold++;
-    // BLEアダプタは1本しかない。呼び出しボタンにも譲ってもらう。
-    await BleBus.instance.take('血圧計');
     if (_bleHold != 1) return;
     await CheckmeRingService.instance.pause();
     await CheckmeProService.instance.pause();
@@ -328,10 +373,7 @@ class AndVitalService extends ChangeNotifier {
   }
 
   Future<void> _releaseOthers() async {
-    if (_bleHold > 0) {
-      _bleHold--;
-      await BleBus.instance.give('血圧計');
-    }
+    if (_bleHold > 0) _bleHold--;
     if (_bleHold != 0 || pairing) return;
     CheckmeRingService.instance.resume();
     CheckmeProService.instance.resume();
@@ -351,32 +393,23 @@ class AndVitalService extends ChangeNotifier {
     _setStatus('血圧計 待機中');
     if (AppManager.isPiTvLayout) {
       if (_otherMeasuring) return;
-      // 探索のスキャンから読み取りまで、通して BLE の順番をもらう。
-      // ここは Ring/Checkme を止めない（従来どおり）が、呼び出しボタンの
-      // 聞き取りとはぶつかるので譲ってもらう必要がある。
-      await BleBus.instance.take('血圧計');
+      final pairedIds = paired.map((e) => e['id']).toSet();
+      final devices = await _scanTargets(const Duration(seconds: _scanSeconds));
+      if (devices.isEmpty || _paused || pairing || _otherMeasuring) return;
+      BluetoothDevice? target;
+      for (final d in devices) {
+        if (pairedIds.contains(d.remoteId.str)) {
+          target = d;
+          break;
+        }
+      }
+      if (target == null) return;
+      await _holdOthers();
       try {
-        final pairedIds = paired.map((e) => e['id']).toSet();
-        final devices =
-            await _scanTargets(const Duration(seconds: _scanSeconds));
-        if (devices.isEmpty || _paused || pairing || _otherMeasuring) return;
-        BluetoothDevice? target;
-        for (final d in devices) {
-          if (pairedIds.contains(d.remoteId.str)) {
-            target = d;
-            break;
-          }
-        }
-        if (target == null) return;
-        await _holdOthers();
-        try {
-          if (_otherMeasuring || _paused || pairing) return;
-          await _readFrom(target);
-        } finally {
-          await _releaseOthers();
-        }
+        if (_otherMeasuring || _paused || pairing) return;
+        await _readFrom(target);
       } finally {
-        await BleBus.instance.give('血圧計');
+        await _releaseOthers();
       }
       return;
     }

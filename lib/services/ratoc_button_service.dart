@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import 'package:amiapp/services/ble_bus.dart';
+import 'package:amiapp/services/ble_scanner.dart';
 import 'package:amiapp/services/ratoc_button_store.dart';
 
 /// ラトックのスマートボタン RS-SCBTN2 を聞き取る。
@@ -50,20 +51,26 @@ import 'package:amiapp/services/ratoc_button_store.dart';
 ///   ボタンは2秒間隔で発信するので、押されている間に何度も機会がある。
 ///   誤検知は、MAC・メーカーID・押下ビットの3つが揃わないと起きない。
 ///
-/// ■ 健康機器に BLE を譲る（2026-09-05 追加）
+/// ■ スキャンを1本にまとめた（2026-09-05）
 ///
 ///   BLEアダプタは1本しかなく、flutter_blue_plus は同時に1つの
 ///   スキャンしか持てない。血圧計・Ring・Checkme Pro が測定のため
 ///   startScan を呼ぶと、こちらのスキャンは**黙って止められる。**
-///   止められたことは知らされないので、以前はそのまま二度と
-///   反応しなくなった。実際 Ring を接続したあとボタンが死んだ。
+///   止められたことは知らされないので、Ring を接続したあと
+///   ボタンが二度と反応しなくなった。
 ///
-///   そこで [BleBus] に譲る役として登録し、
-///     ・誰かが BLE を取ったら聞き取りを止めて譲る
-///     ・全員が返したら、ひとりでに聞き取りへ戻る
-///   さらに [_watchSpan] ごとに「本当に聞き取れているか」を
-///   確かめ、止まっていたら黙って掛け直す。譲っている時以外に
-///   スキャンが消えていることは、あってはならない。
+///   さらに血圧計は、ペアリングされている限り
+///   12秒スキャン → 3秒休む を永久に繰り返す。実測すると
+///   ボタンが聞けるのは15秒のうち3秒（20%）だけだった。
+///
+///   そこで**スキャンは [BleScanner] が1本だけ持ち、ボタンも
+///   血圧計もそこへ相乗りする**形に変えた。奪い合いが起きないので、
+///   聞き取りが途切れることはない。
+///
+///   Ring と Checkme Pro は、測定している間だけ BLE を占有する。
+///   繋いだまま強いスキャンを回すと測定が乱れるおそれがあるため。
+///   その間はボタンも聞こえないが、利用者が自分で始めた操作なので
+///   決め事で運用できる。探すだけの段階は共有スキャンを使う。
 ///
 class RatocButtonService {
   RatocButtonService._();
@@ -79,17 +86,6 @@ class RatocButtonService {
   /// 1回押しただけで呼出が連続して出てしまう。
   static const _debounce = Duration(seconds: 10);
 
-  /// 聞き取りの強さ。
-  ///
-  /// balanced は 1024ms 聞いて 4096ms 休む（25%）。
-  /// lowPower（10%）では押下を取り逃した。lowLatency（100%）は
-  /// リモコンを妨げる。その間をとった値。
-  static const _scanMode = AndroidScanMode.lowLatency;
-
-  /// 聞き取りが生きているかを確かめる間隔。
-  ///
-  /// 他の機器に止められても知らされないので、こちらから見に行く。
-  static const _watchSpan = Duration(seconds: 5);
 
   final _pressed = StreamController<RatocButtonPress>.broadcast();
 
@@ -101,14 +97,6 @@ class RatocButtonService {
   bool _running = false;
   DateTime? _lastFiredAt;
 
-  /// 健康機器へ譲っている間は true。この間だけスキャンが無くてよい。
-  bool _yielding = false;
-
-  /// 聞き取りが生きているかを確かめる見張り。
-  Timer? _watch;
-
-  /// 見張りが掛け直した回数（調査用）。
-  int _revived = 0;
 
 
   /// 受信できているかを確かめるための数え上げ（調査用）。
@@ -117,91 +105,36 @@ class RatocButtonService {
 
   bool get isRunning => _running;
 
-  /// 聞き取りを始める（弱い待機）。
+  /// 聞き取りを始める。
+  ///
+  /// スキャンは自分で持たない。[BleScanner] が1本だけ持っていて、
+  /// そこへ相乗りする。血圧計も同じ1本に相乗りしているので、
+  /// 奪い合いは起きず、聞き取りが途切れることもない。
   Future<void> start() async {
     if (_running) return;
-    try {
-      if (!(await FlutterBluePlus.isSupported)) {
-        _log('この端末はBLEに対応していません');
-        return;
-      }
-    } catch (e) {
-      _log('BLEの確認に失敗 $e');
-      return;
-    }
     if (!RatocButtonStore.instance.isRegistered) {
       _log('ボタンが未登録のため聞き取りません');
       return;
     }
     _running = true;
-
-    // 健康機器がBLEを使う時は譲る。返ってきたら自分で戻る。
-    BleBus.instance.yieldTo(
-      pause: _yieldBle,
-      resume: _takeBackBle,
-    );
-
-    if (BleBus.instance.busy) {
-      _yielding = true;
-      _log('健康機器が使用中のため待ちます（${BleBus.instance.holders.join(",")}）');
-    } else {
-      await _scan();
-    }
-    _startWatch();
-  }
-
-  /// 健康機器へ BLE を譲る。聞き取りだけを止め、[_running] は保つ。
-  ///
-  /// [BleBus.take] はこれが終わるまで待つ。先に止め終わってから
-  /// 相手にスキャンを始めさせないと、こちらの停止が相手のスキャンを
-  /// 巻き添えにして消してしまう。
-  Future<void> _yieldBle() async {
-    if (_yielding) return;
-    _yielding = true;
+    await BleScanner.instance.start();
     await _sub?.cancel();
-    _sub = null;
-    try {
-      await FlutterBluePlus.stopScan();
-    } catch (_) {}
-    _log('健康機器へBLEを譲ります（${BleBus.instance.holders.join(",")}）');
+    _sub = BleScanner.instance.results.listen(
+      _onResults,
+      onError: (e) => _log('受信でエラー $e'),
+    );
+    _log('聞き取り中（共有スキャンに相乗り）');
   }
 
-  /// 健康機器が使い終わったので聞き取りへ戻る。
-  Future<void> _takeBackBle() async {
-    if (!_yielding) return;
-    _yielding = false;
-    if (!_running) return;
-    _log('BLEが空いたので聞き取りへ戻ります');
-    await _scan();
-  }
-
-  /// 聞き取りが生きているかを [_watchSpan] ごとに確かめる。
+  /// 聞き取りを止める。
   ///
-  /// 他の機器の startScan でこちらのスキャンが黙って止められることが
-  /// あり、それに気づく手立てがこれしかない。譲っている間は何もしない。
-  void _startWatch() {
-    _watch?.cancel();
-    _watch = Timer.periodic(_watchSpan, (_) async {
-      if (!_running || _yielding) return;
-      if (FlutterBluePlus.isScanningNow) return;
-      _revived++;
-      _log('聞き取りが止まっていました → 掛け直します（通算$_revived回目）');
-      await _scan();
-    });
-  }
-
-  /// 聞き取りを止めて BLE を解放する。
+  /// スキャンそのものは [BleScanner] のものなので、ここでは止めない。
+  /// 血圧計も同じスキャンを使っている。
   Future<void> stop() async {
     _running = false;
-    _yielding = false;
-    _watch?.cancel();
-    _watch = null;
     await _sub?.cancel();
     _sub = null;
-    try {
-      await FlutterBluePlus.stopScan();
-    } catch (_) {}
-    _log('聞き取りを止めました（BLEを解放）');
+    _log('聞き取りを止めました');
   }
 
   /// 待機へ戻す。通話が終わったあとに呼ぶ。
@@ -209,48 +142,6 @@ class RatocButtonService {
     if (_running) return;
     _log('待機に戻ります');
     await start();
-  }
-
-  Future<void> _scan() async {
-    // 誰かが BLE を使っている間は始めない。始めると相手のスキャンを
-    // 消してしまう。空いたら [_takeBackBle] が呼んでくれる。
-    if (BleBus.instance.busy) {
-      _yielding = true;
-      return;
-    }
-    await _sub?.cancel();
-    try {
-      await FlutterBluePlus.stopScan();
-    } catch (_) {}
-
-    _sub = FlutterBluePlus.scanResults.listen(
-      _onResults,
-      onError: (e) => _log('受信でエラー $e'),
-    );
-
-    try {
-      await FlutterBluePlus.startScan(
-        // 登録した1台だけをチップ側で拾う。
-        // 他の機器で起こされなくなり、リモコンへの負担が最小になる。
-        withRemoteIds: [RatocButtonStore.instance.mac],
-        // 同じ機器の値が変わるたびに知らせてほしい。
-        // これが無いと、一度見つけた機器の2回目以降が届かない。
-        continuousUpdates: true,
-        // 時間で切らない。切ると掛け直しが要り、そのたびリモコンの
-        // 接続が壊れる。止めるのは呼出を出した時だけ。
-        timeout: null,
-        // 待機は弱く、確認のときだけ強く。
-        //   lowPower   512ms 聞いて 5120ms 休む   10%
-        //   lowLatency ずっと聞き続ける          100%
-        // 強さは1つに固定する。途中で変えると停止→再開が要り、
-        // その1〜2秒で発信を取り逃す。
-        androidScanMode: _scanMode,
-        androidUsesFineLocation: false,
-      );
-      _log('聞き取り中（強：ずっと聞き続ける）');
-    } catch (e) {
-      _log('スキャンを始められません $e');
-    }
   }
 
   void _onResults(List<ScanResult> results) {
