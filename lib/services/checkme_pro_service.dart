@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:amiapp/services/ble_bus.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/ble/checkme_pro_protocol.dart';
 import 'package:amiapp/helpers/tv_util.dart';
@@ -202,14 +203,20 @@ class CheckmeProService extends ChangeNotifier {
         }
 
         _setStatus('Checkme Pro 待機中');
-        final target = await _scanForPro();
-        if (!userEnabled || _paused) continue;
-        if (target == null) {
-          await Future<void>.delayed(
-              const Duration(seconds: _idleRecheckSeconds));
-          continue;
+        // 使う間だけ BLE の順番をもらう（呼び出しボタンが譲る）。
+        await BleBus.instance.take('CheckmePro');
+        try {
+          final target = await _scanForPro();
+          if (!userEnabled || _paused) continue;
+          if (target == null) {
+            await Future<void>.delayed(
+                const Duration(seconds: _idleRecheckSeconds));
+            continue;
+          }
+          await _monitor(target);
+        } finally {
+          await BleBus.instance.give('CheckmePro');
         }
-        await _monitor(target);
       } catch (e) {
         _log('loop error: $e');
         await _disconnect('エラー');

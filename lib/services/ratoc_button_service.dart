@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
+import 'package:amiapp/services/ble_bus.dart';
 import 'package:amiapp/services/ratoc_button_store.dart';
 
 /// ラトックのスマートボタン RS-SCBTN2 を聞き取る。
@@ -49,6 +50,21 @@ import 'package:amiapp/services/ratoc_button_store.dart';
 ///   ボタンは2秒間隔で発信するので、押されている間に何度も機会がある。
 ///   誤検知は、MAC・メーカーID・押下ビットの3つが揃わないと起きない。
 ///
+/// ■ 健康機器に BLE を譲る（2026-09-05 追加）
+///
+///   BLEアダプタは1本しかなく、flutter_blue_plus は同時に1つの
+///   スキャンしか持てない。血圧計・Ring・Checkme Pro が測定のため
+///   startScan を呼ぶと、こちらのスキャンは**黙って止められる。**
+///   止められたことは知らされないので、以前はそのまま二度と
+///   反応しなくなった。実際 Ring を接続したあとボタンが死んだ。
+///
+///   そこで [BleBus] に譲る役として登録し、
+///     ・誰かが BLE を取ったら聞き取りを止めて譲る
+///     ・全員が返したら、ひとりでに聞き取りへ戻る
+///   さらに [_watchSpan] ごとに「本当に聞き取れているか」を
+///   確かめ、止まっていたら黙って掛け直す。譲っている時以外に
+///   スキャンが消えていることは、あってはならない。
+///
 class RatocButtonService {
   RatocButtonService._();
   static final RatocButtonService instance = RatocButtonService._();
@@ -70,6 +86,11 @@ class RatocButtonService {
   /// リモコンを妨げる。その間をとった値。
   static const _scanMode = AndroidScanMode.lowLatency;
 
+  /// 聞き取りが生きているかを確かめる間隔。
+  ///
+  /// 他の機器に止められても知らされないので、こちらから見に行く。
+  static const _watchSpan = Duration(seconds: 5);
+
   final _pressed = StreamController<RatocButtonPress>.broadcast();
 
   /// ボタンが押されたら流れてくる。
@@ -79,6 +100,15 @@ class RatocButtonService {
 
   bool _running = false;
   DateTime? _lastFiredAt;
+
+  /// 健康機器へ譲っている間は true。この間だけスキャンが無くてよい。
+  bool _yielding = false;
+
+  /// 聞き取りが生きているかを確かめる見張り。
+  Timer? _watch;
+
+  /// 見張りが掛け直した回数（調査用）。
+  int _revived = 0;
 
 
   /// 受信できているかを確かめるための数え上げ（調査用）。
@@ -104,12 +134,68 @@ class RatocButtonService {
       return;
     }
     _running = true;
+
+    // 健康機器がBLEを使う時は譲る。返ってきたら自分で戻る。
+    BleBus.instance.yieldTo(
+      pause: _yieldBle,
+      resume: _takeBackBle,
+    );
+
+    if (BleBus.instance.busy) {
+      _yielding = true;
+      _log('健康機器が使用中のため待ちます（${BleBus.instance.holders.join(",")}）');
+    } else {
+      await _scan();
+    }
+    _startWatch();
+  }
+
+  /// 健康機器へ BLE を譲る。聞き取りだけを止め、[_running] は保つ。
+  ///
+  /// [BleBus.take] はこれが終わるまで待つ。先に止め終わってから
+  /// 相手にスキャンを始めさせないと、こちらの停止が相手のスキャンを
+  /// 巻き添えにして消してしまう。
+  Future<void> _yieldBle() async {
+    if (_yielding) return;
+    _yielding = true;
+    await _sub?.cancel();
+    _sub = null;
+    try {
+      await FlutterBluePlus.stopScan();
+    } catch (_) {}
+    _log('健康機器へBLEを譲ります（${BleBus.instance.holders.join(",")}）');
+  }
+
+  /// 健康機器が使い終わったので聞き取りへ戻る。
+  Future<void> _takeBackBle() async {
+    if (!_yielding) return;
+    _yielding = false;
+    if (!_running) return;
+    _log('BLEが空いたので聞き取りへ戻ります');
     await _scan();
+  }
+
+  /// 聞き取りが生きているかを [_watchSpan] ごとに確かめる。
+  ///
+  /// 他の機器の startScan でこちらのスキャンが黙って止められることが
+  /// あり、それに気づく手立てがこれしかない。譲っている間は何もしない。
+  void _startWatch() {
+    _watch?.cancel();
+    _watch = Timer.periodic(_watchSpan, (_) async {
+      if (!_running || _yielding) return;
+      if (FlutterBluePlus.isScanningNow) return;
+      _revived++;
+      _log('聞き取りが止まっていました → 掛け直します（通算$_revived回目）');
+      await _scan();
+    });
   }
 
   /// 聞き取りを止めて BLE を解放する。
   Future<void> stop() async {
     _running = false;
+    _yielding = false;
+    _watch?.cancel();
+    _watch = null;
     await _sub?.cancel();
     _sub = null;
     try {
@@ -126,6 +212,12 @@ class RatocButtonService {
   }
 
   Future<void> _scan() async {
+    // 誰かが BLE を使っている間は始めない。始めると相手のスキャンを
+    // 消してしまう。空いたら [_takeBackBle] が呼んでくれる。
+    if (BleBus.instance.busy) {
+      _yielding = true;
+      return;
+    }
     await _sub?.cancel();
     try {
       await FlutterBluePlus.stopScan();
@@ -235,6 +327,8 @@ class RatocButtonService {
   }) async {
     final was = _running;
     if (was) await stop();
+    // 登録画面のスキャンも順番待ちに載せる。健康機器と重ならない。
+    await BleBus.instance.take('ボタン登録');
 
     final found = <String, RatocFound>{};
     StreamSubscription<List<ScanResult>>? sub;
@@ -268,6 +362,7 @@ class RatocButtonService {
       try {
         await FlutterBluePlus.stopScan();
       } catch (_) {}
+      await BleBus.instance.give('ボタン登録');
     }
     _log('探索で ${found.length} 台');
     if (was) await start();

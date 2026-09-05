@@ -8,6 +8,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:amiapp/services/ble_bus.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/ble/and_vital_codec.dart';
 import 'package:amiapp/helpers/tv_util.dart';
@@ -316,6 +317,8 @@ class AndVitalService extends ChangeNotifier {
 
   Future<void> _holdOthers() async {
     _bleHold++;
+    // BLEアダプタは1本しかない。呼び出しボタンにも譲ってもらう。
+    await BleBus.instance.take('血圧計');
     if (_bleHold != 1) return;
     await CheckmeRingService.instance.pause();
     await CheckmeProService.instance.pause();
@@ -325,7 +328,10 @@ class AndVitalService extends ChangeNotifier {
   }
 
   Future<void> _releaseOthers() async {
-    if (_bleHold > 0) _bleHold--;
+    if (_bleHold > 0) {
+      _bleHold--;
+      await BleBus.instance.give('血圧計');
+    }
     if (_bleHold != 0 || pairing) return;
     CheckmeRingService.instance.resume();
     CheckmeProService.instance.resume();
@@ -345,23 +351,32 @@ class AndVitalService extends ChangeNotifier {
     _setStatus('血圧計 待機中');
     if (AppManager.isPiTvLayout) {
       if (_otherMeasuring) return;
-      final pairedIds = paired.map((e) => e['id']).toSet();
-      final devices = await _scanTargets(const Duration(seconds: _scanSeconds));
-      if (devices.isEmpty || _paused || pairing || _otherMeasuring) return;
-      BluetoothDevice? target;
-      for (final d in devices) {
-        if (pairedIds.contains(d.remoteId.str)) {
-          target = d;
-          break;
-        }
-      }
-      if (target == null) return;
-      await _holdOthers();
+      // 探索のスキャンから読み取りまで、通して BLE の順番をもらう。
+      // ここは Ring/Checkme を止めない（従来どおり）が、呼び出しボタンの
+      // 聞き取りとはぶつかるので譲ってもらう必要がある。
+      await BleBus.instance.take('血圧計');
       try {
-        if (_otherMeasuring || _paused || pairing) return;
-        await _readFrom(target);
+        final pairedIds = paired.map((e) => e['id']).toSet();
+        final devices =
+            await _scanTargets(const Duration(seconds: _scanSeconds));
+        if (devices.isEmpty || _paused || pairing || _otherMeasuring) return;
+        BluetoothDevice? target;
+        for (final d in devices) {
+          if (pairedIds.contains(d.remoteId.str)) {
+            target = d;
+            break;
+          }
+        }
+        if (target == null) return;
+        await _holdOthers();
+        try {
+          if (_otherMeasuring || _paused || pairing) return;
+          await _readFrom(target);
+        } finally {
+          await _releaseOthers();
+        }
       } finally {
-        await _releaseOthers();
+        await BleBus.instance.give('血圧計');
       }
       return;
     }

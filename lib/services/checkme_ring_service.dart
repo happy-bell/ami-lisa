@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:amiapp/services/ble_bus.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/ble/checkme_ring_protocol.dart';
 import 'package:amiapp/helpers/tv_util.dart';
@@ -213,21 +214,29 @@ class CheckmeRingService extends ChangeNotifier {
         }
 
         _setStatus('Ring待機中');
-        final target = await _scanForRing();
-        if (_needsButton && !userEnabled) continue;
-        if (_paused) continue;
-        if (target == null) {
-          await Future<void>.delayed(
-              const Duration(seconds: _idleRecheckSeconds));
-          continue;
-        }
+        // BLEアダプタは1本しかない。呼び出しボタンが聞き取りを
+        // 続けているので、使う間だけ順番をもらう。返すまでボタンは
+        // 待ち、返した瞬間に自分で聞き取りへ戻る。
+        await BleBus.instance.take('Ring');
+        try {
+          final target = await _scanForRing();
+          if (_needsButton && !userEnabled) continue;
+          if (_paused) continue;
+          if (target == null) {
+            await Future<void>.delayed(
+                const Duration(seconds: _idleRecheckSeconds));
+            continue;
+          }
 
-        await _monitor(target);
-        if (_needsButton &&
-            userEnabled &&
-            session > _sessionAtEnable) {
-          _log('測定終了 → 自動解除');
-          await setEnabled(false, closePopup: false);
+          await _monitor(target);
+          if (_needsButton &&
+              userEnabled &&
+              session > _sessionAtEnable) {
+            _log('測定終了 → 自動解除');
+            await setEnabled(false, closePopup: false);
+          }
+        } finally {
+          await BleBus.instance.give('Ring');
         }
       } catch (e) {
         _log('loop error: $e');
