@@ -21,6 +21,8 @@ import 'package:amiapp/pages/staff/staff_live_view_page.dart';
 import 'package:amiapp/pages/staff/staff_talk_page.dart';
 import 'package:amiapp/pages/setting/setting_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
+import 'package:amiapp/services/ratoc_button_service.dart';
+import 'package:amiapp/services/ratoc_button_store.dart';
 import 'package:amiapp/services/appmanager.dart';
 import 'package:amiapp/services/address_sync.dart';
 import 'package:amiapp/services/audio_service.dart';
@@ -216,6 +218,15 @@ class _RoomPageState extends State<RoomPage>
 
       _startGetInfoTimer(isGet: true);
       _startHealthTimerIfPi();
+      // ラトックのスマートボタン（RS-SCBTN2）を聞き取る。
+      // 待機は弱いスキャンなので、リモコンの邪魔をしない。
+      if (TvUtil.isTelevision) {
+        RatocButtonService.instance.onPressed.listen(_onRatocButton);
+        // 登録を読んでから聞き取る。未登録ならスキャンしない。
+        RatocButtonStore.instance.load().whenComplete(() {
+          RatocButtonService.instance.start();
+        });
+      }
       _syncCheckmeProForLayout();
       if (TvUtil.isTelevision) {
         // 起動時にカメラを開くとランプが点灯する。通話・見守り開始まで開かない。
@@ -236,6 +247,10 @@ class _RoomPageState extends State<RoomPage>
       _handlePendingIncomingIfNeeded();
       _startGetInfoTimer(isGet: true);
       _startHealthTimerIfPi();
+      // 呼出のあとBLEは解放してある。戻ってきたら弱い待機へ戻す。
+      if (TvUtil.isTelevision) {
+        RatocButtonService.instance.resume();
+      }
       unawaited(_refreshUsbCamera());
     } else if (state == AppLifecycleState.paused) {
       if (_sleeptimer != null) {
@@ -1609,6 +1624,28 @@ class _RoomPageState extends State<RoomPage>
     } else {
       _safetyBlankCover = false;
     }
+  }
+
+  /// スマートボタンが押された（2回目の発信を捕まえた）。
+  ///
+  /// デリゲータ経由の call_button と同じ入口へ入れる。
+  /// 経路を分けると片方だけ直して食い違うため、まとめておく。
+  ///
+  /// この時点で BLE は解放済み。通話が終わって前面に戻ったら、
+  /// didChangeAppLifecycleState が待機へ戻す。
+  void _onRatocButton(RatocButtonPress p) {
+    print('[RatocButton] 呼出 $p');
+    if (!mounted) return;
+    // 状況に関係なく必ず呼び出す。
+    //
+    // 以前は通話中や状態を見て見送っていた。ところが呼出を止めた直後は
+    // まだ通話中の扱いが残っており、押しても見送られていた。
+    // 呼び出しボタンは押したら必ず鳴るべきなので、条件を付けない。
+    // （2026-09-05 修正）
+    if (p.battery >= 0 && p.battery <= 10) {
+      print('[RatocButton] 電池残量が少ない（${p.battery}%）');
+    }
+    _onCallButton();
   }
 
   Future<void> _onCallButton() async {
