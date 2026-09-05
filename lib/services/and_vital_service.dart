@@ -52,6 +52,15 @@ class AndVitalService extends ChangeNotifier {
   BluetoothDevice? _device;
   StreamSubscription<List<int>>? _indicateSub;
 
+  /// 読み終えた（または接続に失敗した）機器と、離れた時刻。
+  ///
+  /// これより古い電波を頼りに繋ぎにいかない。
+  /// 一覧には、もう電波を出していない機器がしばらく残る。それを見て
+  /// 繋ぎにいくと接続が20秒ぶら下がり、その間BLEの探索が84%止まって
+  /// 呼び出しボタンの押下が届かなくなる。2026-09-05 に実測した
+  /// （偶然こうなる確率は15万分の1）。
+  final Map<String, DateTime> _leftAt = {};
+
   AndBpReading? _lastBp;
   double? _lastTemp;
   double? _lastWeight;
@@ -290,6 +299,10 @@ class AndVitalService extends ChangeNotifier {
     // 止めないスキャンなので、去った機器も一覧に残る。
     // 古い電波を頼りに繋ぎにいかないよう、新しさを確かめる。
     if (!BleScanner.isFresh(r)) return false;
+    // 前に離れた相手は、そのあと新しい電波を出すまで相手にしない。
+    // 出していないなら、繋ぎにいっても空回りするだけ。
+    final left = _leftAt[r.device.remoteId.str];
+    if (left != null && !r.timeStamp.isAfter(left)) return false;
     final name = _advName(r);
     final uuids = r.advertisementData.serviceUuids.map((g) => g.str);
     final hitName = AndVitalCodec.nameMatches(name);
@@ -610,6 +623,9 @@ class AndVitalService extends ChangeNotifier {
     final d = _device;
     _device = null;
     if (d != null) {
+      // 離れた時刻を覚えておく。読み終えた時も、繋がらなかった時も。
+      // 次に新しい電波を出すまで、この相手には繋ぎにいかない。
+      _leftAt[d.remoteId.str] = DateTime.now();
       try {
         await d.disconnect();
       } catch (_) {}

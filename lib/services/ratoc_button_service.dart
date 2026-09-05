@@ -106,6 +106,13 @@ class RatocButtonService {
   /// 直前に受け取った中身（変化を見つけるため。調査用）。
   String _lastHex = '';
 
+  /// 直前の発信の時刻。同じ発信を二重に数えないための目印。
+  DateTime? _lastAdvAt;
+
+  /// 直近10秒に届いた発信の数（調査用）。
+  int _recvWindow = 0;
+  Timer? _rate;
+
   bool get isRunning => _running;
 
   /// 聞き取りを始める。
@@ -127,6 +134,15 @@ class RatocButtonService {
       onError: (e) => _log('受信でエラー $e'),
     );
     _log('聞き取り中（共有スキャンに相乗り）');
+
+    // ★調査用 2026-09-05
+    //   ボタンの発信を本当に受け取れているかを10秒ごとに出す。
+    //   接続の空回りで受信が止まるかを見るため。
+    _rate?.cancel();
+    _rate = Timer.periodic(const Duration(seconds: 10), (_) {
+      _log('直近10秒の発信 $_recvWindow件（通算$_recv件）');
+      _recvWindow = 0;
+    });
   }
 
   /// 聞き取りを止める。
@@ -135,6 +151,8 @@ class RatocButtonService {
   /// 血圧計も同じスキャンを使っている。
   Future<void> stop() async {
     _running = false;
+    _rate?.cancel();
+    _rate = null;
     await _sub?.cancel();
     _sub = null;
     _log('聞き取りを止めました');
@@ -162,7 +180,16 @@ class RatocButtonService {
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
           .join(' ');
       final nowMs = DateTime.now();
+
+      // 数えるのは「新しく届いた発信」だけ。
+      //
+      // 一覧はどの機器が電波を出しても丸ごと再送されるので、
+      // ここを素通しで数えると他機器の分まで足し込んでしまう。
+      // 2026-09-05 にそれで受信量を読み違えた。
+      if (r.timeStamp == _lastAdvAt) continue;
+      _lastAdvAt = r.timeStamp;
       _recv++;
+      _recvWindow++;
       // 2026-09-05 調査中。押下の発信が1件も届かない件を追うため、
       // 中身が変わった発信はすべて記録する。原因が分かったら
       // 10秒に1度の記録へ戻す。

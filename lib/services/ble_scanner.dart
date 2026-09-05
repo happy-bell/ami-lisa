@@ -57,10 +57,9 @@ class BleScanner {
   /// 血圧計が「まだ居る」と勘違いして繋ぎにいかないよう、
   /// 受け取る側で新しさを確かめる。
   ///
-  /// flutter_blue_plus の removeIfGone は使わない。あれを付けると
-  /// 250ミリ秒ごとの内部ストリームと合流させる作りになり、
-  /// 2026-09-05 に押下の発信が1件も届かなくなった。原因は特定できて
-  /// いないが、付けない構成では16回中16回届いていた実績がある。
+  /// flutter_blue_plus の removeIfGone は使わない。受け取る側で
+  /// 確かめれば足りる。（一時 removeIfGone を疑ったが、実機で
+  /// 4通り試して無関係だと分かった。2026-09-05）
   static const fresh = Duration(seconds: 20);
 
   /// その電波が [fresh] 以内に届いたものか。
@@ -143,12 +142,9 @@ class BleScanner {
     try {
       await FlutterBluePlus.startScan(
         // 絞り込みは OR で重なる。ここに挙げた機器だけが届く。
-        // 登録済みのボタンは MAC でも指定する。4.6.8 まで
-        // この指定だけで16回中16回の押下を拾えていた実績がある。
-        withRemoteIds: [
-          if (RatocButtonStore.instance.isRegistered)
-            RatocButtonStore.instance.mac,
-        ],
+        // ボタンはメーカーIDで拾う。MAC指定は足さない。
+        // 4通り（MAC有無 × removeIfGone有無）すべてで押下が届くことを
+        // 2026-09-05 に実機で確かめた。絞り込みは少ないほうがよい。
         withMsd: [MsdFilter(buttonMsdId)],
         withServices: [
           Guid(AndVitalCodec.bpService),
