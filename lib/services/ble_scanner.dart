@@ -6,6 +6,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:amiapp/ble/and_vital_codec.dart';
 import 'package:amiapp/ble/checkme_ring_protocol.dart';
 import 'package:amiapp/services/ble_bus.dart';
+import 'package:amiapp/services/ratoc_button_store.dart';
 
 /// BLEのスキャンを1本にまとめる。
 ///
@@ -50,11 +51,21 @@ class BleScanner {
   /// ラトックのスマートボタン。
   static const buttonMsdId = 0x0B60;
 
-  /// しばらく電波が途絶えた機器は一覧から外す。
+  /// これより古い電波は「もう居ない」とみなす。
   ///
-  /// 止めないスキャンなので、これが無いと去った機器がいつまでも
-  /// 残り、血圧計が「まだ居る」と勘違いして繋ぎにいってしまう。
-  static const _forget = Duration(seconds: 20);
+  /// 止めないスキャンなので、去った機器がいつまでも一覧に残る。
+  /// 血圧計が「まだ居る」と勘違いして繋ぎにいかないよう、
+  /// 受け取る側で新しさを確かめる。
+  ///
+  /// flutter_blue_plus の removeIfGone は使わない。あれを付けると
+  /// 250ミリ秒ごとの内部ストリームと合流させる作りになり、
+  /// 2026-09-05 に押下の発信が1件も届かなくなった。原因は特定できて
+  /// いないが、付けない構成では16回中16回届いていた実績がある。
+  static const fresh = Duration(seconds: 20);
+
+  /// その電波が [fresh] 以内に届いたものか。
+  static bool isFresh(ScanResult r) =>
+      DateTime.now().difference(r.timeStamp) <= fresh;
 
   /// 生存確認の間隔。
   static const _watchSpan = Duration(seconds: 5);
@@ -132,6 +143,12 @@ class BleScanner {
     try {
       await FlutterBluePlus.startScan(
         // 絞り込みは OR で重なる。ここに挙げた機器だけが届く。
+        // 登録済みのボタンは MAC でも指定する。4.6.8 まで
+        // この指定だけで16回中16回の押下を拾えていた実績がある。
+        withRemoteIds: [
+          if (RatocButtonStore.instance.isRegistered)
+            RatocButtonStore.instance.mac,
+        ],
         withMsd: [MsdFilter(buttonMsdId)],
         withServices: [
           Guid(AndVitalCodec.bpService),
@@ -142,8 +159,6 @@ class BleScanner {
         // 同じ機器の値が変わるたびに知らせてほしい。
         // これが無いと、一度見つけた機器の2回目以降が届かない。
         continuousUpdates: true,
-        // 去った機器は一覧から外す。
-        removeIfGone: _forget,
         // 時間で切らない。切ると掛け直しが要り、そのたび
         // リモコンの接続が壊れる（2026-09-04 に実際そうなった）。
         timeout: null,

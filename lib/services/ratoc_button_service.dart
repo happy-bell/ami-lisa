@@ -103,6 +103,9 @@ class RatocButtonService {
   int _recv = 0;
   DateTime? _lastRecvLog;
 
+  /// 直前に受け取った中身（変化を見つけるため。調査用）。
+  String _lastHex = '';
+
   bool get isRunning => _running;
 
   /// 聞き取りを始める。
@@ -159,17 +162,22 @@ class RatocButtonService {
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
           .join(' ');
       final nowMs = DateTime.now();
+      _recv++;
+      // 2026-09-05 調査中。押下の発信が1件も届かない件を追うため、
+      // 中身が変わった発信はすべて記録する。原因が分かったら
+      // 10秒に1度の記録へ戻す。
+      final changed = hex != _lastHex;
+      _lastHex = hex;
+      final last = _lastRecvLog;
+      final due = last == null || nowMs.difference(last).inSeconds >= 10;
       if (data[0] == 0x01) {
         _log('発信 [$hex] rssi=${r.rssi} '
             '${nowMs.toIso8601String().substring(11, 23)}');
-      } else {
-        _recv++;
-        final last = _lastRecvLog;
-        if (last == null || nowMs.difference(last).inSeconds >= 10) {
-          _lastRecvLog = nowMs;
-          _log('受信できています [$hex] rssi=${r.rssi} 累計$_recv件 '
-              '${nowMs.toIso8601String().substring(11, 23)}');
-        }
+      } else if (changed || due) {
+        _lastRecvLog = nowMs;
+        _log('受信できています [$hex] rssi=${r.rssi} 累計$_recv件 '
+            '${changed ? "中身が変わった " : ""}'
+            '${nowMs.toIso8601String().substring(11, 23)}');
       }
 
       final name = r.advertisementData.advName;

@@ -252,6 +252,7 @@ class CheckmeRingService extends ChangeNotifier {
   }
 
   bool _isRing(ScanResult r) {
+    if (!BleScanner.isFresh(r)) return false;
     final name = r.advertisementData.advName.isNotEmpty
         ? r.advertisementData.advName
         : r.device.platformName;

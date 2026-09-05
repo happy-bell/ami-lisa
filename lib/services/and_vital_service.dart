@@ -287,6 +287,9 @@ class AndVitalService extends ChangeNotifier {
   }
 
   bool _isTarget(ScanResult r) {
+    // 止めないスキャンなので、去った機器も一覧に残る。
+    // 古い電波を頼りに繋ぎにいかないよう、新しさを確かめる。
+    if (!BleScanner.isFresh(r)) return false;
     final name = _advName(r);
     final uuids = r.advertisementData.serviceUuids.map((g) => g.str);
     final hitName = AndVitalCodec.nameMatches(name);
