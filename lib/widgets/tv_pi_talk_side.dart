@@ -109,6 +109,40 @@ class _TvPiTalkSideState extends State<TvPiTalkSide> {
           onPressed: widget.onHangup,
           padding: const EdgeInsets.symmetric(vertical: 10),
         ),
+        // 通話終了の直下に Ring / Checkme を横並びで置く。
+        //
+        // ドクターモードのときは、押すと**相手の機器**が動く。
+        // 自分の機器は動かない。患者側は自分の機器を動かす。
+        // どちらを操作するかは TvPiTalkVitalSync が決める。
+        if (widget.talking) ...[
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: TvPiFocusButton(
+                  label: _sync.ringButtonOn ? '停止' : 'Ring',
+                  onPressed: _sync.onRingPressed,
+                  color: _sync.ringButtonOn
+                      ? const Color(0xFFC97187)
+                      : const Color(0xFF404040),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                ),
+              ),
+              const SizedBox(width: 2),
+              Expanded(
+                child: TvPiFocusButton(
+                  label: _sync.checkmeButtonOn ? '停止' : 'Checkme',
+                  onPressed: _sync.onCheckmePressed,
+                  color: _sync.checkmeButtonOn
+                      ? const Color(0xFFC97187)
+                      : const Color(0xFF404040),
+                  fontSize: 16 * 0.8,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                ),
+              ),
+            ],
+          ),
+        ],
         if (widget.talking && widget.showLocal) ...[
           const SizedBox(height: 8),
           AspectRatio(
