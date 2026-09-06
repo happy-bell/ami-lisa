@@ -1734,18 +1734,35 @@ class _RoomPageState extends State<RoomPage>
       }
       debugPrint('[RatocButton] 押す前の状態 電源オフ=$wasOff');
 
-      // 眠っているテレビを起こしてから呼び出す。
+      // 眠っているテレビを起こし、アプリを前面に戻してから呼び出す。
       //
       // 見守り（_beginSafetyCheck）には起こす処理があるが、ボタンの
       // 経路には無かった。電源オフのまま押すと、眠ったまま呼び出そうと
       // していた。2026-09-06 の実機で asleep=true のまま20秒なにも
       // 起きないことを確認したため補う。
-      if (wasOff) {
+      //
+      // 画面が点いていても、アプリが前面にいるとは限らない。地デジや
+      // Netflix を見ている時がそれで、呼出のあと moveTaskToBack で
+      // 背面へ回ることもある。背面のアプリは画面を描かないので、
+      // 通話画面が組み立てられず _tap() が待ち続け、以後ずっと
+      // 「すでに呼出中」で見送られる。2026-09-06 16:50 に実機で発生。
+      //
+      //   16:49:38.800  room life cycle state -> paused
+      //   16:49:56.071  Displayed com.netflix.ninja
+      //   16:50:04.338  [呼出] 開始します（通話画面は開かない）
+      //   16:50:21.222  出せません：すでに呼出中です
+      //
+      // そのため「電源オフだったか」ではなく「前面にいないか」で判断する。
+      final needFront = wasOff ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed;
+      if (needFront) {
         try {
-          await TvUtil.wakeScreen(forcePowerOn: true);
+          if (wasOff) {
+            await TvUtil.wakeScreen(forcePowerOn: true);
+          }
           await TvUtil.bringToFront();
         } catch (e) {
-          debugPrint('[RatocButton] 画面を起こせません $e');
+          debugPrint('[RatocButton] 前面に戻せません $e');
         }
         // 前面に戻り切るまで待ってから呼び出す。
         //
