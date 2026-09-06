@@ -1206,8 +1206,13 @@ class IncomingCallOverlayService : Service() {
 
         private fun scheduleHideAfterSleep(context: Context, lockOnly: Boolean) {
             val app = context.applicationContext
+            cancelSleepRetries = false
             for (delay in longArrayOf(300, 800, 1600, 2800, 4000)) {
                 wakeHandler.postDelayed({
+                    if (cancelSleepRetries) {
+                        Log.i(TAG, "sleep retry cancelled delay=$delay")
+                        return@postDelayed
+                    }
                     if (!isTvStandby(app) && isScreenOn(app)) {
                         Log.i(TAG, "sleep retry delay=$delay lockOnly=$lockOnly")
                         val locked = tryLockNow(app)
@@ -1422,8 +1427,22 @@ class IncomingCallOverlayService : Service() {
 
         private val wakeHandler = Handler(Looper.getMainLooper())
 
+        /// 「消し直す」予約を取り消すための旗。
+        ///
+        /// 電源オフへ戻したあと4秒間、点いていたら消す処理を5回予約する
+        /// （scheduleHideAfterSleep）。確実に消すための仕掛けだが、その
+        /// 4秒の間に呼び出しボタンで起こすと、この予約に消されてしまう。
+        /// 2026-09-06 の実機で、呼出終了の0.45秒後に押すと画面が点いた
+        /// 1.8秒後に消え、カメラが起動しなかった。
+        /// 意図して起こしたときは、残りの予約を捨てる。
+        @Volatile
+        private var cancelSleepRetries = false
+
         /** 画面オフ／待機からパネルを起こす。メーカー不問。点灯したら再試行しない（視聴中のTCL等を邪魔しない）。 */
         fun wakeDisplay(context: Context, forcePowerOn: Boolean = false) {
+            // 意図して起こす。残っている「消し直す」予約は捨てる。
+            // 捨てないと、起こした直後にその予約が画面を消してしまう。
+            cancelSleepRetries = true
             // 先に起こすと判定が消える。TCL は isInteractive のままスクリーンレス。
             rememberScreenOffAtIncoming(context)
             val app = context.applicationContext

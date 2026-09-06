@@ -1076,14 +1076,21 @@ class _RoomPageState extends State<RoomPage>
     }
   }
 
-  Future<void> _tap() async {
+  /// 一斉呼出を出す。実際に呼び出したら true を返す。
+  ///
+  /// 戻り値は「押す前の状態へ戻す」判断に使う。呼び出していないのに
+  /// 電源オフへ戻すと、押しただけでテレビが消えてしまう。
+  Future<bool> _tap() async {
     if (!socketservice.isConnect()) {
+      debugPrint('[呼出] 出せません：サーバーに接続されていません');
       AppManager.toast("接続されていません。", bgColor: Colors.blue);
-      return;
+      return false;
     }
     if (_tapping) {
-      return;
+      debugPrint('[呼出] 出せません：すでに呼出中です');
+      return false;
     }
+    debugPrint('[呼出] 開始します');
     _tapping = true;
     _active = false;
     _pauseInfoPlayback();
@@ -1115,6 +1122,7 @@ class _RoomPageState extends State<RoomPage>
     _startGetInfoTimer(isGet: true);
     _resumeInfoPlayback();
     _piFocusHome();
+    return true;
   }
 
   Future<void> _piCallAddress(Address user) async {
@@ -1648,9 +1656,114 @@ class _RoomPageState extends State<RoomPage>
     _onCallButton();
   }
 
+  /// 呼び出しボタンが押された。
+  ///
+  /// BLEのスマートボタンと、デリゲータ経由の call_button の共通の入口。
+  ///
+  /// ■ 押す前の状態へ戻す（2026-09-06 追加）
+  ///
+  ///   テレビの電源が切れている時に押されたら、呼出・通話が終わった
+  ///   あとに電源オフへ戻す。押す前の状態に戻すため。
+  ///
+  ///     電源オフ → ボタン → 呼出／通話 → 終了 → 電源オフ
+  ///
+  ///   電源が入っている時に押された場合は何もしない。地デジなどを
+  ///   見ている最中に押しても、その画面は勝手に切り替えない。
+  ///
+  ///   状態を調べるのは画面を起こす前でなければならない。起きたあとでは
+  ///   screenOn が true になり、消えていたことが分からなくなる。
+  ///   着信（_beginSafetyCheck）でも同じ順序にしている。
   Future<void> _onCallButton() async {
     _safetyCheckEnd(restoreTv: false);
-    _tap();
+
+    var wasOff = false;
+    if (TvUtil.isTelevision) {
+      try {
+        // 2つの状態確認を並列にして、呼出の開始を遅らせない。
+        // Android 12 は電源オフでも stayawake のため isScreenOn だけでは
+        // 足りない。TCLのスクリーンレス判定を OR で見る。
+        final states = await Future.wait<bool>([
+          TvUtil.isScreenOn().catchError((_) => true),
+          TvUtil.isTvStandby().catchError((_) => false),
+        ]);
+        wasOff = !states[0] || states[1];
+      } catch (_) {}
+      if (wasOff) {
+        // 直前の呼出の「電源オフへ戻す」指示が残っていると、
+        // 起こしてもすぐ消されてしまう。先に取り消す。
+        //
+        // 呼出が終わったあと、テレビは10秒ほどオン／オフを繰り返す。
+        //   11:04:48.492 lockScreen（戻す指示）
+        //   11:04:52.679 画面オン
+        //   11:04:53.485 画面オフ ours=false ← テレビ側が待機へ入ろうとする
+        //   11:04:55.995 画面オン
+        //   11:04:58.890 画面オフ ours=false
+        // この最中に押すと、点いてもすぐ消え、カメラが起動しない。
+        // 2026-09-06 の実機で発生した。
+        //
+        // 戻すための記録は、呼出が終わったあとに
+        // restoreAfterSafety が付け直すので、ここで消してよい。
+        try {
+          await TvUtil.setScreenOffAtCall(false);
+        } catch (_) {}
+      }
+      debugPrint('[RatocButton] 押す前の状態 電源オフ=$wasOff');
+
+      // 眠っているテレビを起こしてから呼び出す。
+      //
+      // 見守り（_beginSafetyCheck）には起こす処理があるが、ボタンの
+      // 経路には無かった。電源オフのまま押すと、眠ったまま呼び出そうと
+      // していた。2026-09-06 の実機で asleep=true のまま20秒なにも
+      // 起きないことを確認したため補う。
+      if (wasOff) {
+        try {
+          await TvUtil.wakeScreen(forcePowerOn: true);
+          await TvUtil.bringToFront();
+        } catch (e) {
+          debugPrint('[RatocButton] 画面を起こせません $e');
+        }
+        // 前面に戻り切るまで待ってから呼び出す。
+        //
+        // 待たずに始めると、あとから届く resumed で socket が繋ぎ直され、
+        // 通話の取り決めが二重になる。2026-09-06 の実機で
+        // _receiveOffer が2回走り、相手の映像が0コマになった。
+        //
+        //   10:54:22.170  roomtalk initState
+        //   10:54:22.278  resumed          ← 通話画面より後に届く
+        //   10:54:28.145  peer _receiveOffer
+        //   10:54:28.197  peer _receiveOffer  ← 二重
+        //
+        // 着信の _receiveWhenResumed と同じ待ち方にする。
+        if (WidgetsBinding.instance.lifecycleState !=
+            AppLifecycleState.resumed) {
+          for (var i = 0; i < 40; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+            if (!mounted) return;
+            if (WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed) {
+              break;
+            }
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+        } else {
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+        }
+        if (!mounted) return;
+        debugPrint('[RatocButton] 前面に戻りました。呼び出します');
+      }
+    }
+
+    final called = await _tap();
+    debugPrint('[RatocButton] 呼出を出した=$called 電源オフだった=$wasOff');
+
+    if (wasOff && called && TvUtil.isTelevision) {
+      debugPrint('[RatocButton] 呼出が終わったので電源オフへ戻します');
+      try {
+        await TvUtil.restoreAfterSafety(toPowerOff: true);
+      } catch (e) {
+        debugPrint('[RatocButton] 電源オフへ戻せません $e');
+      }
+    }
   }
 
   @override
