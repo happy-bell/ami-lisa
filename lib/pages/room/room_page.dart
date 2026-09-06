@@ -1090,39 +1090,64 @@ class _RoomPageState extends State<RoomPage>
       debugPrint('[呼出] 出せません：すでに呼出中です');
       return false;
     }
-    debugPrint('[呼出] 開始します');
-    _tapping = true;
-    _active = false;
-    _pauseInfoPlayback();
-    _stopGetInfoTimer();
-    var list = context.read<AddressStore>().addressList;
-    AppManager.selectUser = list[0];
-    AppManager.status = AppStatus.Call;
-
-    if (_sleeptimer != null) {
-      _sleeptimer!.cancel();
+    // 呼び出す相手がいなければ、旗を立てる前に帰る。
+    //
+    // 立ててから落ちると、以後ずっと「すでに呼出中」で見送られ続ける。
+    // 2026-09-06 16:23 に実機でそうなり、ボタンが効かなくなった。
+    //
+    //   16:23:10.825  [呼出] 開始します        ← 旗を立てた
+    //                 （roomtalk initState が無い＝通話画面が開かないまま失敗）
+    //   16:24:10.369  出せません：すでに呼出中です
+    final list = context.read<AddressStore>().addressList;
+    if (list.isEmpty) {
+      debugPrint('[呼出] 出せません：呼び出す相手がいません');
+      AppManager.toast("呼び出す相手がいません。", bgColor: Colors.blue);
+      return false;
     }
 
-    final talkResult = await Navigator.of(context, rootNavigator: true)
-        .push(
+    debugPrint('[呼出] 開始します');
+    _tapping = true;
+    try {
+      _active = false;
+      _pauseInfoPlayback();
+      _stopGetInfoTimer();
+      AppManager.selectUser = list[0];
+      AppManager.status = AppStatus.Call;
+
+      if (_sleeptimer != null) {
+        _sleeptimer!.cancel();
+      }
+
+      await Navigator.of(context, rootNavigator: true).push(
         PageRouteBuilder(
-          pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
+          pageBuilder: (BuildContext context, Animation<double> animation1,
+              Animation<double> animation2) {
             return RoomTalkPage();
           },
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,
-        )
-    );
-    print('[DEBUG PRINT] from roomtalk');
-    audio.stopCall();
-    audio.stopRingtone();
-    _active = true;
-    socketservice.delegate = this;
-    _tapping = false;
-    _startGetInfoTimer(isGet: true);
-    _resumeInfoPlayback();
-    _piFocusHome();
-    return true;
+        ),
+      );
+      print('[DEBUG PRINT] from roomtalk');
+      audio.stopCall();
+      audio.stopRingtone();
+      _active = true;
+      socketservice.delegate = this;
+      _startGetInfoTimer(isGet: true);
+      _resumeInfoPlayback();
+      _piFocusHome();
+      return true;
+    } catch (e) {
+      debugPrint('[呼出] 途中で失敗しました $e');
+      _active = true;
+      _startGetInfoTimer(isGet: true);
+      _resumeInfoPlayback();
+      return false;
+    } finally {
+      // 何があっても旗は降ろす。降ろし忘れると、そのあとボタンが
+      // 永久に効かなくなる。呼び出しボタンなので必ず戻すこと。
+      _tapping = false;
+    }
   }
 
   Future<void> _piCallAddress(Address user) async {
