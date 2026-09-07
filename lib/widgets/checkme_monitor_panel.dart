@@ -11,6 +11,18 @@ import 'package:amiapp/services/tv_pi_checkme_share.dart';
 class CheckmeMonitorPanel extends StatefulWidget {
   const CheckmeMonitorPanel({super.key});
 
+  /// 脈波の向きが正しいか、実データで確かめる。
+  ///
+  /// 推測で符号を反転させないための道具。測定中のデータを渡して使う。
+  ///
+  ///   final r = CheckmeMonitorPanel.checkPlethPolarity(ecg, pleth);
+  ///   debugPrint('脈波の向き: $r');
+  ///
+  /// needInvert が今の設定と食い違ったら、機種か送られてくる値が
+  /// 変わったということ。詳しくは [_CheckmeWavePainter.checkPlethPolarity]。
+  static PlethPolarity checkPlethPolarity(List<int> ecg, List<int> pleth) =>
+      _CheckmeWavePainter.checkPlethPolarity(ecg, pleth);
+
   @override
   State<CheckmeMonitorPanel> createState() => _CheckmeMonitorPanelState();
 }
@@ -280,6 +292,25 @@ class _CheckmeWavePainter extends CustomPainter {
   static const _gridMajor = Color(0xFF78867C);
   static const _ecg = Color(0xFF22E022);
   static const _pleth = Color(0xFF37B6F0);
+
+  /// 脈波（PPG）を上下反転して描くかどうか。
+  ///
+  /// Checkme Pro が送ってくる脈波は「受光量」そのもの。
+  /// 収縮期は指先の血液量が増える → 光の吸収が増える → 受光量は**下がる**。
+  /// つまり脈が来た瞬間に生値は小さくなる。
+  /// そのまま描くと山と谷が入れ替わり、「緩やかに立ち上がって急に落ちる」
+  /// ノコギリ状になる。正しい脈波はその逆で、
+  /// 「急峻に立ち上がり（収縮期）、緩やかに下降する（拡張期）」。
+  ///
+  /// 2026-09-08 の指摘と2枚の画像から反転と判定した。
+  /// 機種が変わったら [checkPlethPolarity] で確かめてから切り替えること。
+  static const bool _plethInvert = true;
+
+  /// 心電図は電位そのものなので**絶対に反転しない。**
+  /// R波が上向きであることに診断上の意味があるため。
+  /// この定数は「反転させない」ことを明示するために置いてある。
+  /// 値を変えてはいけない。
+  static const bool _ecgInvert = false;
   static const _majorSquares = 5.0;
   static const _smallPerMajor = 25.0;
   static const _cellsAcross = _majorSquares * _smallPerMajor;
@@ -377,7 +408,10 @@ class _CheckmeWavePainter extends CustomPainter {
     peak = absDev[(absDev.length * 0.98).floor().clamp(0, absDev.length - 1)];
     // 1.0mV = 大マス2つ（小マス10）。R波がだいたいこの高さになる。
     final targetPx = 10.0 * mm;
-    final gain = peak < 20 ? targetPx / 2000.0 : targetPx / peak;
+    // 心電図は反転しない（_ecgInvert は常に false）。
+    // 上向きが正の電位。R波が上に出る向きを守る。
+    final gain =
+        (peak < 20 ? targetPx / 2000.0 : targetPx / peak) * (_ecgInvert ? -1 : 1);
     final mid = (top + bottom) / 2;
     // 共有波形は 46amip4 checkme_monitor.php と同じく横幅いっぱいに伸ばす。
     final stepX = stretchToWidth && samples.length > 1
@@ -427,7 +461,11 @@ class _CheckmeWavePainter extends CustomPainter {
     final path = Path();
     for (var i = 0; i < samples.length; i++) {
       final x = i * stepX;
-      final y = bottom - pad - ((samples[i] - lo) / span) * (band - pad * 2);
+      // 0〜1 に正規化してから、必要なら上下を入れ替える。
+      // 反転はここだけで行い、拡大率とは切り離してある。
+      final norm = (samples[i] - lo) / span;
+      final v = _plethInvert ? 1.0 - norm : norm;
+      final y = bottom - pad - v * (band - pad * 2);
       if (i == 0) {
         path.moveTo(x, y);
       } else {
@@ -486,6 +524,82 @@ class _CheckmeWavePainter extends CustomPainter {
     return out;
   }
 
+  /// 脈波の向きが正しいか、実データで確かめる。
+  ///
+  /// 推測で符号を反転させないための道具。
+  /// 脈波伝播時間により、R波の 0.15〜0.35秒後に収縮期のピークが来る。
+  /// その区間で生値が**下がる**なら、受光量ベースなので反転が要る。
+  ///
+  /// 戻り値の needInvert が [_plethInvert] と食い違ったら、
+  /// 機種か送られてくる値が変わったということ。
+  ///
+  /// 使い方
+  ///   final r = CheckmeMonitorPanel.checkPlethPolarity(ecg, pleth);
+  ///   debugPrint('脈波の向き: $r');
+  ///
+  /// [ecg] と [pleth] は同じ長さ・同じサンプリングレート（125Hz）を前提とする。
+  static PlethPolarity checkPlethPolarity(List<int> ecg, List<int> pleth) {
+    const fs = _fs;
+    if (ecg.length < fs || pleth.length < fs) {
+      return const PlethPolarity(needInvert: null, votes: 0, beats: 0);
+    }
+    final n = math.min(ecg.length, pleth.length);
+
+    // R波を拾う。中央値から大きく上に外れた点の山を1拍とみなす。
+    final sorted = List<int>.from(ecg.take(n))..sort();
+    final mid = sorted[n >> 1];
+    final dev = <int>[];
+    for (var i = 0; i < n; i++) {
+      dev.add((ecg[i] - mid).abs());
+    }
+    final ds = List<int>.from(dev)..sort();
+    final thr = ds[(ds.length * 0.97).floor().clamp(0, ds.length - 1)];
+    if (thr <= 0) {
+      return const PlethPolarity(needInvert: null, votes: 0, beats: 0);
+    }
+
+    final peaks = <int>[];
+    final refractory = (0.25 * fs).round(); // 不応期。1拍を二重に数えない
+    var i = 1;
+    while (i < n - 1) {
+      if (ecg[i] - mid >= thr &&
+          ecg[i] >= ecg[i - 1] &&
+          ecg[i] >= ecg[i + 1]) {
+        peaks.add(i);
+        i += refractory;
+      } else {
+        i++;
+      }
+    }
+
+    // 各拍について、R波の 0.15〜0.35秒後に生値が上下どちらへ振れたかを数える
+    final from = (0.15 * fs).round();
+    final to = (0.35 * fs).round();
+    var votes = 0;
+    var beats = 0;
+    for (final r in peaks) {
+      final s0 = r + from;
+      final e0 = r + to;
+      if (s0 < 0 || e0 >= pleth.length) continue;
+      final base = pleth[r];
+      var up = 0;
+      var dn = 0;
+      for (var k = s0; k < e0; k++) {
+        final d = pleth[k] - base;
+        if (d > up) up = d;
+        if (d < dn) dn = d;
+      }
+      // 振れ幅が大きいほうを1票とする
+      votes += (dn.abs() > up) ? -1 : 1;
+      beats++;
+    }
+    if (beats < 3) {
+      return PlethPolarity(needInvert: null, votes: votes, beats: beats);
+    }
+    // マイナス優勢 ＝ 生値が下がる ＝ 反転が必要
+    return PlethPolarity(needInvert: votes < 0, votes: votes, beats: beats);
+  }
+
   double _median(List<double> data) {
     final s = List<double>.from(data)..sort();
     final n = s.length;
@@ -499,4 +613,26 @@ class _CheckmeWavePainter extends CustomPainter {
     return oldDelegate.version != version ||
         oldDelegate.stretchToWidth != stretchToWidth;
   }
+}
+
+/// [_CheckmeWavePainter.checkPlethPolarity] の結果。
+class PlethPolarity {
+  const PlethPolarity({
+    required this.needInvert,
+    required this.votes,
+    required this.beats,
+  });
+
+  /// true なら反転が必要。判定できなかったときは null。
+  final bool? needInvert;
+
+  /// 拍ごとの投票の合計。マイナスなら「生値が下がる」が優勢。
+  final int votes;
+
+  /// 判定に使えた拍の数。3拍未満だと判定しない。
+  final int beats;
+
+  @override
+  String toString() =>
+      'PlethPolarity(needInvert: $needInvert, votes: $votes, beats: $beats)';
 }
