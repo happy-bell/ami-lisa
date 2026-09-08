@@ -278,6 +278,19 @@ class _CheckmeMonitorPanelState extends State<CheckmeMonitorPanel> {
   }
 }
 
+/// 共有波形として送るサンプル数（125Hz）。
+///
+/// 患者側の表示が画面に出しているのと**同じ長さ**にしてある。
+/// 患者側は「30%間引いても格子が埋まるよう」5秒ぶん(625)の 10/7 倍を
+/// 取っているため、893サンプル＝約7.14秒が画面に出ている。
+///
+/// ドクター側は受け取った波形を横幅いっぱいに配るので、
+/// **送る長さがそのまま相手の時間軸になる。**
+/// ここを5秒ぶんにすると、ドクターだけ時間軸が変わってしまう。
+///
+/// 患者側の表示を変えるときは、この値も一緒に直すこと。
+const int kCheckmeShareSamples = 893;
+
 class _CheckmeWavePainter extends CustomPainter {
   _CheckmeWavePainter({
     required this.ecg,
@@ -396,7 +409,13 @@ class _CheckmeWavePainter extends CustomPainter {
     double mm,
     int visible,
   ) {
-    final samples = _prepare(data, stretchToWidth ? math.min(data.length, (5 * _fs).round()) : visible);
+    final samples = _prepare(
+      data,
+      // 共有波形は送られてきた分をそのまま使う。長さを削ると時間軸がずれる。
+      stretchToWidth ? data.length : visible,
+      // 送信側で間引き済みなので、ここでは間引かない。
+      thin: !stretchToWidth,
+    );
     if (samples.length < 4) return;
     final baseline = _median(samples);
     var peak = 0.0;
@@ -444,7 +463,13 @@ class _CheckmeWavePainter extends CustomPainter {
     double mm,
     int visible,
   ) {
-    final samples = _prepare(data, stretchToWidth ? math.min(data.length, (5 * _fs).round()) : visible);
+    final samples = _prepare(
+      data,
+      // 共有波形は送られてきた分をそのまま使う。長さを削ると時間軸がずれる。
+      stretchToWidth ? data.length : visible,
+      // 送信側で間引き済みなので、ここでは間引かない。
+      thin: !stretchToWidth,
+    );
     if (samples.length < 4) return;
     var lo = samples.first;
     var hi = samples.first;
@@ -486,7 +511,12 @@ class _CheckmeWavePainter extends CustomPainter {
       ..isAntiAlias = true;
   }
 
-  List<double> _prepare(List<int> data, int visible) {
+  /// 描くサンプルを整える。
+  ///
+  /// [thin] が false のときは間引かない。共有で届いた波形は
+  /// **送信側が既に30%間引いている**ため、ここで重ねて間引くと
+  /// 元の49%まで減って波形が潰れる。時間軸は変わらないが荒くなる。
+  List<double> _prepare(List<int> data, int visible, {bool thin = true}) {
     if (data.length < 4) return const [];
     final start = math.max(0, data.length - visible);
     final out = <double>[];
@@ -510,7 +540,7 @@ class _CheckmeWavePainter extends CustomPainter {
       prev = v;
       have = true;
     }
-    return _thinDisplay(out);
+    return thin ? _thinDisplay(out) : out;
   }
 
   /// ラズパイ版の表示だけ 30% 間引き（10点中7点残す）。TCLは変えない。

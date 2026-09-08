@@ -10,6 +10,7 @@ import 'package:amiapp/services/checkme_ring_service.dart';
 import 'package:amiapp/services/socket_io_service.dart';
 import 'package:amiapp/services/tv_pi_checkme_share.dart';
 import 'package:amiapp/services/tv_pi_vitals.dart';
+import 'package:amiapp/widgets/checkme_monitor_panel.dart';
 
 /// ラズパイ版の通話中バイタル共有（46amip4 spo2share / checkmeshare / ringctl）。
 class TvPiTalkVitalSync extends ChangeNotifier {
@@ -243,9 +244,17 @@ class TvPiTalkVitalSync extends ChangeNotifier {
     return data.sublist(data.length - keep);
   }
 
-  /// 5秒分（125Hz）を送り、表示と同じ30%間引き。長すぎると相手側で心拍が詰まる。
+  /// 患者側の表示と**同じ長さ**を送り、表示と同じ30%間引きをかける。
+  ///
+  /// ドクター側は受け取った波形を横幅いっぱいに配るため、
+  /// **送る長さがそのまま相手の時間軸になる。**
+  /// 5秒ぶん(625)にすると患者は約7.14秒、ドクターは5秒となり、
+  /// 同じ波形なのに横の伸びが食い違う。長さを揃えれば一致する。
+  ///
+  /// 長さの定義は [kCheckmeShareSamples]（checkme_monitor_panel.dart）。
+  /// 患者側の表示を変えるときは、そちらと一緒に直すこと。
   List<dynamic> _shareWave(List<int> data) {
-    final keep = _tail(data, 625);
+    final keep = _tail(data, kCheckmeShareSamples);
     final out = <int>[];
     for (var i = 0; i < keep.length; i++) {
       if (i % 10 < 7) out.add(keep[i]);
