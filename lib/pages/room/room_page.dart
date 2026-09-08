@@ -1692,8 +1692,14 @@ class _RoomPageState extends State<RoomPage>
   ///
   ///     電源オフ → ボタン → 呼出／通話 → 終了 → 電源オフ
   ///
-  ///   電源が入っている時に押された場合は何もしない。地デジなどを
-  ///   見ている最中に押しても、その画面は勝手に切り替えない。
+  ///   地デジ・Netflix・YouTube など他のアプリを見ている最中に押されたら、
+  ///   呼出・通話が終わったあとにそのアプリへ戻す（2026-09-08 追加）。
+  ///   前面へ出す前に、着信と同じ captureForegroundApp で直前のアプリを
+  ///   覚えておき、終わったら returnToPreviousApp で戻す。
+  ///
+  ///     地デジ → ボタン → 呼出／通話 → 終了 → 地デジ
+  ///
+  ///   アプリが最初から前面にいた時は何もしない。
   ///
   ///   状態を調べるのは画面を起こす前でなければならない。起きたあとでは
   ///   screenOn が true になり、消えていたことが分からなくなる。
@@ -1702,6 +1708,8 @@ class _RoomPageState extends State<RoomPage>
     _safetyCheckEnd(restoreTv: false);
 
     var wasOff = false;
+    // 画面は点いているが、他のアプリが前面にいたか。
+    var wasBehind = false;
     if (TvUtil.isTelevision) {
       try {
         // 2つの状態確認を並列にして、呼出の開始を遅らせない。
@@ -1753,12 +1761,20 @@ class _RoomPageState extends State<RoomPage>
       //   16:50:21.222  出せません：すでに呼出中です
       //
       // そのため「電源オフだったか」ではなく「前面にいないか」で判断する。
-      final needFront = wasOff ||
-          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed;
+      final resumed =
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+      wasBehind = !wasOff && !resumed;
+      final needFront = wasOff || !resumed;
       if (needFront) {
         try {
           if (wasOff) {
             await TvUtil.wakeScreen(forcePowerOn: true);
+          } else if (wasBehind) {
+            // 地デジ・Netflix などを見ている最中。前面へ出す前に、
+            // 着信と同じ手順で直前のアプリを覚えておく。
+            // （ネイティブ側は、アミが既に前面なら記録しない）
+            await TvUtil.captureForegroundApp();
+            debugPrint('[RatocButton] 他のアプリを見ていたので覚えました');
           }
           await TvUtil.bringToFront();
         } catch (e) {
@@ -1796,14 +1812,26 @@ class _RoomPageState extends State<RoomPage>
     }
 
     final called = await _tap();
-    debugPrint('[RatocButton] 呼出を出した=$called 電源オフだった=$wasOff');
+    debugPrint('[RatocButton] 呼出を出した=$called '
+        '電源オフだった=$wasOff 他アプリだった=$wasBehind');
 
-    if (wasOff && called && TvUtil.isTelevision) {
+    if (!called || !TvUtil.isTelevision) return;
+    if (wasOff) {
+      // 電源オフ → ボタン → 呼出／通話 → 終了 → 電源オフ
       debugPrint('[RatocButton] 呼出が終わったので電源オフへ戻します');
       try {
         await TvUtil.restoreAfterSafety(toPowerOff: true);
       } catch (e) {
         debugPrint('[RatocButton] 電源オフへ戻せません $e');
+      }
+    } else if (wasBehind) {
+      // 地デジ → ボタン → 呼出／通話 → 終了 → 地デジ
+      // 無応答で40秒後に閉じた時も同じ道を通る（_tap が返るのは同じ）。
+      try {
+        final ok = await TvUtil.returnToPreviousApp();
+        debugPrint('[RatocButton] 呼出が終わったので直前のアプリへ戻します=$ok');
+      } catch (e) {
+        debugPrint('[RatocButton] 直前のアプリへ戻せません $e');
       }
     }
   }
