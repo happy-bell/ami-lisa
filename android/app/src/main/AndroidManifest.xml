@@ -32,6 +32,14 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- 待機サービスを「位置情報」タイプの前面サービスにするため（Android 14 以降で必要）。
+         テレビが電源オフ（アプリは背面）のあいだに BLE スキャンを掛け直すと、Android は
+         開始時の位置情報の許可を「アプリの使用中のみ」と判定して結果を全部捨てる
+         （BluetoothUtils: Permission denial: Need ACCESS_FINE_LOCATION）。
+         location タイプの前面サービスを持つプロセスには背面でも位置情報の能力が付く
+         （OomAdjuster: PROCESS_CAPABILITY_FOREGROUND_LOCATION）。2026-09-08 TV005 で確認。
+         スマホでは使わない（IncomingCallOverlayService.foregroundTypes）。 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -192,7 +200,7 @@
             android:name=".IncomingCallOverlayService"
             android:exported="false"
             android:stopWithTask="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="specialUse|location">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="incoming_call_waiting_overlay" />

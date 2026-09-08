@@ -23,6 +23,7 @@ import android.media.AudioPlaybackConfiguration
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.net.Uri
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -1814,10 +1815,53 @@ class IncomingCallOverlayService : Service() {
         }
     }
 
+    /**
+     * 前面サービスの種別。テレビでは「位置情報」を含める（2026-09-08）。
+     *
+     * テレビの電源が切れている間（アプリは背面）に BLE スキャンを掛け直すと、
+     * Android は開始時に位置情報の許可を「アプリの使用中のみ」と判定し、
+     * そのスキャンの結果を全部捨てる。
+     *   BluetoothUtils: Permission denial: Need ACCESS_FINE_LOCATION permission
+     *                   to get scan results
+     * 2026-09-08 TV005 で、掛け直しのたびに受信が 0 件になった原因がこれだった。
+     *
+     * location タイプの前面サービスを持つプロセスには、背面でも位置情報の
+     * 能力が付く（OomAdjuster: PROCESS_CAPABILITY_FOREGROUND_LOCATION →
+     * AppOpsService.evalMode が MODE_ALLOWED を返す）。待機サービスは常時
+     * 前面化しているので、ここに型を足すだけで掛け直しが背面でも通る。
+     * appops を手で allow にしても権限管理側に戻されるため使えない。
+     *
+     * スマホでは付けない。Android 14 以降は location 型の前面化に権限と
+     * 起動条件が要り、着信待機が例外で落ちる恐れがあるため。
+     * テレビ判定は AmiIncomingFcmReceiver.isTelevision と同じ。
+     */
+    private fun foregroundTypes(): Int {
+        var t = 0
+        if (Build.VERSION.SDK_INT >= 34) {
+            t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        }
+        if (AmiIncomingFcmReceiver.isTelevision(this)) {
+            t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        }
+        return t
+    }
+
+    /** 型付きで前面化する。型が決まらない環境ではマニフェストの宣言に従う。 */
+    private fun startForegroundTyped(id: Int, notification: Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val t = foregroundTypes()
+            if (t != 0) {
+                startForeground(id, notification, t)
+                return
+            }
+        }
+        startForeground(id, notification)
+    }
+
     /** startForegroundService のあとは必ず startForeground する。省略すると即落ちる。 */
     private fun ensureForeground(reason: String) {
         try {
-            startForeground(NOTIF_ID, buildWaitingNotification())
+            startForegroundTyped(NOTIF_ID, buildWaitingNotification())
             foregroundStarted = true
             Log.i(TAG, "startForeground ok ($reason)")
         } catch (e: Exception) {
@@ -2236,7 +2280,7 @@ class IncomingCallOverlayService : Service() {
         val fromPowerOff = wasScreenOffAtCall(this)
         // 電源オフ発／画面オフ／オーバーレイ不可は着信用 Activity（はい／いいえ）。
         val needActivity = fromPowerOff || !screenOn || !overlayOk
-        startForeground(
+        startForegroundTyped(
             INCOMING_NOTIF_ID,
             buildIncomingNotification(callerId, label, useFullScreen = needActivity)
         )
@@ -2380,7 +2424,7 @@ class IncomingCallOverlayService : Service() {
             Log.i(TAG, "overlay shown callerId=$callerId name=$callerName")
         } catch (e: Exception) {
             Log.e(TAG, "failed to add overlay; IncomingCallActivity", e)
-            startForeground(
+            startForegroundTyped(
                 INCOMING_NOTIF_ID,
                 buildIncomingNotification(callerId, callerName, useFullScreen = true)
             )
