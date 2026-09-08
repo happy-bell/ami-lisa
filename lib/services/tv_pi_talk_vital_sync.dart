@@ -66,6 +66,55 @@ class TvPiTalkVitalSync extends ChangeNotifier {
     return CheckmeRingService.instance.spo2?.toString() ?? '-';
   }
 
+  /// 通話中のバイタル表に出す HR。
+  ///
+  ///   ドクター  相手（患者）から届いた Checkme の値
+  ///   患者      自分の Checkme の値
+  /// どちらも無ければサーバーから取った値をそのまま使う。
+  String hrText(String fetched) {
+    final share = CheckmeShareView.instance;
+    if (share.recent && share.hr != null) return '${share.hr}';
+    final live = CheckmeProService.instance.hr;
+    if (live != null) return '$live';
+    return fetched;
+  }
+
+  /// 通話中のバイタル表に出す PI。優先順位は [hrText] と同じ。
+  String piText(String fetched) {
+    final share = CheckmeShareView.instance;
+    if (share.recent && share.pi != null) {
+      return share.pi!.toStringAsFixed(1);
+    }
+    final proPi = CheckmeProService.instance.pi;
+    if (proPi != null) return proPi.toStringAsFixed(1);
+    final ringPi = CheckmeRingService.instance.pi;
+    if (ringPi != null) return '$ringPi';
+    return fetched;
+  }
+
+  /// 通話中のバイタル表に出す SpO2。
+  /// Ring の共有（spo2share）→ Checkme の共有 → 自分の機器 → 取得値の順。
+  String spo2TextOr(String fetched) {
+    if (receivingSpo2Share) return remoteSpo2?.toString() ?? fetched;
+    final share = CheckmeShareView.instance;
+    if (share.recent && share.spo2 != null) return '${share.spo2}';
+    final mine = CheckmeRingService.instance.spo2 ??
+        CheckmeProService.instance.spo2;
+    if (mine != null) return '$mine';
+    return fetched;
+  }
+
+  /// 通話中のバイタル表に出す PR。優先順位は [spo2TextOr] と同じ。
+  String prTextOr(String fetched) {
+    if (receivingSpo2Share) return remotePr?.toString() ?? fetched;
+    final share = CheckmeShareView.instance;
+    if (share.recent && share.pr != null) return '${share.pr}';
+    final mine = CheckmeRingService.instance.pulse ??
+        CheckmeProService.instance.pr;
+    if (mine != null) return '$mine';
+    return fetched;
+  }
+
   String get prText {
     if (receivingSpo2Share) return remotePr?.toString() ?? '-';
     return CheckmeRingService.instance.pulse?.toString() ?? '-';

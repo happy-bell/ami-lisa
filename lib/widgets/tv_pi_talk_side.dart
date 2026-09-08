@@ -13,6 +13,7 @@ import 'package:amiapp/widgets/and_vital_result_popup.dart';
 import 'package:amiapp/widgets/checkme_monitor_panel.dart';
 import 'package:amiapp/widgets/tv_pi_focus_button.dart';
 import 'package:amiapp/widgets/tv_pi_spo2_popup.dart';
+import 'package:amiapp/widgets/tv_room_sidebar.dart';
 
 /// ラズパイ版通話中の右列（通話終了・Ring/Checkme・自分映像・バイタル）。
 class TvPiTalkSide extends StatefulWidget {
@@ -154,7 +155,44 @@ class _TvPiTalkSideState extends State<TvPiTalkSide> {
             ),
           ),
         ],
+        // 通話中のバイタル表。
+        //
+        //   ドクター  相手（患者）のバイタルを出す
+        //   患者      自分のバイタルを出す
+        //
+        // どちらの値を取るかは TvPiTalkVitalSync._refreshVitals が決めており
+        // （ドクターは相手のID、患者は自分のID）、ここは出すだけ。
+        if (widget.talking) ...[
+          const SizedBox(height: 8),
+          _vitalTable(context),
+        ],
       ],
+    );
+  }
+
+  /// 通話中に出すバイタル表。ホーム右下と同じ [TvPiVitalTable] を使う。
+  ///
+  /// 高さは画面の45%。表は最大11行を基準に1行の高さを決めるので、
+  /// 値の無い行が隠れても文字の大きさは変わらない。
+  Widget _vitalTable(BuildContext context) {
+    final v = _sync.vitals;
+    final h = MediaQuery.of(context).size.height;
+    return SizedBox(
+      height: h * 0.45,
+      child: TvPiVitalTable(
+        name: _sync.displayName,
+        bpHigh: v.bp1,
+        bpLow: v.bp2,
+        bpPulse: v.bp4,
+        temp: v.bt1,
+        weight: v.bw1,
+        roomTemp: v.temp,
+        roomHum: v.pressure,
+        spo2: _sync.spo2TextOr(v.spo2),
+        pr: _sync.prTextOr(v.spo2Pr),
+        hr: _sync.hrText(v.hr),
+        pi: _sync.piText(v.pi),
+      ),
     );
   }
 }
