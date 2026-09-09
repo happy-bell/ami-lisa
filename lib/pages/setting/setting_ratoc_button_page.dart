@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:amiapp/helpers/tv_util.dart';
 import 'package:amiapp/services/ratoc_button_service.dart';
 import 'package:amiapp/services/ratoc_button_store.dart';
 import 'package:amiapp/widgets/tv_focusable.dart';
@@ -110,16 +109,16 @@ class _SettingRatocButtonPageState extends State<SettingRatocButtonPage> {
     required VoidCallback onActivate,
     bool autofocus = false,
   }) {
+    // 中の入れ物に色を塗らない。
+    //
+    // TvSettingFocus は、当たっている行の背景を水色にし、左に青い帯を出す。
+    // ここで白を塗ると、その水色が隠れて左の帯しか見えなくなる。
+    // 設定画面（setting_page.dart の tapListContainer）も色を塗っていない。
+    // 下の区切り線も TvSettingFocus が引くので、ここでは引かない。
     return TvSettingFocus(
       autofocus: autofocus,
       onActivate: onActivate,
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            bottom: BorderSide(color: Color.fromARGB(255, 220, 220, 220)),
-          ),
-        ),
         height: _rowHeight,
         padding: const EdgeInsets.symmetric(horizontal: 10.0),
         child: Row(
@@ -191,12 +190,29 @@ class _SettingRatocButtonPageState extends State<SettingRatocButtonPage> {
         trailing: const Icon(Icons.refresh, color: Colors.grey),
         onActivate: _scanning ? () {} : _search,
       ),
+      // テレビでは上の「←」を押せないので、一覧の最後に戻る行を置く。
+      // リモコンの下キーで辿り着ける。
+      _row(
+        title: '戻る',
+        sub: '設定に戻ります',
+        trailing: const Icon(Icons.arrow_back, color: Colors.grey),
+        onActivate: () {
+          if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+        },
+      ),
     ];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('呼び出しボタン'),
-        automaticallyImplyLeading: !TvUtil.isTelevision,
+        // テレビでも「←」を出す。押せはしないが、戻れることが分かる。
+        // 実際に戻るのは一覧の最後の「戻る」か、リモコンの戻るキー。
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+          },
+        ),
       ),
       body: ListView(children: rows),
     );
