@@ -106,12 +106,25 @@ flutter_native_splash:
 # flutter pub run flutter_native_splash:create
 
 flutter_icons:
-  # ~/fvm/versions/3.0.5/bin/flutter pub run flutter_launcher_icons:main
-  #  image_path: "assets/images/icon-128x128.png"
+  # dart run flutter_launcher_icons
+  image_path: "assets/images/icon/icon.png"
   image_path_android: "assets/images/icon/icon.png"
   image_path_ios: "assets/images/icon/icon.png"
-  android: true # can specify file name here e.g. "ic_launcher"
-  ios: true # can specify file name here e.g. "My-Launcher-Icon"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/icon/icon_foreground.png"
+
+flutter_launcher_icons:
+  image_path: "assets/images/icon/icon.png"
+  image_path_android: "assets/images/icon/icon.png"
+  image_path_ios: "assets/images/icon/icon.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/icon/icon_foreground.png"
 
 # The following section is specific to Flutter packages.
 flutter:
