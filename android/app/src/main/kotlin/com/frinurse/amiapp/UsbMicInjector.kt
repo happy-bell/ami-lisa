@@ -275,6 +275,10 @@ object UsbMicBridge {
     /// アイリス（Changhong）は HAL が USB マイクを出す。UAC で占有すると
     /// AudioRecord が usbaudio HAL を開けず、スマホが無音になる。
     private fun useHalUsbInsteadOfUac(): Boolean {
+        // Streamer も HAL が USB マイクを出す。UAC で占有すると
+        // AudioRecord が開けず、スマホが無音になる（アイリスと同じ）。
+        // TCL は kirkwood ではないので、従来どおり UAC を使う。
+        if (TvAudioHw.isHdmiAudioStick()) return true
         val man = Build.MANUFACTURER.lowercase()
         val brand = Build.BRAND.lowercase()
         val model = Build.MODEL.lowercase()

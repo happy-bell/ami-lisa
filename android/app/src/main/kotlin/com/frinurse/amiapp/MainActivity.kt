@@ -66,6 +66,7 @@ class MainActivity : FlutterActivity() {
     private val actionUsbPermission = "jp.amiplus.lisa.USB_PERMISSION"
     private var probedOnce = false
     private var methodChannel: MethodChannel? = null
+    private val audioHandler = Handler(Looper.getMainLooper())
 
     private val usbPermissionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -525,6 +526,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        audioHandler.removeCallbacksAndMessages(null)
         if (current?.get() === this) {
             current = null
         }
@@ -720,7 +722,6 @@ class MainActivity : FlutterActivity() {
     private fun prepareCommunicationAudio(): Map<String, Any?> {
         val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         am.mode = AudioManager.MODE_NORMAL
-        am.isSpeakerphoneOn = true
         am.isMicrophoneMute = false
 
         var outputSelected: String? = null
@@ -734,24 +735,35 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            am.clearCommunicationDevice()
-            val outs = am.availableCommunicationDevices
-            val preferred = outs.firstOrNull {
-                it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER ||
-                    it.type == AudioDeviceInfo.TYPE_HDMI ||
-                    it.type == AudioDeviceInfo.TYPE_HDMI_ARC ||
-                    it.type == AudioDeviceInfo.TYPE_TELEPHONY
-            } ?: outs.firstOrNull {
-                it.type != AudioDeviceInfo.TYPE_USB_DEVICE &&
-                    it.type != AudioDeviceInfo.TYPE_USB_HEADSET &&
-                    it.type != AudioDeviceInfo.TYPE_USB_ACCESSORY &&
-                    it.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO &&
-                    it.type != AudioDeviceInfo.TYPE_BLUETOOTH_A2DP
-            }
-            if (preferred != null) {
-                am.setCommunicationDevice(preferred)
-                outputSelected = "${preferred.productName} type=${preferred.type}"
+        // Streamer / Chromecast だけ HDMI へ出す。
+        // スピーカー指定は実体が無く、入力も内蔵マイク（無音）へ寄る。
+        // TCL / アイリスは従来どおりスピーカー。
+        if (TvAudioHw.isHdmiAudioStick()) {
+            @Suppress("DEPRECATION")
+            am.isSpeakerphoneOn = false
+            outputSelected = applyHdmiCommunicationDevice(am)
+            scheduleHdmiAudioRestore()
+        } else {
+            am.isSpeakerphoneOn = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                am.clearCommunicationDevice()
+                val outs = am.availableCommunicationDevices
+                val preferred = outs.firstOrNull {
+                    it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER ||
+                        it.type == AudioDeviceInfo.TYPE_HDMI ||
+                        it.type == AudioDeviceInfo.TYPE_HDMI_ARC ||
+                        it.type == AudioDeviceInfo.TYPE_TELEPHONY
+                } ?: outs.firstOrNull {
+                    it.type != AudioDeviceInfo.TYPE_USB_DEVICE &&
+                        it.type != AudioDeviceInfo.TYPE_USB_HEADSET &&
+                        it.type != AudioDeviceInfo.TYPE_USB_ACCESSORY &&
+                        it.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO &&
+                        it.type != AudioDeviceInfo.TYPE_BLUETOOTH_A2DP
+                }
+                if (preferred != null) {
+                    am.setCommunicationDevice(preferred)
+                    outputSelected = "${preferred.productName} type=${preferred.type}"
+                }
             }
         }
 
@@ -760,8 +772,49 @@ class MainActivity : FlutterActivity() {
             "micMute" to am.isMicrophoneMute,
             "speakerOn" to am.isSpeakerphoneOn,
             "output" to outputSelected,
-            "usbInputSeen" to usbInputSeen
+            "usbInputSeen" to usbInputSeen,
+            "hdmiStick" to TvAudioHw.isHdmiAudioStick()
         )
+    }
+
+    private fun applyHdmiCommunicationDevice(am: AudioManager): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
+        am.clearCommunicationDevice()
+        val outs = am.availableCommunicationDevices
+        val hdmiEarc = 29 // AudioDeviceInfo.TYPE_HDMI_EARC
+        val preferred = outs.firstOrNull {
+            it.type == AudioDeviceInfo.TYPE_HDMI ||
+                it.type == AudioDeviceInfo.TYPE_HDMI_ARC ||
+                it.type == hdmiEarc
+        } ?: outs.firstOrNull {
+            it.type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER &&
+                it.type != AudioDeviceInfo.TYPE_TELEPHONY &&
+                it.type != AudioDeviceInfo.TYPE_USB_DEVICE &&
+                it.type != AudioDeviceInfo.TYPE_USB_HEADSET &&
+                it.type != AudioDeviceInfo.TYPE_USB_ACCESSORY &&
+                it.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO &&
+                it.type != AudioDeviceInfo.TYPE_BLUETOOTH_A2DP
+        }
+        if (preferred != null) {
+            am.setCommunicationDevice(preferred)
+            Log.i(tag, "hdmi communication device=${preferred.productName} type=${preferred.type}")
+            return "${preferred.productName} type=${preferred.type}"
+        }
+        Log.w(tag, "hdmi communication device not found outs=${outs.map { "${it.productName}:${it.type}" }}")
+        return null
+    }
+
+    private fun scheduleHdmiAudioRestore() {
+        audioHandler.removeCallbacksAndMessages(null)
+        for (delay in longArrayOf(200, 800, 2000, 4000)) {
+            audioHandler.postDelayed({
+                if (!TvAudioHw.isHdmiAudioStick()) return@postDelayed
+                val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                @Suppress("DEPRECATION")
+                am.isSpeakerphoneOn = false
+                applyHdmiCommunicationDevice(am)
+            }, delay)
+        }
     }
 
     private fun findUsbInput(inputs: Array<AudioDeviceInfo>): AudioDeviceInfo? {
@@ -943,5 +996,22 @@ class MainActivity : FlutterActivity() {
             "usbFound" to (usb != null),
             "inputCount" to inputs.size
         )
+    }
+}
+
+/** HDMI出力だけの箱（Google TV Streamer / Chromecast）。内蔵スピーカーはない。 */
+object TvAudioHw {
+    fun isHdmiAudioStick(): Boolean {
+        val device = Build.DEVICE.lowercase()
+        val product = Build.PRODUCT.lowercase()
+        val model = Build.MODEL.lowercase()
+        val manufacturer = Build.MANUFACTURER.lowercase()
+        return device.contains("kirkwood") ||
+            product.contains("kirkwood") ||
+            device.contains("deadpool") ||
+            device.contains("sabrina") ||
+            device.contains("boreal") ||
+            model.contains("chromecast") ||
+            (model.contains("streamer") && manufacturer.contains("google"))
     }
 }

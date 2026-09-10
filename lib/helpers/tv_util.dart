@@ -147,6 +147,17 @@ class TvUtil {
     return null;
   }
 
+  static Future<Map<String, dynamic>?> prepareCommunicationAudio() async {
+    if (!_isTelevision) return null;
+    try {
+      final raw = await _channel.invokeMethod('prepareCommunicationAudio');
+      if (raw is Map) return Map<String, dynamic>.from(raw);
+    } catch (e) {
+      debugPrint('prepareCommunicationAudio failed: $e');
+    }
+    return null;
+  }
+
   /// USBカメラ（Camera2 または UVC / 既知機種）が挿さっているか。
   /// Wi‑Fiドングルだけのときは false。
   static Future<bool> hasUsbCamera() async {
