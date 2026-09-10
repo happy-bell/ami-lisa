@@ -693,6 +693,13 @@ class Peer {
       } catch (e) {
         print('usbMicStart failed: $e');
       }
+      // WebRTC が setSpeakerphoneOn(true) でスピーカーへ戻すため、もう一度経路を直す。
+      try {
+        final again = await TvUtil.prepareCommunicationAudio();
+        print('prepareCommunicationAudio after stream: $again');
+      } catch (e) {
+        print('prepareCommunicationAudio after stream failed: $e');
+      }
     }
     return stream;
   }
@@ -819,6 +826,12 @@ class Peer {
               } catch (e) {
                 print('re-setSpeakerphoneOn on onTrack failed: $e');
               }
+            } else {
+              try {
+                await TvUtil.prepareCommunicationAudio();
+              } catch (e) {
+                print('prepareCommunicationAudio on onTrack failed: $e');
+              }
             }
           }
         };
@@ -847,6 +860,12 @@ class Peer {
                 await Helper.setSpeakerphoneOn(true);
               } catch (e) {
                 print('re-setSpeakerphoneOn on onAddTrack failed: $e');
+              }
+            } else {
+              try {
+                await TvUtil.prepareCommunicationAudio();
+              } catch (e) {
+                print('prepareCommunicationAudio on onAddTrack failed: $e');
               }
             }
           }

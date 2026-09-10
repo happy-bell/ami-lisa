@@ -21,6 +21,8 @@ import 'package:amiapp/pages/staff/staff_live_view_page.dart';
 import 'package:amiapp/pages/staff/staff_talk_page.dart';
 import 'package:amiapp/pages/setting/setting_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
+import 'package:amiapp/services/ratoc_button_service.dart';
+import 'package:amiapp/services/ratoc_button_store.dart';
 import 'package:amiapp/services/appmanager.dart';
 import 'package:amiapp/services/address_sync.dart';
 import 'package:amiapp/services/audio_service.dart';
@@ -216,6 +218,15 @@ class _RoomPageState extends State<RoomPage>
 
       _startGetInfoTimer(isGet: true);
       _startHealthTimerIfPi();
+      // ラトックのスマートボタン（RS-SCBTN2）を聞き取る。
+      // 待機は弱いスキャンなので、リモコンの邪魔をしない。
+      if (TvUtil.isTelevision) {
+        RatocButtonService.instance.onPressed.listen(_onRatocButton);
+        // 登録を読んでから聞き取る。未登録ならスキャンしない。
+        RatocButtonStore.instance.load().whenComplete(() {
+          RatocButtonService.instance.start();
+        });
+      }
       _syncCheckmeProForLayout();
       if (TvUtil.isTelevision) {
         // 起動時にカメラを開くとランプが点灯する。通話・見守り開始まで開かない。
@@ -236,6 +247,10 @@ class _RoomPageState extends State<RoomPage>
       _handlePendingIncomingIfNeeded();
       _startGetInfoTimer(isGet: true);
       _startHealthTimerIfPi();
+      // 呼出のあとBLEは解放してある。戻ってきたら弱い待機へ戻す。
+      if (TvUtil.isTelevision) {
+        RatocButtonService.instance.resume();
+      }
       unawaited(_refreshUsbCamera());
     } else if (state == AppLifecycleState.paused) {
       if (_sleeptimer != null) {
@@ -1061,45 +1076,78 @@ class _RoomPageState extends State<RoomPage>
     }
   }
 
-  Future<void> _tap() async {
+  /// 一斉呼出を出す。実際に呼び出したら true を返す。
+  ///
+  /// 戻り値は「押す前の状態へ戻す」判断に使う。呼び出していないのに
+  /// 電源オフへ戻すと、押しただけでテレビが消えてしまう。
+  Future<bool> _tap() async {
     if (!socketservice.isConnect()) {
+      debugPrint('[呼出] 出せません：サーバーに接続されていません');
       AppManager.toast("接続されていません。", bgColor: Colors.blue);
-      return;
+      return false;
     }
     if (_tapping) {
-      return;
+      debugPrint('[呼出] 出せません：すでに呼出中です');
+      return false;
     }
+    // 呼び出す相手がいなければ、旗を立てる前に帰る。
+    //
+    // 立ててから落ちると、以後ずっと「すでに呼出中」で見送られ続ける。
+    // 2026-09-06 16:23 に実機でそうなり、ボタンが効かなくなった。
+    //
+    //   16:23:10.825  [呼出] 開始します        ← 旗を立てた
+    //                 （roomtalk initState が無い＝通話画面が開かないまま失敗）
+    //   16:24:10.369  出せません：すでに呼出中です
+    final list = context.read<AddressStore>().addressList;
+    if (list.isEmpty) {
+      debugPrint('[呼出] 出せません：呼び出す相手がいません');
+      AppManager.toast("呼び出す相手がいません。", bgColor: Colors.blue);
+      return false;
+    }
+
+    debugPrint('[呼出] 開始します');
     _tapping = true;
-    _active = false;
-    _pauseInfoPlayback();
-    _stopGetInfoTimer();
-    var list = context.read<AddressStore>().addressList;
-    AppManager.selectUser = list[0];
-    AppManager.status = AppStatus.Call;
+    try {
+      _active = false;
+      _pauseInfoPlayback();
+      _stopGetInfoTimer();
+      AppManager.selectUser = list[0];
+      AppManager.status = AppStatus.Call;
 
-    if (_sleeptimer != null) {
-      _sleeptimer!.cancel();
-    }
+      if (_sleeptimer != null) {
+        _sleeptimer!.cancel();
+      }
 
-    final talkResult = await Navigator.of(context, rootNavigator: true)
-        .push(
+      await Navigator.of(context, rootNavigator: true).push(
         PageRouteBuilder(
-          pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
+          pageBuilder: (BuildContext context, Animation<double> animation1,
+              Animation<double> animation2) {
             return RoomTalkPage();
           },
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,
-        )
-    );
-    print('[DEBUG PRINT] from roomtalk');
-    audio.stopCall();
-    audio.stopRingtone();
-    _active = true;
-    socketservice.delegate = this;
-    _tapping = false;
-    _startGetInfoTimer(isGet: true);
-    _resumeInfoPlayback();
-    _piFocusHome();
+        ),
+      );
+      print('[DEBUG PRINT] from roomtalk');
+      audio.stopCall();
+      audio.stopRingtone();
+      _active = true;
+      socketservice.delegate = this;
+      _startGetInfoTimer(isGet: true);
+      _resumeInfoPlayback();
+      _piFocusHome();
+      return true;
+    } catch (e) {
+      debugPrint('[呼出] 途中で失敗しました $e');
+      _active = true;
+      _startGetInfoTimer(isGet: true);
+      _resumeInfoPlayback();
+      return false;
+    } finally {
+      // 何があっても旗は降ろす。降ろし忘れると、そのあとボタンが
+      // 永久に効かなくなる。呼び出しボタンなので必ず戻すこと。
+      _tapping = false;
+    }
   }
 
   Future<void> _piCallAddress(Address user) async {
@@ -1611,9 +1659,181 @@ class _RoomPageState extends State<RoomPage>
     }
   }
 
+  /// スマートボタンが押された（2回目の発信を捕まえた）。
+  ///
+  /// デリゲータ経由の call_button と同じ入口へ入れる。
+  /// 経路を分けると片方だけ直して食い違うため、まとめておく。
+  ///
+  /// この時点で BLE は解放済み。通話が終わって前面に戻ったら、
+  /// didChangeAppLifecycleState が待機へ戻す。
+  void _onRatocButton(RatocButtonPress p) {
+    print('[RatocButton] 呼出 $p');
+    if (!mounted) return;
+    // 状況に関係なく必ず呼び出す。
+    //
+    // 以前は通話中や状態を見て見送っていた。ところが呼出を止めた直後は
+    // まだ通話中の扱いが残っており、押しても見送られていた。
+    // 呼び出しボタンは押したら必ず鳴るべきなので、条件を付けない。
+    // （2026-09-05 修正）
+    if (p.battery >= 0 && p.battery <= 10) {
+      print('[RatocButton] 電池残量が少ない（${p.battery}%）');
+    }
+    _onCallButton();
+  }
+
+  /// 呼び出しボタンが押された。
+  ///
+  /// BLEのスマートボタンと、デリゲータ経由の call_button の共通の入口。
+  ///
+  /// ■ 押す前の状態へ戻す（2026-09-06 追加）
+  ///
+  ///   テレビの電源が切れている時に押されたら、呼出・通話が終わった
+  ///   あとに電源オフへ戻す。押す前の状態に戻すため。
+  ///
+  ///     電源オフ → ボタン → 呼出／通話 → 終了 → 電源オフ
+  ///
+  ///   地デジ・Netflix・YouTube など他のアプリを見ている最中に押されたら、
+  ///   呼出・通話が終わったあとにそのアプリへ戻す（2026-09-08 追加）。
+  ///   前面へ出す前に、着信と同じ captureForegroundApp で直前のアプリを
+  ///   覚えておき、終わったら returnToPreviousApp で戻す。
+  ///
+  ///     地デジ → ボタン → 呼出／通話 → 終了 → 地デジ
+  ///
+  ///   アプリが最初から前面にいた時は何もしない。
+  ///
+  ///   状態を調べるのは画面を起こす前でなければならない。起きたあとでは
+  ///   screenOn が true になり、消えていたことが分からなくなる。
+  ///   着信（_beginSafetyCheck）でも同じ順序にしている。
   Future<void> _onCallButton() async {
     _safetyCheckEnd(restoreTv: false);
-    _tap();
+
+    var wasOff = false;
+    // 画面は点いているが、他のアプリが前面にいたか。
+    var wasBehind = false;
+    if (TvUtil.isTelevision) {
+      try {
+        // 2つの状態確認を並列にして、呼出の開始を遅らせない。
+        // Android 12 は電源オフでも stayawake のため isScreenOn だけでは
+        // 足りない。TCLのスクリーンレス判定を OR で見る。
+        final states = await Future.wait<bool>([
+          TvUtil.isScreenOn().catchError((_) => true),
+          TvUtil.isTvStandby().catchError((_) => false),
+        ]);
+        wasOff = !states[0] || states[1];
+      } catch (_) {}
+      if (wasOff) {
+        // 直前の呼出の「電源オフへ戻す」指示が残っていると、
+        // 起こしてもすぐ消されてしまう。先に取り消す。
+        //
+        // 呼出が終わったあと、テレビは10秒ほどオン／オフを繰り返す。
+        //   11:04:48.492 lockScreen（戻す指示）
+        //   11:04:52.679 画面オン
+        //   11:04:53.485 画面オフ ours=false ← テレビ側が待機へ入ろうとする
+        //   11:04:55.995 画面オン
+        //   11:04:58.890 画面オフ ours=false
+        // この最中に押すと、点いてもすぐ消え、カメラが起動しない。
+        // 2026-09-06 の実機で発生した。
+        //
+        // 戻すための記録は、呼出が終わったあとに
+        // restoreAfterSafety が付け直すので、ここで消してよい。
+        try {
+          await TvUtil.setScreenOffAtCall(false);
+        } catch (_) {}
+      }
+      debugPrint('[RatocButton] 押す前の状態 電源オフ=$wasOff');
+
+      // 眠っているテレビを起こし、アプリを前面に戻してから呼び出す。
+      //
+      // 見守り（_beginSafetyCheck）には起こす処理があるが、ボタンの
+      // 経路には無かった。電源オフのまま押すと、眠ったまま呼び出そうと
+      // していた。2026-09-06 の実機で asleep=true のまま20秒なにも
+      // 起きないことを確認したため補う。
+      //
+      // 画面が点いていても、アプリが前面にいるとは限らない。地デジや
+      // Netflix を見ている時がそれで、呼出のあと moveTaskToBack で
+      // 背面へ回ることもある。背面のアプリは画面を描かないので、
+      // 通話画面が組み立てられず _tap() が待ち続け、以後ずっと
+      // 「すでに呼出中」で見送られる。2026-09-06 16:50 に実機で発生。
+      //
+      //   16:49:38.800  room life cycle state -> paused
+      //   16:49:56.071  Displayed com.netflix.ninja
+      //   16:50:04.338  [呼出] 開始します（通話画面は開かない）
+      //   16:50:21.222  出せません：すでに呼出中です
+      //
+      // そのため「電源オフだったか」ではなく「前面にいないか」で判断する。
+      final resumed =
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+      wasBehind = !wasOff && !resumed;
+      final needFront = wasOff || !resumed;
+      if (needFront) {
+        try {
+          if (wasOff) {
+            await TvUtil.wakeScreen(forcePowerOn: true);
+          } else if (wasBehind) {
+            // 地デジ・Netflix などを見ている最中。前面へ出す前に、
+            // 着信と同じ手順で直前のアプリを覚えておく。
+            // （ネイティブ側は、アミが既に前面なら記録しない）
+            await TvUtil.captureForegroundApp();
+            debugPrint('[RatocButton] 他のアプリを見ていたので覚えました');
+          }
+          await TvUtil.bringToFront();
+        } catch (e) {
+          debugPrint('[RatocButton] 前面に戻せません $e');
+        }
+        // 前面に戻り切るまで待ってから呼び出す。
+        //
+        // 待たずに始めると、あとから届く resumed で socket が繋ぎ直され、
+        // 通話の取り決めが二重になる。2026-09-06 の実機で
+        // _receiveOffer が2回走り、相手の映像が0コマになった。
+        //
+        //   10:54:22.170  roomtalk initState
+        //   10:54:22.278  resumed          ← 通話画面より後に届く
+        //   10:54:28.145  peer _receiveOffer
+        //   10:54:28.197  peer _receiveOffer  ← 二重
+        //
+        // 着信の _receiveWhenResumed と同じ待ち方にする。
+        if (WidgetsBinding.instance.lifecycleState !=
+            AppLifecycleState.resumed) {
+          for (var i = 0; i < 40; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+            if (!mounted) return;
+            if (WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed) {
+              break;
+            }
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+        } else {
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+        }
+        if (!mounted) return;
+        debugPrint('[RatocButton] 前面に戻りました。呼び出します');
+      }
+    }
+
+    final called = await _tap();
+    debugPrint('[RatocButton] 呼出を出した=$called '
+        '電源オフだった=$wasOff 他アプリだった=$wasBehind');
+
+    if (!called || !TvUtil.isTelevision) return;
+    if (wasOff) {
+      // 電源オフ → ボタン → 呼出／通話 → 終了 → 電源オフ
+      debugPrint('[RatocButton] 呼出が終わったので電源オフへ戻します');
+      try {
+        await TvUtil.restoreAfterSafety(toPowerOff: true);
+      } catch (e) {
+        debugPrint('[RatocButton] 電源オフへ戻せません $e');
+      }
+    } else if (wasBehind) {
+      // 地デジ → ボタン → 呼出／通話 → 終了 → 地デジ
+      // 無応答で40秒後に閉じた時も同じ道を通る（_tap が返るのは同じ）。
+      try {
+        final ok = await TvUtil.returnToPreviousApp();
+        debugPrint('[RatocButton] 呼出が終わったので直前のアプリへ戻します=$ok');
+      } catch (e) {
+        debugPrint('[RatocButton] 直前のアプリへ戻せません $e');
+      }
+    }
   }
 
   @override

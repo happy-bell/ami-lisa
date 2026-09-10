@@ -16,6 +16,8 @@ import 'package:amiapp/services/tv_message_schedule.dart';
 import 'package:amiapp/pages/setting/setting_multi_select_page.dart';
 import 'package:amiapp/pages/staff/staff_page.dart';
 import 'package:amiapp/pages/singin/signin_page.dart';
+import 'package:amiapp/pages/setting/setting_ratoc_button_page.dart';
+import 'package:amiapp/services/ratoc_button_store.dart';
 import 'package:amiapp/services/appmanager.dart';
 import 'package:amiapp/services/address_sync.dart';
 
@@ -530,6 +532,18 @@ class _SettingPageState extends State<SettingPage> {
             }),
           );
         }
+        // ラトックのスマートボタン（RS-SCBTN2）。
+        // 登録した1台だけを聞き取る。未登録の間はスキャンしない。
+        listContainers.add(
+          nextListContainer('呼び出しボタン', _ratocButtonLabel(), () async {
+            await Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => const SettingRatocButtonPage(),
+            ));
+            setState(() {
+              _savedSwitch = !_savedSwitch;
+            });
+          }),
+        );
         listContainers.add(
           nextListContainer('BLE ペアリング', '', () {
             showDialog<void>(
@@ -800,6 +814,13 @@ class _SettingPageState extends State<SettingPage> {
         ),
       ),
     );
+  }
+
+  /// 設定一覧の右側に出す文言。
+  String _ratocButtonLabel() {
+    final st = RatocButtonStore.instance;
+    if (!st.isRegistered) return '未登録';
+    return st.name.isEmpty ? st.mac : st.name;
   }
 
   Widget abountListContainer() {

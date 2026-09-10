@@ -10,6 +10,7 @@ import 'package:amiapp/services/checkme_ring_service.dart';
 import 'package:amiapp/services/socket_io_service.dart';
 import 'package:amiapp/services/tv_pi_checkme_share.dart';
 import 'package:amiapp/services/tv_pi_vitals.dart';
+import 'package:amiapp/widgets/checkme_monitor_panel.dart';
 
 /// ラズパイ版の通話中バイタル共有（46amip4 spo2share / checkmeshare / ringctl）。
 class TvPiTalkVitalSync extends ChangeNotifier {
@@ -19,6 +20,7 @@ class TvPiTalkVitalSync extends ChangeNotifier {
   TvPiVitalValues vitals = TvPiVitalValues();
   String displayName = '';
   bool remoteRingOn = false;
+  bool remoteCheckmeOn = false;
   int? remoteSpo2;
   int? remotePr;
   DateTime? lastSpo2ShareAt;
@@ -42,7 +44,17 @@ class TvPiTalkVitalSync extends ChangeNotifier {
 
   bool get checkmeButtonOn =>
       CheckmeProService.instance.userEnabled ||
+      remoteCheckmeOn ||
       CheckmeShareView.instance.active;
+
+  /// このボタンが「相手の機器」を操作するか。
+  ///
+  ///   患者            いつでも自分の機器（ホームでも通話中でも）
+  ///   ドクター ホーム  自分の機器（ホームのボタンは room_page が直接扱う）
+  ///   ドクター 通話中  相手の機器。自分の機器は動かさない
+  ///
+  /// 2026-09-06 追加。それまでは押すと自分と相手の両方が動いていた。
+  bool get controlsRemote => _running && AppManager.isDoctorMode;
 
   bool get spo2PopupVisible {
     if (receivingSpo2Share) return true;
@@ -53,6 +65,55 @@ class TvPiTalkVitalSync extends ChangeNotifier {
   String get spo2Text {
     if (receivingSpo2Share) return remoteSpo2?.toString() ?? '-';
     return CheckmeRingService.instance.spo2?.toString() ?? '-';
+  }
+
+  /// 通話中のバイタル表に出す HR。
+  ///
+  ///   ドクター  相手（患者）から届いた Checkme の値
+  ///   患者      自分の Checkme の値
+  /// どちらも無ければサーバーから取った値をそのまま使う。
+  String hrText(String fetched) {
+    final share = CheckmeShareView.instance;
+    if (share.recent && share.hr != null) return '${share.hr}';
+    final live = CheckmeProService.instance.hr;
+    if (live != null) return '$live';
+    return fetched;
+  }
+
+  /// 通話中のバイタル表に出す PI。優先順位は [hrText] と同じ。
+  String piText(String fetched) {
+    final share = CheckmeShareView.instance;
+    if (share.recent && share.pi != null) {
+      return share.pi!.toStringAsFixed(1);
+    }
+    final proPi = CheckmeProService.instance.pi;
+    if (proPi != null) return proPi.toStringAsFixed(1);
+    final ringPi = CheckmeRingService.instance.pi;
+    if (ringPi != null) return '$ringPi';
+    return fetched;
+  }
+
+  /// 通話中のバイタル表に出す SpO2。
+  /// Ring の共有（spo2share）→ Checkme の共有 → 自分の機器 → 取得値の順。
+  String spo2TextOr(String fetched) {
+    if (receivingSpo2Share) return remoteSpo2?.toString() ?? fetched;
+    final share = CheckmeShareView.instance;
+    if (share.recent && share.spo2 != null) return '${share.spo2}';
+    final mine = CheckmeRingService.instance.spo2 ??
+        CheckmeProService.instance.spo2;
+    if (mine != null) return '$mine';
+    return fetched;
+  }
+
+  /// 通話中のバイタル表に出す PR。優先順位は [spo2TextOr] と同じ。
+  String prTextOr(String fetched) {
+    if (receivingSpo2Share) return remotePr?.toString() ?? fetched;
+    final share = CheckmeShareView.instance;
+    if (share.recent && share.pr != null) return '${share.pr}';
+    final mine = CheckmeRingService.instance.pulse ??
+        CheckmeProService.instance.pr;
+    if (mine != null) return '$mine';
+    return fetched;
   }
 
   String get prText {
@@ -92,6 +153,7 @@ class TvPiTalkVitalSync extends ChangeNotifier {
     CheckmeShareView.instance.removeListener(_onLocal);
     CheckmeShareView.instance.clear();
     remoteRingOn = false;
+    remoteCheckmeOn = false;
     remoteSpo2 = null;
     remotePr = null;
     lastSpo2ShareAt = null;
@@ -182,9 +244,17 @@ class TvPiTalkVitalSync extends ChangeNotifier {
     return data.sublist(data.length - keep);
   }
 
-  /// 5秒分（125Hz）を送り、表示と同じ30%間引き。長すぎると相手側で心拍が詰まる。
+  /// 患者側の表示と**同じ長さ**を送り、表示と同じ30%間引きをかける。
+  ///
+  /// ドクター側は受け取った波形を横幅いっぱいに配るため、
+  /// **送る長さがそのまま相手の時間軸になる。**
+  /// 5秒ぶん(625)にすると患者は約7.14秒、ドクターは5秒となり、
+  /// 同じ波形なのに横の伸びが食い違う。長さを揃えれば一致する。
+  ///
+  /// 長さの定義は [kCheckmeShareSamples]（checkme_monitor_panel.dart）。
+  /// 患者側の表示を変えるときは、そちらと一緒に直すこと。
   List<dynamic> _shareWave(List<int> data) {
-    final keep = _tail(data, 625);
+    final keep = _tail(data, kCheckmeShareSamples);
     final out = <int>[];
     for (var i = 0; i < keep.length; i++) {
       if (i % 10 < 7) out.add(keep[i]);
@@ -194,39 +264,71 @@ class TvPiTalkVitalSync extends ChangeNotifier {
 
   Future<void> onRingPressed() async {
     if (_applyingRemote) return;
-    final wantStop = ringButtonOn || CheckmeRingService.instance.popupVisible;
+
+    // ドクターが通話中に押したときは、相手の Ring だけを動かす。
+    // 自分の Ring には触らない。
+    if (controlsRemote) {
+      final wantStop = ringButtonOn;
+      _emit({'id2': 'ringctl', 'action': wantStop ? 'stop' : 'start'});
+      remoteRingOn = !wantStop;
+      if (wantStop) {
+        lastSpo2ShareAt = null;
+        remoteSpo2 = null;
+        remotePr = null;
+      }
+      notifyListeners();
+      return;
+    }
+
+    // 自分の Ring だけを動かす。相手へは指示を送らない。
+    // 測定値は _sendShares が spo2share で流すので、相手には見えている。
+    final ring = CheckmeRingService.instance;
+    final wantStop = ring.userEnabled || ring.popupVisible;
     if (wantStop) {
-      if (CheckmeRingService.instance.userEnabled) {
+      if (ring.userEnabled) {
         await BleExclusive.toggleRing();
       }
       remoteRingOn = false;
       lastSpo2ShareAt = null;
       remoteSpo2 = null;
       remotePr = null;
-      _emit({'id2': 'ringctl', 'action': 'stop'});
+      _emit({'id2': 'ringstate', 'on': '0'});
     } else {
       await BleExclusive.toggleRing();
-      _emit({'id2': 'ringctl', 'action': 'start'});
+      _emit({'id2': 'ringstate', 'on': '1'});
     }
     notifyListeners();
   }
 
   Future<void> onCheckmePressed() async {
     if (_applyingRemote) return;
-    final wantStop = checkmeButtonOn;
-    if (wantStop) {
-      if (CheckmeProService.instance.userEnabled) {
-        await BleExclusive.togglePro();
+
+    // ドクターが通話中に押したときは、相手の Checkme だけを動かす。
+    if (controlsRemote) {
+      final wantStop = checkmeButtonOn;
+      _emit({'id2': 'checkmectl', 'action': wantStop ? 'stop' : 'start'});
+      if (wantStop) {
+        CheckmeShareView.instance.clear();
       }
-      CheckmeShareView.instance.clear();
-      _emit({'id2': 'checkmectl', 'action': 'stop'});
+      remoteCheckmeOn = !wantStop;
+      notifyListeners();
+      return;
+    }
+
+    // 自分の Checkme だけを動かす。波形は _sendShares が流す。
+    final pro = CheckmeProService.instance;
+    final wantStop = pro.userEnabled;
+    CheckmeShareView.instance.clear();
+    await BleExclusive.togglePro();
+    if (wantStop) {
+      // 自分が止めたことを相手の表示にも伝える。
       _emit({'id2': 'checkmeshare', 'closed': '1'});
+      _emit({'id2': 'checkmestate', 'on': '0'});
     } else {
-      CheckmeShareView.instance.clear();
-      await BleExclusive.togglePro();
-      _emit({'id2': 'checkmectl', 'action': 'start'});
+      _emit({'id2': 'checkmestate', 'on': '1'});
       _kickShares();
     }
+    remoteCheckmeOn = false;
     notifyListeners();
   }
 
@@ -263,6 +365,29 @@ class TvPiTalkVitalSync extends ChangeNotifier {
     if (id2 == 'checkmeclose') {
       await _applyCheckme(false, relay: false);
       return;
+    }
+    // 相手が自分で入切した知らせ。機器は動かさず、ボタンの表示だけ合わせる。
+    // これが無いと、相手が自分で止めてもドクターのボタンが「停止」のまま残る。
+    if (id2 == 'ringstate') {
+      remoteRingOn = info['on']?.toString() == '1';
+      if (!remoteRingOn) {
+        lastSpo2ShareAt = null;
+        remoteSpo2 = null;
+        remotePr = null;
+      }
+      notifyListeners();
+      return;
+    }
+    if (id2 == 'checkmestate') {
+      remoteCheckmeOn = info['on']?.toString() == '1';
+      if (!remoteCheckmeOn) CheckmeShareView.instance.clear();
+      notifyListeners();
+      return;
+    }
+    // 操作の指示。ドクターが通話中に受け取ることは無い（患者は送らない）が、
+    // 古い版の相手から届いても自分の機器を動かさないようにしておく。
+    if (id2 == 'ringctl' || id2 == 'checkmectl') {
+      if (controlsRemote) return;
     }
     if (id2 == 'ringctl') {
       final action = info['action']?.toString();
@@ -315,6 +440,7 @@ class TvPiTalkVitalSync extends ChangeNotifier {
       }
       if (!on) {
         CheckmeShareView.instance.clear();
+        remoteCheckmeOn = false;
       }
     } finally {
       _applyingRemote = false;

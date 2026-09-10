@@ -23,6 +23,9 @@ import android.media.AudioPlaybackConfiguration
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.net.Uri
+import android.Manifest
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -1206,8 +1209,13 @@ class IncomingCallOverlayService : Service() {
 
         private fun scheduleHideAfterSleep(context: Context, lockOnly: Boolean) {
             val app = context.applicationContext
+            cancelSleepRetries = false
             for (delay in longArrayOf(300, 800, 1600, 2800, 4000)) {
                 wakeHandler.postDelayed({
+                    if (cancelSleepRetries) {
+                        Log.i(TAG, "sleep retry cancelled delay=$delay")
+                        return@postDelayed
+                    }
                     if (!isTvStandby(app) && isScreenOn(app)) {
                         Log.i(TAG, "sleep retry delay=$delay lockOnly=$lockOnly")
                         val locked = tryLockNow(app)
@@ -1422,8 +1430,22 @@ class IncomingCallOverlayService : Service() {
 
         private val wakeHandler = Handler(Looper.getMainLooper())
 
+        /// 「消し直す」予約を取り消すための旗。
+        ///
+        /// 電源オフへ戻したあと4秒間、点いていたら消す処理を5回予約する
+        /// （scheduleHideAfterSleep）。確実に消すための仕掛けだが、その
+        /// 4秒の間に呼び出しボタンで起こすと、この予約に消されてしまう。
+        /// 2026-09-06 の実機で、呼出終了の0.45秒後に押すと画面が点いた
+        /// 1.8秒後に消え、カメラが起動しなかった。
+        /// 意図して起こしたときは、残りの予約を捨てる。
+        @Volatile
+        private var cancelSleepRetries = false
+
         /** 画面オフ／待機からパネルを起こす。メーカー不問。点灯したら再試行しない（視聴中のTCL等を邪魔しない）。 */
         fun wakeDisplay(context: Context, forcePowerOn: Boolean = false) {
+            // 意図して起こす。残っている「消し直す」予約は捨てる。
+            // 捨てないと、起こした直後にその予約が画面を消してしまう。
+            cancelSleepRetries = true
             // 先に起こすと判定が消える。TCL は isInteractive のままスクリーンレス。
             rememberScreenOffAtIncoming(context)
             val app = context.applicationContext
@@ -1795,10 +1817,79 @@ class IncomingCallOverlayService : Service() {
         }
     }
 
+    /**
+     * 前面サービスの種別。
+     *
+     * テレビで位置情報の許可が付いているときだけ「位置情報」を含める。
+     * テレビの電源が切れている間（アプリは背面）に BLE スキャンを掛け直すと、
+     * Android は開始時に位置情報の許可を「アプリの使用中のみ」と判定し、
+     * そのスキャンの結果を全部捨てる。
+     *   BluetoothUtils: Permission denial: Need ACCESS_FINE_LOCATION permission
+     *                   to get scan results
+     * 2026-09-08 TV005 で、掛け直しのたびに受信が 0 件になった原因がこれだった。
+     *
+     * location タイプの前面サービスを持つプロセスには、背面でも位置情報の
+     * 能力が付く（OomAdjuster: PROCESS_CAPABILITY_FOREGROUND_LOCATION →
+     * AppOpsService.evalMode が MODE_ALLOWED を返す）。待機サービスは常時
+     * 前面化しているので、ここに型を足すだけで掛け直しが背面でも通る。
+     * appops を手で allow にしても権限管理側に戻されるため使えない。
+     *
+     * ACCESS_FINE_LOCATION は maxSdkVersion=30 のため、新しいテレビ
+     * （Google TV Streamer など）では権限が無い。targetSdk 36 で location
+     * 型を付けると SecurityException でプロセスが落ち、着信と同時に
+     * スプラッシュへ戻って起動しない。許可が無いときは specialUse だけにする。
+     * スマホでは位置情報型を付けない。
+     * テレビ判定は AmiIncomingFcmReceiver.isTelevision と同じ。
+     */
+    private fun hasLocationPermission(): Boolean {
+        val fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        val coarse = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        return fine || coarse
+    }
+
+    private fun foregroundTypes(): Int {
+        var t = 0
+        if (Build.VERSION.SDK_INT >= 34) {
+            t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        }
+        if (AmiIncomingFcmReceiver.isTelevision(this) && hasLocationPermission()) {
+            t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        }
+        return t
+    }
+
+    /** 型付きで前面化する。型が決まらない環境ではマニフェストの宣言に従う。 */
+    private fun startForegroundTyped(id: Int, notification: Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val t = foregroundTypes()
+            if (t != 0) {
+                try {
+                    startForeground(id, notification, t)
+                    return
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "startForeground typed failed, retry without location: ${e.message}")
+                    val fallback = if (Build.VERSION.SDK_INT >= 34) {
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                    } else {
+                        0
+                    }
+                    if (fallback != 0 && fallback != t) {
+                        startForeground(id, notification, fallback)
+                        return
+                    }
+                    throw e
+                }
+            }
+        }
+        startForeground(id, notification)
+    }
+
     /** startForegroundService のあとは必ず startForeground する。省略すると即落ちる。 */
     private fun ensureForeground(reason: String) {
         try {
-            startForeground(NOTIF_ID, buildWaitingNotification())
+            startForegroundTyped(NOTIF_ID, buildWaitingNotification())
             foregroundStarted = true
             Log.i(TAG, "startForeground ok ($reason)")
         } catch (e: Exception) {
@@ -2217,10 +2308,14 @@ class IncomingCallOverlayService : Service() {
         val fromPowerOff = wasScreenOffAtCall(this)
         // 電源オフ発／画面オフ／オーバーレイ不可は着信用 Activity（はい／いいえ）。
         val needActivity = fromPowerOff || !screenOn || !overlayOk
-        startForeground(
-            INCOMING_NOTIF_ID,
-            buildIncomingNotification(callerId, label, useFullScreen = needActivity)
-        )
+        try {
+            startForegroundTyped(
+                INCOMING_NOTIF_ID,
+                buildIncomingNotification(callerId, label, useFullScreen = needActivity)
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "incoming startForeground failed; continue UI", e)
+        }
         if (needActivity) {
             launchIncomingActivity(callerId, label)
         }
@@ -2361,10 +2456,14 @@ class IncomingCallOverlayService : Service() {
             Log.i(TAG, "overlay shown callerId=$callerId name=$callerName")
         } catch (e: Exception) {
             Log.e(TAG, "failed to add overlay; IncomingCallActivity", e)
-            startForeground(
-                INCOMING_NOTIF_ID,
-                buildIncomingNotification(callerId, callerName, useFullScreen = true)
-            )
+            try {
+                startForegroundTyped(
+                    INCOMING_NOTIF_ID,
+                    buildIncomingNotification(callerId, callerName, useFullScreen = true)
+                )
+            } catch (fg: Exception) {
+                Log.e(TAG, "incoming fallback startForeground failed; continue UI", fg)
+            }
             launchIncomingActivity(callerId, callerName)
         }
     }

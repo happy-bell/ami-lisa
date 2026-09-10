@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:amiapp/services/ble_bus.dart';
+import 'package:amiapp/services/ble_scanner.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/ble/checkme_pro_protocol.dart';
 import 'package:amiapp/helpers/tv_util.dart';
@@ -136,6 +138,8 @@ class CheckmeProService extends ChangeNotifier {
       try {
         await FlutterBluePlus.stopScan();
       } catch (_) {}
+      // 共有スキャンを巻き添えにしているので、すぐ戻す。
+      await BleScanner.instance.reopen();
       await _disconnect('ボタンで停止', closePopup: true);
       _setStatus('停止中');
     }
@@ -202,6 +206,7 @@ class CheckmeProService extends ChangeNotifier {
         }
 
         _setStatus('Checkme Pro 待機中');
+        // 探すのは共有スキャンから。見つからない時だけ自前でスキャンする。
         final target = await _scanForPro();
         if (!userEnabled || _paused) continue;
         if (target == null) {
@@ -209,7 +214,13 @@ class CheckmeProService extends ChangeNotifier {
               const Duration(seconds: _idleRecheckSeconds));
           continue;
         }
-        await _monitor(target);
+        // 測定の間は BLE を占有する。この間ボタンは聞こえない。
+        await BleBus.instance.take('CheckmePro');
+        try {
+          await _monitor(target);
+        } finally {
+          await BleBus.instance.give('CheckmePro');
+        }
       } catch (e) {
         _log('loop error: $e');
         await _disconnect('エラー');
@@ -220,17 +231,73 @@ class CheckmeProService extends ChangeNotifier {
     if (_started) _runLoop();
   }
 
+  bool _isPro(ScanResult r) {
+    if (!BleScanner.isFresh(r)) return false;
+    final name = r.advertisementData.advName.isNotEmpty
+        ? r.advertisementData.advName
+        : r.device.platformName;
+    if (!CheckmeProProtocol.isProName(name)) return false;
+    return r.rssi >= _minRssi;
+  }
+
+  /// Checkme Pro を探す。共有スキャンから拾えればそれを使い、
+  /// 拾えない時だけ自前でスキャンする（保険）。
+  ///
+  /// Checkme Pro は名前でしか見分けていない。共有スキャンは
+  /// サービスUUIDで絞っているため、届くかどうかは実機で確かめる。
+  /// どちらで見つかったかを記録に残す。
   Future<ScanResult?> _scanForPro() async {
+    if (BleScanner.instance.isRunning) {
+      final shared = await _scanForProShared();
+      if (shared != null) {
+        _log('found via shared scan');
+        return shared;
+      }
+    }
+    await BleBus.instance.take('CheckmePro探索');
+    try {
+      return await _scanForProOwn();
+    } finally {
+      await BleBus.instance.give('CheckmePro探索');
+    }
+  }
+
+  /// 1本にまとめたスキャンから拾う。自分ではスキャンを起こさない。
+  Future<ScanResult?> _scanForProShared() async {
+    ScanResult? best;
+    void collect(List<ScanResult> results) {
+      for (final r in results) {
+        if (!_isPro(r)) continue;
+        if (best == null || r.rssi > best!.rssi) best = r;
+      }
+    }
+
+    collect(BleScanner.instance.latest);
+    if (best != null) return best;
+
+    final sub = BleScanner.instance.results.listen(collect);
+    try {
+      final deadline =
+          DateTime.now().add(const Duration(seconds: _scanSeconds));
+      while (DateTime.now().isBefore(deadline)) {
+        if (best != null) break;
+        if (_paused || !_started || !userEnabled) break;
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+    } finally {
+      await sub.cancel();
+    }
+    return best;
+  }
+
+  /// 自前でスキャンする（保険）。
+  Future<ScanResult?> _scanForProOwn() async {
     ScanResult? best;
     StreamSubscription<List<ScanResult>>? sub;
     try {
       sub = FlutterBluePlus.scanResults.listen((results) {
         for (final r in results) {
-          final name = r.advertisementData.advName.isNotEmpty
-              ? r.advertisementData.advName
-              : r.device.platformName;
-          if (!CheckmeProProtocol.isProName(name)) continue;
-          if (r.rssi < _minRssi) continue;
+          if (!_isPro(r)) continue;
           if (best == null || r.rssi > best!.rssi) best = r;
         }
       });

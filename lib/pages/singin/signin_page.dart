@@ -714,7 +714,15 @@ class _SignInPageState extends State<SignInPage> {
 
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 238, 239, 243),
-      resizeToAvoidBottomInset: !isTv,
+      // ソフトキーボードで画面を縮めない。
+      //
+      // 縮めると、下の SingleChildScrollView が足している
+      // viewInsets.bottom の余白と二重になり、二度押し上げられる。
+      // そのうえ上下の余白（verticalPadding=150）は縮まないので、
+      // 使える高さが潰れて入力フォームが隠れてしまう。
+      // スマホ・タブレット（isTv=false）でだけ起きていた。
+      // ami_tv 側と同じ false に戻す。（2026-09-05）
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [

@@ -8,6 +8,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:amiapp/services/ble_scanner.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/ble/and_vital_codec.dart';
 import 'package:amiapp/helpers/tv_util.dart';
@@ -50,6 +51,15 @@ class AndVitalService extends ChangeNotifier {
   int _bleHold = 0;
   BluetoothDevice? _device;
   StreamSubscription<List<int>>? _indicateSub;
+
+  /// 読み終えた（または接続に失敗した）機器と、離れた時刻。
+  ///
+  /// これより古い電波を頼りに繋ぎにいかない。
+  /// 一覧には、もう電波を出していない機器がしばらく残る。それを見て
+  /// 繋ぎにいくと接続が20秒ぶら下がり、その間BLEの探索が84%止まって
+  /// 呼び出しボタンの押下が届かなくなる。2026-09-05 に実測した
+  /// （偶然こうなる確率は15万分の1）。
+  final Map<String, DateTime> _leftAt = {};
 
   AndBpReading? _lastBp;
   double? _lastTemp;
@@ -269,19 +279,73 @@ class AndVitalService extends ChangeNotifier {
     }
   }
 
+  /// 対象の機器を探す。
+  ///
+  /// [BleScanner] が動いている時は、そこへ相乗りして自前ではスキャン
+  /// しない。血圧計はペアリングされている限り 12秒スキャン → 3秒休む を
+  /// 永久に繰り返すので、自前でスキャンすると呼び出しボタンの聞き取りを
+  /// 15秒のうち12秒も止めてしまう（2026-09-05 実測）。
+  ///
+  /// [BleScanner] が動いていないテレビ（呼び出しボタンが未登録）では、
+  /// 従来どおり自前でスキャンする。動きは今までと変わらない。
   Future<List<BluetoothDevice>> _scanTargets(Duration timeout) async {
+    if (BleScanner.instance.isRunning) {
+      return _scanTargetsShared(timeout);
+    }
+    return _scanTargetsOwn(timeout);
+  }
+
+  bool _isTarget(ScanResult r) {
+    // 止めないスキャンなので、去った機器も一覧に残る。
+    // 古い電波を頼りに繋ぎにいかないよう、新しさを確かめる。
+    if (!BleScanner.isFresh(r)) return false;
+    // 前に離れた相手は、そのあと新しい電波を出すまで相手にしない。
+    // 出していないなら、繋ぎにいっても空回りするだけ。
+    final left = _leftAt[r.device.remoteId.str];
+    if (left != null && !r.timeStamp.isAfter(left)) return false;
+    final name = _advName(r);
+    final uuids = r.advertisementData.serviceUuids.map((g) => g.str);
+    final hitName = AndVitalCodec.nameMatches(name);
+    final hitUuid = uuids.any((u) => AndVitalCodec.kindForService(u) != null);
+    return hitName || hitUuid;
+  }
+
+  /// 1本にまとめたスキャンから拾う。自分ではスキャンを起こさない。
+  Future<List<BluetoothDevice>> _scanTargetsShared(Duration timeout) async {
+    final found = <String, BluetoothDevice>{};
+    void collect(List<ScanResult> results) {
+      for (final r in results) {
+        if (_isTarget(r)) found[r.device.remoteId.str] = r.device;
+      }
+    }
+
+    // すでに届いているものを先に見る。去った機器は BleScanner が
+    // 一覧から外しているので、古い相手に繋ぎにいくことはない。
+    collect(BleScanner.instance.latest);
+    if (found.isNotEmpty) return found.values.toList();
+
+    final sub = BleScanner.instance.results.listen(collect);
+    try {
+      final deadline = DateTime.now().add(timeout);
+      while (DateTime.now().isBefore(deadline)) {
+        if (found.isNotEmpty) break;
+        if (_paused || !_started) break;
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+    } finally {
+      await sub.cancel();
+    }
+    return found.values.toList();
+  }
+
+  /// 自前でスキャンする（呼び出しボタンが未登録のテレビ向け）。
+  Future<List<BluetoothDevice>> _scanTargetsOwn(Duration timeout) async {
     final found = <String, BluetoothDevice>{};
     StreamSubscription<List<ScanResult>>? sub;
     try {
       sub = FlutterBluePlus.scanResults.listen((results) {
         for (final r in results) {
-          final name = _advName(r);
-          final uuids = r.advertisementData.serviceUuids.map((g) => g.str);
-          final hitName = AndVitalCodec.nameMatches(name);
-          final hitUuid = uuids.any((u) => AndVitalCodec.kindForService(u) != null);
-          if (hitName || hitUuid) {
-            found[r.device.remoteId.str] = r.device;
-          }
+          if (_isTarget(r)) found[r.device.remoteId.str] = r.device;
         }
       });
       await FlutterBluePlus.startScan(
@@ -322,6 +386,9 @@ class AndVitalService extends ChangeNotifier {
     try {
       await FlutterBluePlus.stopScan();
     } catch (_) {}
+    // 上の stopScan は相手を選べないので、共有スキャンも巻き添えに
+    // なる。血圧計の接続と共有スキャンはぶつからないため、すぐ戻す。
+    await BleScanner.instance.reopen();
   }
 
   Future<void> _releaseOthers() async {
@@ -556,6 +623,9 @@ class AndVitalService extends ChangeNotifier {
     final d = _device;
     _device = null;
     if (d != null) {
+      // 離れた時刻を覚えておく。読み終えた時も、繋がらなかった時も。
+      // 次に新しい電波を出すまで、この相手には繋ぎにいかない。
+      _leftAt[d.remoteId.str] = DateTime.now();
       try {
         await d.disconnect();
       } catch (_) {}

@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:amiapp/services/ble_bus.dart';
+import 'package:amiapp/services/ble_scanner.dart';
 import 'package:amiapp/appdefine.dart';
 import 'package:amiapp/ble/checkme_ring_protocol.dart';
 import 'package:amiapp/helpers/tv_util.dart';
@@ -136,6 +138,8 @@ class CheckmeRingService extends ChangeNotifier {
       try {
         await FlutterBluePlus.stopScan();
       } catch (_) {}
+      // 共有スキャンを巻き添えにしているので、すぐ戻す。
+      await BleScanner.instance.reopen();
       await _disconnect('ボタンで停止', closePopup: closePopup);
       _setStatus('停止中');
     }
@@ -213,6 +217,8 @@ class CheckmeRingService extends ChangeNotifier {
         }
 
         _setStatus('Ring待機中');
+        // 探すのは共有スキャン（BleScanner）から。見つからない時だけ
+        // 自前でスキャンし、その間だけ順番をもらう。
         final target = await _scanForRing();
         if (_needsButton && !userEnabled) continue;
         if (_paused) continue;
@@ -222,12 +228,19 @@ class CheckmeRingService extends ChangeNotifier {
           continue;
         }
 
-        await _monitor(target);
-        if (_needsButton &&
-            userEnabled &&
-            session > _sessionAtEnable) {
-          _log('測定終了 → 自動解除');
-          await setEnabled(false, closePopup: false);
+        // 測定の間は BLE を占有する。繋いだまま強いスキャンを回すと
+        // 測定が乱れるおそれがあるため。この間ボタンは聞こえない。
+        await BleBus.instance.take('Ring');
+        try {
+          await _monitor(target);
+          if (_needsButton &&
+              userEnabled &&
+              session > _sessionAtEnable) {
+            _log('測定終了 → 自動解除');
+            await setEnabled(false, closePopup: false);
+          }
+        } finally {
+          await BleBus.instance.give('Ring');
         }
       } catch (e) {
         _log('loop error: $e');
@@ -238,25 +251,81 @@ class CheckmeRingService extends ChangeNotifier {
     _loopRunning = false;
   }
 
-  /// Ringをスキャンし、最も電波の強い1台を返す（見つからなければnull）。
+  bool _isRing(ScanResult r) {
+    if (!BleScanner.isFresh(r)) return false;
+    final name = r.advertisementData.advName.isNotEmpty
+        ? r.advertisementData.advName
+        : r.device.platformName;
+    final uuids =
+        r.advertisementData.serviceUuids.map((u) => u.str.toLowerCase());
+    final isRing = CheckmeRingProtocol.isRingName(name) ||
+        uuids.any(CheckmeRingProtocol.isRingServiceUuid);
+    if (!isRing || r.rssi < _minRssi) return false;
+    final lower = name.toLowerCase();
+    if (lower.contains('checkadv') || lower.contains('checkme pro')) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Ringを探す。共有スキャンから拾えればそれを使い、
+  /// 拾えない時だけ自前でスキャンする（保険）。
+  ///
+  /// 自前でスキャンすると呼び出しボタンの聞き取りが止まるので、
+  /// 共有で足りるならそちらを使う。どちらで見つかったかは記録する。
   Future<ScanResult?> _scanForRing() async {
+    if (BleScanner.instance.isRunning) {
+      final shared = await _scanForRingShared();
+      if (shared != null) {
+        _log('found via shared scan');
+        return shared;
+      }
+    }
+    await BleBus.instance.take('Ring探索');
+    try {
+      return await _scanForRingOwn();
+    } finally {
+      await BleBus.instance.give('Ring探索');
+    }
+  }
+
+  /// 1本にまとめたスキャンから拾う。自分ではスキャンを起こさない。
+  Future<ScanResult?> _scanForRingShared() async {
+    ScanResult? best;
+    void collect(List<ScanResult> results) {
+      for (final r in results) {
+        if (!_isRing(r)) continue;
+        if (best == null || r.rssi > best!.rssi) best = r;
+      }
+    }
+
+    collect(BleScanner.instance.latest);
+    if (best != null) return best;
+
+    final sub = BleScanner.instance.results.listen(collect);
+    try {
+      final deadline =
+          DateTime.now().add(const Duration(seconds: _scanSeconds));
+      while (DateTime.now().isBefore(deadline)) {
+        if (best != null) break;
+        if (_paused || !_started) break;
+        if (_needsButton && !userEnabled) break;
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+    } finally {
+      await sub.cancel();
+    }
+    return best;
+  }
+
+  /// 自前でスキャンする（保険）。
+  Future<ScanResult?> _scanForRingOwn() async {
     ScanResult? best;
     StreamSubscription<List<ScanResult>>? sub;
     try {
       sub = FlutterBluePlus.scanResults.listen((results) {
         for (final r in results) {
-          final name = r.advertisementData.advName.isNotEmpty
-              ? r.advertisementData.advName
-              : r.device.platformName;
-          final uuids = r.advertisementData.serviceUuids
-              .map((u) => u.str.toLowerCase());
-          final isRing = CheckmeRingProtocol.isRingName(name) ||
-              uuids.any(CheckmeRingProtocol.isRingServiceUuid);
-          if (!isRing || r.rssi < _minRssi) continue;
-          if (name.toLowerCase().contains('checkadv') ||
-              name.toLowerCase().contains('checkme pro')) {
-            continue;
-          }
+          if (!_isRing(r)) continue;
           if (best == null || r.rssi > best!.rssi) best = r;
         }
       });
